@@ -6,15 +6,9 @@ Este proyecto utiliza el siguiente conjunto de tecnologías:
 
 - **React 18** – Biblioteca principal para construir la interfaz de usuario con componentes reutilizables
 - **Redux Toolkit** – Gestión de estado global de la aplicación con patrones modernos
-<<<<<<< HEAD
-- **Material-UI (MUI) ** – Biblioteca de componentes de diseño siguiendo Material Design
-- **Vite** – Herramienta de construcción y desarrollo ultrarrápida
-- **React Router ** – Enrutamiento declarativo para aplicaciones de una sola página
-=======
 - **Material-UI (MUI)** – Biblioteca de componentes de diseño siguiendo Material Design
 - **Vite** – Herramienta de construcción y desarrollo ultrarrápida
 - **React Router** – Enrutamiento declarativo para aplicaciones de una sola página
->>>>>>> 08c0582 (Template commit)
 - **JavaScript ES6+** – Lenguaje principal con características modernas
 
 
