@@ -6,9 +6,15 @@ Este proyecto utiliza el siguiente conjunto de tecnologías:
 
 - **React 18** – Biblioteca principal para construir la interfaz de usuario con componentes reutilizables
 - **Redux Toolkit** – Gestión de estado global de la aplicación con patrones modernos
+<<<<<<< HEAD
 - **Material-UI (MUI) ** – Biblioteca de componentes de diseño siguiendo Material Design
 - **Vite** – Herramienta de construcción y desarrollo ultrarrápida
 - **React Router ** – Enrutamiento declarativo para aplicaciones de una sola página
+=======
+- **Material-UI (MUI)** – Biblioteca de componentes de diseño siguiendo Material Design
+- **Vite** – Herramienta de construcción y desarrollo ultrarrápida
+- **React Router** – Enrutamiento declarativo para aplicaciones de una sola página
+>>>>>>> 08c0582 (Template commit)
 - **JavaScript ES6+** – Lenguaje principal con características modernas
 
 
@@ -31,7 +37,11 @@ src/
 
 **Components**: Contiene componentes de UI reutilizables como cards, modals, barras de búsqueda. 
 
+<<<<<<< HEAD
 **Pages**: Implementa las páginas principales del sistema (Reportes, Clientes, Remitos, etc.), coordinando componentes y conectando con el estado global.
+=======
+**Pages**: Implementa las páginas principales del sistema, coordinando componentes y conectando con el estado global.
+>>>>>>> 08c0582 (Template commit)
 
 **Redux**: Gestiona el estado de la aplicación utilizando Redux Toolkit, incluyendo slices por dominio.
 
@@ -113,8 +123,12 @@ npm run dev
 
 
 ### Páginas Principales
+<<<<<<< HEAD
 - **Reports**: Gestión y generación de reportes
 - **Clients**: Administración de clientes
 - **Remitos**: Gestión de remitos y documentación
 - **Destinos**: Gestion de destinos
 - **Varios**: Control de mercadería y estados
+=======
+- **name**: desc
+>>>>>>> 08c0582 (Template commit)
