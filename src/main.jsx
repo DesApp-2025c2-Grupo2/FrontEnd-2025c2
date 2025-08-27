@@ -9,19 +9,14 @@ import { createTheme, ThemeProvider } from "@mui/material";
 const theme = createTheme({
   palette: {
     primary: {
-      main: "#028090",
+      main: "#f8f9fa",
     },
     secondary: {
-      main: "#f4fff8",
+      main: "#2563eb",
     },
-  },
-  components: {
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          color: "#f4fff8",
-        },
-      },
+    text: {
+      primary: "#2563eb",
+      secondary: "#727273",
     },
   },
 });
