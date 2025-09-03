@@ -7,6 +7,7 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
+  ListItemButton,
   Typography,
 } from "@mui/material";
 import HomeIcon from "@mui/icons-material/Home";
@@ -72,30 +73,26 @@ export default function NavBar({ mobileOpen, handleDrawerToggle }) {
             </Box>
           </ListItemIcon>
           <ListItemText primary="AesMed" secondary="Medicina Integral" />
-        </ListItem>
-        {/* Botón de cierre solo visible en móviles */}
-        <ListItem
-          sx={{
-            display: { xs: "flex", md: "none" },
-            justifyContent: "flex-end",
-          }}
-        >
+          {/* Botón de cierre solo visible en móviles */}
           <IconButton
             edge="end"
             color="inherit"
             onClick={handleDrawerToggle}
             aria-label="Cerrar menú"
+            sx={{
+              display: { xs: "flex", md: "none" },
+              justifyContent: "flex-end",
+              px: 2,
+            }}
           >
             <CloseIcon />
           </IconButton>
         </ListItem>
-
         <Divider />
 
         {/* Menú */}
         {menuItems.map((item) => (
-          <ListItem
-            button
+          <ListItemButton
             key={item.text}
             component={Link}
             to={item.path}
@@ -114,7 +111,7 @@ export default function NavBar({ mobileOpen, handleDrawerToggle }) {
               {item.icon}
             </ListItemIcon>
             <ListItemText primary={item.text} />
-          </ListItem>
+          </ListItemButton>
         ))}
       </List>
     </Box>
