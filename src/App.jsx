@@ -22,7 +22,7 @@ const router = createBrowserRouter([
       { path: "prestadores", element: <Prestadores /> },
       { path: "especialidades", element: <Especialidades /> },
       { path: "turnos", element: <Turnos /> },
-      { path: "consultas&reportes", element: <ConsultasReportes /> },
+      { path: "consultas-reportes", element: <ConsultasReportes /> },
       { path: "situaciones", element: <SituacionesTerapeuticas /> },
       { path: "planes", element: <Planes /> },
     ],

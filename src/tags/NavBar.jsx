@@ -38,8 +38,8 @@ const menuItems = [
   },
   { text: "Turnos", path: "/turnos", icon: <AccessTimeIcon /> },
   {
-    text: "Consultas & Reportes",
-    path: "/consultas&reportes",
+    text: "Consultas y Reportes",
+    path: "/consultas-reportes",
     icon: <PollIcon />,
   },
   {
@@ -72,23 +72,22 @@ export default function NavBar({ mobileOpen, handleDrawerToggle }) {
             </Box>
           </ListItemIcon>
           <ListItemText primary="AesMed" secondary="Medicina Integral" />
-          {/* Botón de cierre solo visible en móviles */}
-          <ListItem
-            sx={{
-              display: { xs: "flex", md: "none" },
-              justifyContent: "flex-end",
-              px: 2,
-            }}
+        </ListItem>
+        {/* Botón de cierre solo visible en móviles */}
+        <ListItem
+          sx={{
+            display: { xs: "flex", md: "none" },
+            justifyContent: "flex-end",
+          }}
+        >
+          <IconButton
+            edge="end"
+            color="inherit"
+            onClick={handleDrawerToggle}
+            aria-label="Cerrar menú"
           >
-            <IconButton
-              edge="end"
-              color="inherit"
-              onClick={handleDrawerToggle}
-              aria-label="Cerrar menú"
-            >
-              <CloseIcon />
-            </IconButton>
-          </ListItem>
+            <CloseIcon />
+          </IconButton>
         </ListItem>
 
         <Divider />
