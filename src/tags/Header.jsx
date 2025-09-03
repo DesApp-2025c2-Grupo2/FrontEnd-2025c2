@@ -1,9 +1,29 @@
-function Header() {
+import { AppBar, Toolbar, IconButton, Typography } from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+
+export default function Header({ onMenuClick }) {
   return (
-    <div>
-      <a href="/">Inicio</a>
-    </div>
+    <AppBar
+      position="fixed"
+      sx={{
+        display: { xs: "flex", md: "none" },
+        bgcolor: "primary.main",
+        color: "text.primary",
+      }}
+    >
+      <Toolbar>
+        <IconButton
+          edge="start"
+          color="inherit"
+          aria-label="menu"
+          onClick={onMenuClick}
+        >
+          <MenuIcon />
+        </IconButton>
+        <Typography variant="h6" sx={{ ml: 2 }}>
+          AesMed
+        </Typography>
+      </Toolbar>
+    </AppBar>
   );
 }
-
-export default Header;
