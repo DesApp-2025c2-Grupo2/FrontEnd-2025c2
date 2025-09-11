@@ -1,34 +1,32 @@
-import './App.css';
-import { createBrowserRouter, RouterProvider, Outlet } from "react-router-dom";
-import Home from "./pages/Home.jsx";
-import Documents from "./pages/Documents.jsx";
-import Clients from "./pages/Clients.jsx";
-import Destinations from "./pages/Destinations.jsx";
-import Reports from "./pages/Reports.jsx";
-import Varios from "./pages/Varios.jsx";
-import Header from "./tags/Header.jsx";
-import Footer from "./tags/Footer.jsx";
-
-function Layout() {
-  return (
-    <div>
-      <Header />
-      <main>
-        <Outlet />
-      </main>
-      <Footer />
-    </div>
-  );
-}
+import "./App.css";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import Dashboard from "./pages/Dashboard.jsx";
+import Afiliados from "./pages/Afiliados.jsx";
+import Prestadores from "./pages/Prestadores.jsx";
+import Especialidades from "./pages/Especialidades.jsx";
+import Planes from "./pages/Planes.jsx";
+import Layout from "./layouts/Layout.jsx";
+import GruposFamiliares from "./pages/GruposFamiliares.jsx";
+import Turnos from "./pages/Turnos.jsx";
+import ConsultasReportes from "./pages/ConsultasReportes.jsx";
+import SituacionesTerapeuticas from "./pages/SituacionesTerapeuticas.jsx";
 
 const router = createBrowserRouter([
   {
-    path: '/',
-    element: <Layout />, 
+    path: "/",
+    element: <Layout />,
     children: [
-      { path: '', element: <Home /> },
-    ]
-  }
+      { path: "", element: <Dashboard /> },
+      { path: "grupos", element: <GruposFamiliares /> },
+      { path: "afiliados", element: <Afiliados /> },
+      { path: "prestadores", element: <Prestadores /> },
+      { path: "especialidades", element: <Especialidades /> },
+      { path: "turnos", element: <Turnos /> },
+      { path: "consultas-reportes", element: <ConsultasReportes /> },
+      { path: "situaciones", element: <SituacionesTerapeuticas /> },
+      { path: "planes", element: <Planes /> },
+    ],
+  },
 ]);
 
 function App() {
@@ -36,4 +34,3 @@ function App() {
 }
 
 export default App;
-
