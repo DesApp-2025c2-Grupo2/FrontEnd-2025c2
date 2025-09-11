@@ -55,7 +55,7 @@ const afiliados = [
 ]
 const titulares = [
     {nombre: "Juan", dni: "13456789", grupoFamiliar: "0000000001", parentesco: 1},
-    {nombre: "Julia", dni: "33908000", grupoFamiliar: "0000000003", paretesco: 1},
+    {nombre: "Julia", dni: "33908000", grupoFamiliar: "0000000003", parentesco: 1},
     {nombre: "María", dni: "40563111", grupoFamiliar: "0000000002", parentesco: 1}
 ]
 
@@ -123,8 +123,8 @@ const handleCambiarPlan = (grupo) => {
       />
     <Box>
       {familiasFiltradas.map(familia => {
-        var titularFamilia = titularDeGrupoFamiliar(titulares, familia)
-        var cantAfiliados = afiliadosPorGrupoFamiliar(afiliados, familia).length
+        const titularFamilia = titularDeGrupoFamiliar(titulares, familia)
+        const cantAfiliados = afiliadosPorGrupoFamiliar(afiliados, familia).length
         return <TarjetaFamiliar 
         familia={familia}
         key={familia.id}
