@@ -27,10 +27,15 @@ export const toggleEspecialidadStatus = createAsyncThunk(
 
 export const addEspecialidad = createAsyncThunk(
   'especialidades/add',
-  async ({ nombre, descripcion }, { rejectWithValue }) => {
+  async ({ nombre, descripcion }, { rejectWithValue, getState }) => {
     try {
       await new Promise(r => setTimeout(r, 400));
-      return { id: Date.now(), nombre, descripcion, activa: true };
+    
+      const state = getState();
+      const maxId = Math.max(...state.especialidades.especialidades.map(e => e.id), 0);
+      const newId = maxId + 1;
+      
+      return { id: newId, nombre, descripcion, activa: true };
     } catch (e) {
       return rejectWithValue('Error al agregar');
     }
