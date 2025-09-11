@@ -20,7 +20,7 @@ export default function TarjetaAfiliadoMuestra({afiliado, grupo}){
                 <PersonIcon sx={{ fontSize: 40 }} color="secondary"/>
                 <Box sx={{display: "flex", flexDirection: "column", gap: 1.5}}>  
                     <Typography variant="h5" color="black">{afiliado.apellido}, {afiliado.nombre}</Typography>
-                    <Typography variant="p" color="textSecondary">
+                    <Typography variant="body1" color="textSecondary">
                         <Box component="span" fontWeight="bold">DNI:</Box> {afiliado.dni} | {" "}
                         <Box component="span" fontWeight="bold">Credencial: </Box> {grupo.id}-{afiliado.nroIntegrante} 
                     </Typography>

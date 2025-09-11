@@ -44,8 +44,8 @@ export default function DialogCambioPlan({ grupo, open, planes, onClose }){
                 label="Nuevo plan"
                 sx={{color: "black"}}
                 >
-                    {planes.map((plan, index) => (
-                        <MenuItem key={index} value={plan.nombre}>
+                    {planes.map((plan) => (
+                        <MenuItem key={plan.id} value={plan.nombre}>
                         {plan.nombre}
                         </MenuItem>
                     ))}

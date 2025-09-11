@@ -70,7 +70,7 @@ export default function DialogAgregarAfiliado({grupo, open, onClose, planes}){
                     label="Número de documento"
                     />
                     <FormControl fullWidth sx={{mt: 2}}>
-                        <InputLabel id="parentesco-label"></InputLabel>
+                        <InputLabel id="parentesco-label"> Seleccione parentesco</InputLabel>
                         <Select
                         labelId="parentesco-label"
                         value={parentescoSeleccionado}

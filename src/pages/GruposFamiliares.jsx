@@ -68,10 +68,10 @@ const afiliadosPorGrupoFamiliar = function(listaAfiliados, grupoFamiliar){
 }
 
 const titularDeGrupoFamiliar = function(titulares, grupoFamiliar){
-    const titularHayado = titulares.find(afiliado => afiliado.grupoFamiliar === grupoFamiliar.id)
-    console.log("Este es el titular hayado:")
-    console.log(titularHayado)
-    return titularHayado
+    const titularHallado = titulares.find(afiliado => afiliado.grupoFamiliar === grupoFamiliar.id)
+    console.log("Este es el titular hallado:")
+    console.log(titularHallado)
+    return titularHallado
 }
 
 // FIN DE FUNCIONES Y DATOS HARDCODEADOS
@@ -104,7 +104,7 @@ const handleCambiarPlan = (grupo) => {
   return (
     <>
     <Typography variant="h4" color="secondary">Grupos Familiares</Typography>
-    <Typography variant="p">Gestión de grupos familiares existentes</Typography>
+    <Typography variant="body1">Gestión de grupos familiares existentes</Typography>
     <TextField
         placeholder="Buscar familia por nombre o n° de afiliado"
         variant="outlined"
