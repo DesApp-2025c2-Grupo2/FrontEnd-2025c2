@@ -4,7 +4,7 @@ import Dashboard from "./pages/Dashboard.jsx";
 import Afiliados from "./pages/Afiliados.jsx";
 import Prestadores from "./pages/Prestadores.jsx";
 import Especialidades from "./pages/Especialidades.jsx";
-import Planes from "./pages/Planes.jsx";
+import PlanesMedicos from "./pages/PlanesMedicos.jsx";
 import Layout from "./layouts/Layout.jsx";
 import GruposFamiliares from "./pages/GruposFamiliares.jsx";
 import Turnos from "./pages/Turnos.jsx";
@@ -24,7 +24,7 @@ const router = createBrowserRouter([
       { path: "turnos", element: <Turnos /> },
       { path: "consultas-reportes", element: <ConsultasReportes /> },
       { path: "situaciones", element: <SituacionesTerapeuticas /> },
-      { path: "planes", element: <Planes /> },
+      { path: "planes", element: <PlanesMedicos /> },
     ],
   },
 ]);
