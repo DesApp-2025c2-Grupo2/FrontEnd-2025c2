@@ -24,12 +24,13 @@ export default function Layout() {
           flexGrow: 1,
           width: { xs: "100%", md: `calc(100% - ${drawerWidth}px)` },
           ml: { md: `${drawerWidth}px` },
+          minHeight: 0,
         }}
       >
         {/* Espacio para el AppBar en móviles */}
         <Toolbar sx={{ display: { xs: "block", md: "none" } }} />
 
-        <Box sx={{ flexGrow: 1, p: 3 }}>
+        <Box sx={{ flexGrow: 1, p: 3, minHeight: 0, overflowY: 'auto' }}>
           <Outlet />
         </Box>
         <Footer />
