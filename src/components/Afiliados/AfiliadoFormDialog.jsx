@@ -307,16 +307,16 @@ export default function AfiliadoFormDialog({
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>
+        <Button variant="outlined" onClick={onClose}>
           {selectedAfiliado && !isEditing ? "Cerrar" : "Cancelar"}
         </Button>
         {(!selectedAfiliado || isEditing) && (
-          <Button variant="contained" color="primary" onClick={onSave}>
+          <Button variant="contained" color="secondary" onClick={onSave}>
             {selectedAfiliado ? "Guardar Cambios" : "Crear Afiliado"}
           </Button>
         )}
         {selectedAfiliado && !isEditing && (
-          <Button variant="contained" color="primary" onClick={onEdit}>
+          <Button variant="contained" color="secondary" onClick={onEdit}>
             Editar
           </Button>
         )}

@@ -206,8 +206,8 @@ export default function FamiliarFormDialog({
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancelar</Button>
-        <Button variant="contained" color="primary" onClick={onSave}>
+        <Button variant="outlined" onClick={onClose}>Cancelar</Button>
+        <Button variant="contained" color="secondary" onClick={onSave}>
           {selectedFamiliar && isEditing
             ? "Guardar Cambios"
             : "Agregar Familiar"}
