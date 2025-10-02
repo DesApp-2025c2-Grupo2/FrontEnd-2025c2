@@ -1,4 +1,3 @@
-// pages/Afiliados.jsx
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Box, Typography, Fab, Snackbar, Alert } from "@mui/material";
@@ -11,6 +10,7 @@ import {
   reactivarAfiliado,
 } from "../store/afiliadosSlice";
 import {
+
   addPersona,
   updatePersona,
   deletePersona,
