@@ -56,7 +56,7 @@ export default function DialogEspecialidad({ abierto, valorInicial, onCerrar, on
         </div>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCerrar} sx={{ fontWeight: 700 }}>Cancelar</Button>
+        <Button color='secondary' variant='outlined' onClick={onCerrar} sx={{ fontWeight: 700 }}>Cancelar</Button>
         <Button variant="contained" color="secondary" onClick={guardar} disabled={Object.keys(errores).length > 0} sx={{ fontWeight: 700 }}>Guardar</Button>
       </DialogActions>
     </Dialog>

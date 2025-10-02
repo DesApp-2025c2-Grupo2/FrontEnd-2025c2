@@ -436,7 +436,7 @@ export default function AfiliadoFormDialog({
               </Grid>
             </Grid>
 
-            <Grid container spacing={2}>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12}>
                 <ContactInfoEditor
                   icon={<HomeIcon sx={{ mr: 1, color: "#1976d2" }} />}

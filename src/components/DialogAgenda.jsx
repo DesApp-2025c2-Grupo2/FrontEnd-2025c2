@@ -711,16 +711,16 @@ export default function DialogAgenda({ abierto, valorInicial, onCerrar, onGuarda
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onCerrar} sx={{ fontWeight: 700, textTransform: 'none' }}>
-          Cancelar
+        <Button variant='outlined' color='secondary' onClick={onCerrar} sx={{ fontWeight: 700, textTransform: 'none' }}>
+          CANCELAR
         </Button>
         <Button
           variant="contained"
-          color="primary"
+          color="secondary"
           onClick={guardar}
           sx={{ fontWeight: 700, textTransform: 'none' }}
         >
-          {form.id ? 'Guardar Cambios' : 'Crear Agenda'}
+          {form.id ? 'GUARDAR CAMBIOS' : 'CREAR AGENDA'}
         </Button>
       </DialogActions>
     </Dialog>
