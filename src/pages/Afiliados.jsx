@@ -21,56 +21,103 @@ import {
   Person as PersonIcon, // Ícono de persona para afiliados
   Add as AddIcon // Ícono de agregar
 } from '@mui/icons-material';
+import ModalDetalleAfiliado from '../components/ModalDetalleAfiliado';
+import ModalEditarAfiliado from '../components/ModalEditarAfiliado';
+import ModalNuevoAfiliado from '../components/ModalNuevoAfiliado';
 
 function Afiliados() { // Componente principal
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(''); // Estado de búsqueda
+  const [modalDetalleOpen, setModalDetalleOpen] = useState(false);
+  const [modalEditarOpen, setModalEditarOpen] = useState(false);
+  const [modalNuevoOpen, setModalNuevoOpen] = useState(false);
+  const [afiliadoSeleccionado, setAfiliadoSeleccionado] = useState(null);
 
   // Array de afiliados con estado controlado
   const [afiliados, setAfiliados] = useState([
     {
-      id: 1, // ID único
-      nombre: 'Gómez, Pedro', // Nombre del afiliado
-      credencial: '0000001-01', // Credencial del afiliado
-      dni: '12345678', // DNI del afiliado
-      plan: 'Plan 310', // Plan de cobertura
-      estado: 'Activo', // Estado actual
-      grupoFamiliar: 'Titular', // Rol en el grupo familiar
-      alta: '14/1/2024', // Fecha de alta
-      infoAdicional: [] // Sin información adicional
+      id: 1,
+      nombre: 'Pedro',
+      apellido: 'Gómez',
+      nombreCompleto: 'Gómez, Pedro',
+      credencial: '0000001-01',
+      nroAfiliado: '0000001',
+      nroIntegrante: '01',
+      tipoDocumento: 'DNI',
+      numeroDocumento: '12345678',
+      fechaNacimiento: '14/5/1980',
+      parentesco: 'Titular',
+      plan: 'Plan 310',
+      estado: 'Activo',
+      grupoFamiliar: '0000001',
+      alta: '14/1/2024',
+      telefonos: ['11-1234-5678', '11-9876-5432', '15-5555-1234'],
+      emails: ['pedro.gomez@email.com', 'pedro.trabajo@empresa.com', 'pgomez@gmail.com'],
+      direcciones: ['Av. Corrientes 1234, CABA', 'Calle Falsa 123, CABA'],
+      situacionesTerapeuticas: []
     },
     {
       id: 2,
-      nombre: 'Gómez, María',
+      nombre: 'María',
+      apellido: 'Gómez',
+      nombreCompleto: 'Gómez, María',
       credencial: '0000001-02',
-      dni: '87654321',
+      nroAfiliado: '0000001',
+      nroIntegrante: '02',
+      tipoDocumento: 'DNI',
+      numeroDocumento: '87654321',
+      fechaNacimiento: '20/3/1985',
+      parentesco: 'Cónyuge',
       plan: 'Plan 310',
       estado: 'Activo',
-      grupoFamiliar: 'Cónyuge',
+      grupoFamiliar: '0000001',
       alta: '14/1/2024',
-      infoAdicional: ['Embarazo'] // Información adicional
+      telefonos: ['11-1111-2222', '11-3333-4444'],
+      emails: ['maria.gomez@email.com', 'maria.trabajo@empresa.com'],
+      direcciones: ['Av. Corrientes 1234, CABA'],
+      situacionesTerapeuticas: ['Embarazo']
     },
     {
       id: 3,
-      nombre: 'López, Ana',
+      nombre: 'Ana',
+      apellido: 'López',
+      nombreCompleto: 'López, Ana',
       credencial: '0000002-01',
-      dni: '11223344',
+      nroAfiliado: '0000002',
+      nroIntegrante: '01',
+      tipoDocumento: 'DNI',
+      numeroDocumento: '11223344',
+      fechaNacimiento: '10/8/1975',
+      parentesco: 'Titular',
       plan: 'Plan 510',
       estado: 'Activo',
-      grupoFamiliar: 'Titular',
+      grupoFamiliar: '0000002',
       alta: '31/1/2024',
-      infoAdicional: ['Diabetes'] // Información adicional
+      telefonos: ['11-5555-6666'],
+      emails: ['ana.lopez@email.com'],
+      direcciones: ['Av. Santa Fe 4567, CABA'],
+      situacionesTerapeuticas: ['Diabetes']
     },
     {
       id: 4,
-      nombre: 'Rodríguez, Carlos',
+      nombre: 'Carlos',
+      apellido: 'Rodríguez',
+      nombreCompleto: 'Rodríguez, Carlos',
       credencial: '0000001-03',
-      dni: '55667788',
+      nroAfiliado: '0000001',
+      nroIntegrante: '03',
+      tipoDocumento: 'DNI',
+      numeroDocumento: '55667788',
+      fechaNacimiento: '15/12/2010',
+      parentesco: 'Hijo',
       plan: 'Plan 310',
       estado: 'Activo',
-      grupoFamiliar: 'Hijo',
+      grupoFamiliar: '0000001',
       alta: '10/6/2021',
-      infoAdicional: [] // Sin información adicional
+      telefonos: ['11-7777-8888'],
+      emails: ['carlos.rodriguez@email.com'],
+      direcciones: ['Av. Corrientes 1234, CABA'],
+      situacionesTerapeuticas: []
     }
   ]);
 
@@ -127,14 +174,57 @@ function Afiliados() { // Componente principal
     return infoColors[info] || '#ff9800';
   };
 
-  // Abrir modal agregar afiliado si viene ?nuevo=1 (placeholder: alerta hasta que se integre modal real)
-  useEffect(() => {
-    if (searchParams.get('nuevo') === '1') {
-      alert('Abrir modal: Nuevo Afiliado (pendiente de integrar)');
-      searchParams.delete('nuevo');
-      setSearchParams(searchParams, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
+  // Función de búsqueda mejorada
+  const afiliadosFiltrados = afiliados.filter(afiliado => {
+    const termino = searchTerm.toLowerCase();
+    return (
+      afiliado.nombreCompleto.toLowerCase().includes(termino) ||
+      afiliado.nombre.toLowerCase().includes(termino) ||
+      afiliado.apellido.toLowerCase().includes(termino) ||
+      afiliado.numeroDocumento.includes(termino) ||
+      afiliado.credencial.includes(termino) ||
+      afiliado.parentesco.toLowerCase().includes(termino) ||
+      afiliado.plan.toLowerCase().includes(termino) ||
+      afiliado.situacionesTerapeuticas.some(sit => sit.toLowerCase().includes(termino))
+    );
+  });
+
+  // Funciones para manejar modales
+  const handleVerDetalle = (afiliado) => {
+    setAfiliadoSeleccionado(afiliado);
+    setModalDetalleOpen(true);
+  };
+
+  const handleEditar = (afiliado) => {
+    setAfiliadoSeleccionado(afiliado);
+    setModalEditarOpen(true);
+  };
+
+  const handleGuardarCambios = (afiliadoActualizado) => {
+    setAfiliados(prevAfiliados =>
+      prevAfiliados.map(afiliado =>
+        afiliado.id === afiliadoActualizado.id ? afiliadoActualizado : afiliado
+      )
+    );
+    setModalEditarOpen(false);
+    setAfiliadoSeleccionado(null);
+  };
+
+  const handleCerrarModales = () => {
+    setModalDetalleOpen(false);
+    setModalEditarOpen(false);
+    setModalNuevoOpen(false);
+    setAfiliadoSeleccionado(null);
+  };
+
+  const handleCrearAfiliado = () => {
+    setModalNuevoOpen(true);
+  };
+
+  const handleGuardarNuevoAfiliado = (nuevoAfiliado) => {
+    setAfiliados(prevAfiliados => [nuevoAfiliado, ...prevAfiliados]);
+    setModalNuevoOpen(false);
+  };
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3 } }}> {/* Contenedor principal responsive */}
@@ -144,7 +234,7 @@ function Afiliados() { // Componente principal
         component="h1" 
         gutterBottom 
         sx={{ 
-          color: 'text.primary', 
+          color: '#2563eb', 
           mb: { xs: 0.5, sm: 1 }, 
           fontWeight: 'bold',
           fontSize: { xs: '1.5rem', sm: '2.125rem' }
@@ -161,14 +251,14 @@ function Afiliados() { // Componente principal
           fontSize: { xs: '0.875rem', sm: '1rem' }
         }}
       >
-        Gestión de afiliados y grupos familiares {/* Subtítulo */}
+        Gestión de afiliados - Solo se pueden crear titulares {/* Subtítulo */}
       </Typography>
 
       {/* Campo de búsqueda */}
       <TextField
         fullWidth // Ocupa todo el ancho
         variant="outlined" // Variante con borde
-        placeholder="Buscar por nombre, DNI, credencial, plan o grupo familiar..." // Texto de ayuda
+        placeholder="Buscar por apellido, nombre, DNI, credencial, parentesco o plan..." // Texto de ayuda
         value={searchTerm} // Valor controlado
         onChange={(e) => setSearchTerm(e.target.value)} // Actualiza el estado
         InputProps={{
@@ -189,7 +279,7 @@ function Afiliados() { // Componente principal
 
       {/* Lista de afiliados */}
       <Box sx={{ mb: 4 }}>
-        {afiliados.map((afiliado, index) => (
+        {afiliadosFiltrados.map((afiliado, index) => (
           <Box key={afiliado.id}>
                          <Card 
                elevation={1} // Sombra sutil
@@ -229,7 +319,7 @@ function Afiliados() { // Componente principal
                              wordBreak: 'break-word'
                            }}
                          >
-                           {afiliado.nombre}
+                           {afiliado.nombreCompleto}
                          </Typography>
                        </Box>
                        
@@ -282,7 +372,7 @@ function Afiliados() { // Componente principal
                            fontSize: { xs: '0.8rem', sm: '0.9rem' },
                            wordBreak: 'break-word'
                          }}>
-                           <strong>DNI:</strong> {afiliado.dni}
+                           <strong>DNI:</strong> {afiliado.numeroDocumento}
                          </Typography>
                          <Typography variant="body2" color="text.secondary" sx={{ 
                            fontSize: { xs: '0.8rem', sm: '0.9rem' },
@@ -299,14 +389,14 @@ function Afiliados() { // Componente principal
                          flexWrap: 'wrap',
                          mt: 'auto'
                        }}>
-                         {/* Botón del grupo familiar */}
+                         {/* Botón del parentesco */}
                          <Button
                            variant="outlined"
                            size="small"
                            sx={{
                              backgroundColor: 'transparent',
-                             borderColor: getGrupoFamiliarColor(afiliado.grupoFamiliar),
-                             color: getGrupoFamiliarColor(afiliado.grupoFamiliar),
+                             borderColor: getGrupoFamiliarColor(afiliado.parentesco),
+                             color: getGrupoFamiliarColor(afiliado.parentesco),
                              fontWeight: 'bold',
                              fontSize: { xs: '0.75rem', sm: '0.875rem' },
                              height: { xs: 24, sm: 28 },
@@ -314,24 +404,24 @@ function Afiliados() { // Componente principal
                              minWidth: 'fit-content',
                              px: { xs: 0.5, sm: 1 },
                              '&:hover': {
-                               backgroundColor: getGrupoFamiliarColor(afiliado.grupoFamiliar),
+                               backgroundColor: getGrupoFamiliarColor(afiliado.parentesco),
                                color: 'white'
                              }
                            }}
                          >
-                           {afiliado.grupoFamiliar}
+                           {afiliado.parentesco}
                          </Button>
                          
-                         {/* Botones de información adicional */}
-                         {afiliado.infoAdicional.map((info, index) => (
+                         {/* Botones de situaciones terapéuticas */}
+                         {afiliado.situacionesTerapeuticas.map((situacion, index) => (
                            <Button
                              key={index}
                              variant="outlined"
                              size="small"
                              sx={{
                                backgroundColor: 'transparent',
-                               borderColor: getInfoAdicionalColor(info),
-                               color: getInfoAdicionalColor(info),
+                               borderColor: getInfoAdicionalColor(situacion),
+                               color: getInfoAdicionalColor(situacion),
                                fontWeight: 'bold',
                                fontSize: { xs: '0.75rem', sm: '0.875rem' },
                                height: { xs: 24, sm: 28 },
@@ -339,12 +429,12 @@ function Afiliados() { // Componente principal
                                minWidth: 'fit-content',
                                px: { xs: 0.5, sm: 1 },
                                '&:hover': {
-                                 backgroundColor: getInfoAdicionalColor(info),
+                                 backgroundColor: getInfoAdicionalColor(situacion),
                                  color: 'white'
                                }
                              }}
                            >
-                             {info}
+                             {situacion}
                            </Button>
                          ))}
                        </Box>
@@ -367,6 +457,7 @@ function Afiliados() { // Componente principal
                          variant="outlined"
                          size="small"
                          startIcon={<VisibilityIcon />}
+                         onClick={() => handleVerDetalle(afiliado)}
                          sx={{
                            borderColor: '#2196f3',
                            color: '#2196f3',
@@ -392,6 +483,7 @@ function Afiliados() { // Componente principal
                          variant="outlined"
                          size="small"
                          startIcon={<EditIcon />}
+                         onClick={() => handleEditar(afiliado)}
                          sx={{
                            borderColor: '#2196f3',
                            color: '#2196f3',
@@ -444,7 +536,7 @@ function Afiliados() { // Componente principal
             </Card>
             
                          {/* Separador entre afiliados */}
-             {index < afiliados.length - 1 && (
+             {index < afiliadosFiltrados.length - 1 && (
                <Divider sx={{ my: { xs: 2, sm: 3 }, opacity: 0.6 }} />
              )}
            </Box>
@@ -455,6 +547,7 @@ function Afiliados() { // Componente principal
        <Fab
          color="primary"
          aria-label="add"
+         onClick={handleCrearAfiliado}
          sx={{
            position: 'fixed',
            bottom: { xs: 16, sm: 24 },
@@ -467,6 +560,27 @@ function Afiliados() { // Componente principal
        >
          <AddIcon />
        </Fab>
+
+       {/* Modales */}
+       <ModalDetalleAfiliado
+         open={modalDetalleOpen}
+         onClose={handleCerrarModales}
+         afiliado={afiliadoSeleccionado}
+         onEdit={handleEditar}
+       />
+
+       <ModalEditarAfiliado
+         open={modalEditarOpen}
+         onClose={handleCerrarModales}
+         afiliado={afiliadoSeleccionado}
+         onSave={handleGuardarCambios}
+       />
+
+       <ModalNuevoAfiliado
+         open={modalNuevoOpen}
+         onClose={handleCerrarModales}
+         onSave={handleGuardarNuevoAfiliado}
+       />
     </Box>
   );
 }
