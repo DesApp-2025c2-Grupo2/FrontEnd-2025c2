@@ -19,6 +19,9 @@ import {
 } from "@mui/icons-material";
 import PersonaListItem from "./PersonaListItem";
 
+const padNumeroAfiliado = (n) => String(Number(n) || 0).padStart(7, "0");
+const padIntegrante = (n) => String(Number(n) || 0).padStart(2, "0");
+
 export default function AfiliadosCard({
   afiliado,
   titular,
@@ -119,13 +122,17 @@ export default function AfiliadosCard({
             }}
           >
             <Typography variant="body2" color="textSecondary">
-              <strong>Afiliado Nº:</strong> {afiliado.numeroAfiliado}
+              <strong>Afiliado Nº:</strong>{" "}
+              {padNumeroAfiliado(afiliado.numeroAfiliado)}-
+              {padIntegrante(titular.numeroIntegrante)}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               <strong>Alta:</strong>{" "}
-              {new Date(afiliado.alta).toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              })}
+              {afiliado.alta
+                ? new Date(afiliado.alta).toLocaleDateString("es-AR", {
+                    timeZone: "UTC",
+                  })
+                : ""}
             </Typography>
             {afiliado.baja && (
               <Typography variant="body2" color="textSecondary">

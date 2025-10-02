@@ -2,7 +2,6 @@ import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
   personas: [
-    // Titular del afiliado 1
     {
       id: "1",
       numeroIntegrante: 1,
@@ -17,13 +16,9 @@ const initialState = {
       baja: null,
       telefonos: ["11-1234-5678", "11-9876-5432", "15-5555-1234"],
       emails: ["pedro.gomez@email.com", "pedro.trabajo@empresa.com"],
-      direcciones: [
-        "Av. Corrientes 1234, CABA",
-        "San Martín 890, Vicente López",
-      ],
+      direcciones: ["Av. Corrientes 1234, CABA", "San Martín 890, Vicente López"],
       situacionesTerapeuticas: [],
     },
-    // Familiares del afiliado 1 (NO incluye al titular)
     {
       id: "2",
       numeroIntegrante: 2,
@@ -32,7 +27,7 @@ const initialState = {
       tipoDocumento: "DNI",
       numeroDocumento: "23345678",
       fechaNacimiento: "1985-08-20",
-      parentesco: 2, // 2: Cónyuge
+      parentesco: 2,
       afiliadoId: "1",
       alta: "2024-01-15",
       baja: null,
@@ -49,7 +44,7 @@ const initialState = {
       tipoDocumento: "DNI",
       numeroDocumento: "48654321",
       fechaNacimiento: "2010-03-12",
-      parentesco: 3, // 3: Hijo
+      parentesco: 3,
       afiliadoId: "1",
       alta: "2024-01-15",
       baja: null,
@@ -58,7 +53,6 @@ const initialState = {
       direcciones: ["Av. Corrientes 1234, CABA"],
       situacionesTerapeuticas: [],
     },
-    // Titular del afiliado 2
     {
       id: "4",
       numeroIntegrante: 1,
@@ -67,7 +61,7 @@ const initialState = {
       tipoDocumento: "DNI",
       numeroDocumento: "35687457",
       fechaNacimiento: "1975-12-10",
-      parentesco: 1, // Titular
+      parentesco: 1,
       afiliadoId: "2",
       alta: "2024-02-01",
       baja: null,
@@ -76,7 +70,6 @@ const initialState = {
       direcciones: ["Belgrano 567, CABA"],
       situacionesTerapeuticas: ["Diabetes"],
     },
-    // Familiar del afiliado 2
     {
       id: "5",
       numeroIntegrante: 2,
@@ -85,7 +78,7 @@ const initialState = {
       tipoDocumento: "DNI",
       numeroDocumento: "26589451",
       fechaNacimiento: "2015-06-25",
-      parentesco: 3, // Hijo
+      parentesco: 3,
       afiliadoId: "2",
       alta: "2024-02-01",
       baja: null,
@@ -94,7 +87,6 @@ const initialState = {
       direcciones: ["Belgrano 567, CABA"],
       situacionesTerapeuticas: [],
     },
-    // Titular del afiliado 3
     {
       id: "6",
       numeroIntegrante: 1,
@@ -103,7 +95,7 @@ const initialState = {
       tipoDocumento: "DNI",
       numeroDocumento: "26987453",
       fechaNacimiento: "1982-09-18",
-      parentesco: 1, // Titular
+      parentesco: 1,
       afiliadoId: "3",
       alta: "2024-01-25",
       baja: null,
@@ -137,7 +129,7 @@ const personasSlice = createSlice({
     updatePersona: (state, action) => {
       const index = state.personas.findIndex((p) => p.id === action.payload.id);
       if (index !== -1) {
-        state.personas[index] = action.payload;
+        state.personas[index] = { ...state.personas[index], ...action.payload };
       }
     },
     deletePersona: (state, action) => {
@@ -146,99 +138,61 @@ const personasSlice = createSlice({
     setBajaPersona: (state, action) => {
       const { personaId, fechaBaja } = action.payload;
       const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) {
-        persona.baja = fechaBaja;
-      }
+      if (persona) persona.baja = fechaBaja;
     },
     cancelBajaPersona: (state, action) => {
       const persona = state.personas.find((p) => p.id === action.payload);
-      if (persona) {
-        persona.baja = null;
-      }
+      if (persona) persona.baja = null;
     },
-    // Acciones para teléfonos
     addTelefonoToPersona: (state, action) => {
       const { personaId, telefono } = action.payload;
       const persona = state.personas.find((p) => p.id === personaId);
-      if (persona && !persona.telefonos.includes(telefono)) {
-        persona.telefonos.push(telefono);
-      }
+      if (persona && !persona.telefonos.includes(telefono)) persona.telefonos.push(telefono);
     },
     removeTelefonoFromPersona: (state, action) => {
       const { personaId, telefonoIndex } = action.payload;
       const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) {
-        persona.telefonos = persona.telefonos.filter(
-          (_, index) => index !== telefonoIndex
-        );
-      }
+      if (persona) persona.telefonos = persona.telefonos.filter((_, i) => i !== telefonoIndex);
     },
-    // Acciones para emails
     addEmailToPersona: (state, action) => {
       const { personaId, email } = action.payload;
       const persona = state.personas.find((p) => p.id === personaId);
-      if (persona && !persona.emails.includes(email)) {
-        persona.emails.push(email);
-      }
+      if (persona && !persona.emails.includes(email)) persona.emails.push(email);
     },
     removeEmailFromPersona: (state, action) => {
       const { personaId, emailIndex } = action.payload;
       const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) {
-        persona.emails = persona.emails.filter(
-          (_, index) => index !== emailIndex
-        );
-      }
+      if (persona) persona.emails = persona.emails.filter((_, i) => i !== emailIndex);
     },
-    // Acciones para direcciones
     addDireccionToPersona: (state, action) => {
       const { personaId, direccion } = action.payload;
       const persona = state.personas.find((p) => p.id === personaId);
-      if (persona && !persona.direcciones.includes(direccion)) {
-        persona.direcciones.push(direccion);
-      }
+      if (persona && !persona.direcciones.includes(direccion)) persona.direcciones.push(direccion);
     },
     removeDireccionFromPersona: (state, action) => {
       const { personaId, direccionIndex } = action.payload;
       const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) {
-        persona.direcciones = persona.direcciones.filter(
-          (_, index) => index !== direccionIndex
-        );
-      }
+      if (persona) persona.direcciones = persona.direcciones.filter((_, i) => i !== direccionIndex);
     },
-    // Acciones para situaciones terapéuticas
     addSituacionTerapeuticaToPersona: (state, action) => {
       const { personaId, situacion } = action.payload;
       const persona = state.personas.find((p) => p.id === personaId);
-      if (persona && !persona.situacionesTerapeuticas.includes(situacion)) {
-        persona.situacionesTerapeuticas.push(situacion);
-      }
+      if (persona && !persona.situacionesTerapeuticas.includes(situacion)) persona.situacionesTerapeuticas.push(situacion);
     },
     removeSituacionTerapeuticaFromPersona: (state, action) => {
       const { personaId, situacionIndex } = action.payload;
       const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) {
-        persona.situacionesTerapeuticas =
-          persona.situacionesTerapeuticas.filter(
-            (_, index) => index !== situacionIndex
-          );
-      }
+      if (persona) persona.situacionesTerapeuticas = persona.situacionesTerapeuticas.filter((_, i) => i !== situacionIndex);
     },
-    // Nueva acción para actualizar afiliadoId de una persona
     updateAfiliadoIdPersona: (state, action) => {
       const { personaId, afiliadoId } = action.payload;
       const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) {
-        persona.afiliadoId = afiliadoId;
-      }
+      if (persona) persona.afiliadoId = afiliadoId;
     },
     updateAltaPersona: (state, action) => {
       const { personaId, fechaAlta } = action.payload;
       const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) {
-        persona.alta = fechaAlta;
-      }
+      if (persona) persona.alta = fechaAlta;
     },
   },
 });
@@ -260,5 +214,9 @@ export const {
   updateAfiliadoIdPersona,
   updateAltaPersona,
 } = personasSlice.actions;
+
+export const selectPersonas = (state) => state.personas.personas;
+export const selectParentescos = (state) => state.personas.parentescos;
+export const selectTiposDocumento = (state) => state.personas.tiposDocumento;
 
 export default personasSlice.reducer;

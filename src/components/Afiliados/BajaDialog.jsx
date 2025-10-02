@@ -13,6 +13,14 @@ import {
   Alert,
 } from "@mui/material";
 
+const hoyISO = () => new Date().toISOString().split("T")[0];
+
+const startOfDay = (d) => {
+  const dt = new Date(d);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+};
+
 export default function BajaDialog({
   open,
   afiliado,
@@ -23,25 +31,17 @@ export default function BajaDialog({
   const [fechaBaja, setFechaBaja] = useState("");
   const [esBajaInmediata, setEsBajaInmediata] = useState(true);
 
-  // Resetear estado cuando se abre/cierra el diálogo
   useEffect(() => {
     if (open) {
-      const hoy = new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
-      setFechaBaja(hoy);
+      setFechaBaja(hoyISO());
       setEsBajaInmediata(true);
     }
   }, [open]);
 
   const handleConfirm = () => {
-    if (esBajaInmediata) {
-      onConfirm(afiliado, new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              }));
-    } else if (fechaBaja) {
-      onConfirm(afiliado, fechaBaja);
-    }
+    const fechaFinal = esBajaInmediata ? hoyISO() : fechaBaja;
+    if (!fechaFinal) return;
+    onConfirm(afiliado, fechaFinal);
     onClose();
   };
 
@@ -50,12 +50,15 @@ export default function BajaDialog({
     onClose();
   };
 
-  const esFechaFutura = fechaBaja && new Date(fechaBaja) > new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
-  const esFechaPasada = fechaBaja && new Date(fechaBaja) < new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
+  const hoy = startOfDay(new Date());
+  const afiliadoTieneBaja = Boolean(afiliado?.baja);
+  const bajaEsFutura =
+    afiliadoTieneBaja && startOfDay(new Date(afiliado.baja)) > hoy;
+
+  const esFechaFutura =
+    Boolean(fechaBaja) && startOfDay(new Date(fechaBaja)) > hoy;
+  const esFechaPasada =
+    Boolean(fechaBaja) && startOfDay(new Date(fechaBaja)) < hoy;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -66,21 +69,17 @@ export default function BajaDialog({
       </DialogTitle>
       <DialogContent>
         <Box sx={{ pt: 2 }}>
-          {afiliado?.baja ? (
+          {afiliadoTieneBaja ? (
             <>
               <Typography variant="body1" gutterBottom>
                 Este afiliado tiene una baja programada para el{" "}
                 <strong>
-                  {new Date(afiliado.baja).toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              })}
+                  {new Date(afiliado.baja).toLocaleDateString("es-AR")}
                 </strong>
                 .
               </Typography>
 
-              {new Date(afiliado.baja) > new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              }) ? (
+              {bajaEsFutura ? (
                 <Alert severity="warning" sx={{ mt: 2, mb: 2 }}>
                   La baja aún no ha entrado en efecto. Puede cancelarla o
                   modificar la fecha.
@@ -96,6 +95,7 @@ export default function BajaDialog({
                 <Typography variant="body2" color="textSecondary" gutterBottom>
                   Programar nueva fecha de baja:
                 </Typography>
+
                 <FormControlLabel
                   control={
                     <Checkbox
@@ -107,6 +107,7 @@ export default function BajaDialog({
                   label="Baja inmediata (hoy)"
                   sx={{ mb: 2 }}
                 />
+
                 {!esBajaInmediata && (
                   <TextField
                     fullWidth
@@ -159,12 +160,9 @@ export default function BajaDialog({
               {esFechaFutura && (
                 <Alert severity="info" sx={{ mt: 2 }}>
                   El afiliado permanecerá activo hasta el{" "}
-                  {new Date(fechaBaja).toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              })}.
+                  {new Date(fechaBaja).toLocaleDateString("es-AR")}.
                 </Alert>
               )}
-
               {esBajaInmediata && (
                 <Alert severity="warning" sx={{ mt: 2 }}>
                   El afiliado será dado de baja inmediatamente.
@@ -174,12 +172,13 @@ export default function BajaDialog({
           )}
         </Box>
       </DialogContent>
+
       <DialogActions>
         <Button variant="outlined" onClick={onClose}>
           Cancelar
         </Button>
 
-        {afiliado?.baja && (
+        {afiliadoTieneBaja && (
           <Button variant="outlined" color="success" onClick={handleCancelBaja}>
             Cancelar Baja
           </Button>
@@ -187,11 +186,11 @@ export default function BajaDialog({
 
         <Button
           variant="contained"
-          color={afiliado?.baja ? "warning" : "error"}
+          color={afiliadoTieneBaja ? "warning" : "error"}
           onClick={handleConfirm}
           disabled={!esBajaInmediata && (!fechaBaja || esFechaPasada)}
         >
-          {afiliado?.baja ? "Modificar Baja" : "Confirmar Baja"}
+          {afiliadoTieneBaja ? "Modificar Baja" : "Confirmar Baja"}
         </Button>
       </DialogActions>
     </Dialog>

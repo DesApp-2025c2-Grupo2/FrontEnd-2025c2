@@ -13,6 +13,14 @@ import {
   Alert,
 } from "@mui/material";
 
+const hoyISO = () => new Date().toISOString().split("T")[0];
+
+const startOfDay = (d) => {
+  const dt = new Date(d);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+};
+
 export default function AltaDialog({
   open,
   afiliado,
@@ -26,49 +34,30 @@ export default function AltaDialog({
 
   useEffect(() => {
     if (open) {
-      const hoy = new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
-      setFechaAlta(hoy);
+      setFechaAlta(hoyISO());
       setEsAltaInmediata(true);
     }
   }, [open]);
 
   const handleConfirm = () => {
-    let fechaAltaFinal;
+    const fechaAltaFinal = esAltaInmediata ? hoyISO() : fechaAlta;
+    if (!fechaAltaFinal) return;
 
-    if (esAltaInmediata) {
-      fechaAltaFinal = new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
-    } else if (fechaAlta) {
-      fechaAltaFinal = fechaAlta;
-    }
-
-    if (fechaAltaFinal) {
-      if (esAltaInmediata && afiliado?.baja) {
-        // Si es alta inmediata y tiene baja, usar reactivación
-        onReactivar(afiliado);
-      } else {
-        // Si es alta programada, usar programación normal
-        onConfirm(afiliado, fechaAltaFinal);
-      }
+    if (esAltaInmediata && afiliado?.baja) {
+      onReactivar(afiliado);
+    } else {
+      onConfirm(afiliado, fechaAltaFinal);
     }
     onClose();
   };
 
+  const hoy = startOfDay(new Date());
   const tieneAltaProgramada =
-    afiliado?.alta && new Date(afiliado.alta) > new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
-
-  // Definir las variables que faltaban
-  const esFechaFutura = fechaAlta && new Date(fechaAlta) > new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
-  const esFechaPasada = fechaAlta && new Date(fechaAlta) < new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
+    Boolean(afiliado?.alta) && startOfDay(new Date(afiliado.alta)) > hoy;
+  const esFechaFutura =
+    Boolean(fechaAlta) && startOfDay(new Date(fechaAlta)) > hoy;
+  const esFechaPasada =
+    Boolean(fechaAlta) && startOfDay(new Date(fechaAlta)) < hoy;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -79,6 +68,7 @@ export default function AltaDialog({
           ? "Programar Alta del Afiliado"
           : "Alta del Afiliado"}
       </DialogTitle>
+
       <DialogContent>
         <Box sx={{ pt: 2 }}>
           {tieneAltaProgramada ? (
@@ -86,9 +76,7 @@ export default function AltaDialog({
               <Typography variant="body1" gutterBottom>
                 Este afiliado tiene una alta programada para el{" "}
                 <strong>
-                  {new Date(afiliado.alta).toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              })}
+                  {new Date(afiliado.alta).toLocaleDateString("es-AR")}
                 </strong>
                 .
               </Typography>
@@ -171,13 +159,10 @@ export default function AltaDialog({
               {esFechaFutura && (
                 <Alert severity="info" sx={{ mt: 2 }}>
                   El afiliado se activará el{" "}
-                  {new Date(fechaAlta).toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              })}. La baja
+                  {new Date(fechaAlta).toLocaleDateString("es-AR")}. La baja
                   existente será cancelada.
                 </Alert>
               )}
-
               {esAltaInmediata && (
                 <Alert severity="success" sx={{ mt: 2 }}>
                   El afiliado será activado inmediatamente. La baja existente
@@ -225,12 +210,9 @@ export default function AltaDialog({
               {esFechaFutura && (
                 <Alert severity="info" sx={{ mt: 2 }}>
                   El afiliado se activará el{" "}
-                  {new Date(fechaAlta).toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              })}.
+                  {new Date(fechaAlta).toLocaleDateString("es-AR")}.
                 </Alert>
               )}
-
               {esAltaInmediata && (
                 <Alert severity="success" sx={{ mt: 2 }}>
                   El afiliado será activado inmediatamente.
@@ -240,6 +222,7 @@ export default function AltaDialog({
           )}
         </Box>
       </DialogContent>
+
       <DialogActions>
         <Button variant="outlined" onClick={onClose}>
           Cancelar
@@ -249,7 +232,10 @@ export default function AltaDialog({
           <Button
             variant="outlined"
             color="warning"
-            onClick={() => onCancelAlta(afiliado)}
+            onClick={() => {
+              onCancelAlta(afiliado);
+              onClose();
+            }}
           >
             Cancelar Alta Programada
           </Button>

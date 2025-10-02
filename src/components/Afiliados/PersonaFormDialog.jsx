@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import {
   Dialog,
   DialogTitle,
@@ -22,6 +22,7 @@ import {
   Home as HomeIcon,
 } from "@mui/icons-material";
 import ContactInfoEditor from "./ContactInfoEditor";
+import SituacionesSelector from "./SituacionesSelector";
 import {
   addTelefonoToPersona,
   removeTelefonoFromPersona,
@@ -29,7 +30,13 @@ import {
   removeEmailFromPersona,
   addDireccionToPersona,
   removeDireccionFromPersona,
+  addSituacionTerapeuticaToPersona,
+  removeSituacionTerapeuticaFromPersona,
 } from "../../store/personasSlice";
+import { selectSituaciones } from "../../store/situacionesTerapeuticasSlice";
+
+const padNumeroAfiliado = (n) => String(Number(n) || 0).padStart(7, "0");
+const padIntegrante = (n) => String(Number(n) || 0).padStart(2, "0");
 
 export default function PersonaFormDialog({
   open,
@@ -41,24 +48,24 @@ export default function PersonaFormDialog({
   editTelefonos,
   editEmails,
   editDirecciones,
+  editSituaciones,
   onEditTelefonosChange,
   onEditEmailsChange,
   onEditDireccionesChange,
+  onEditSituacionesChange,
   onClose,
   onSave,
   onFormChange,
 }) {
   const dispatch = useDispatch();
+  const situacionesCatalogo = useSelector(selectSituaciones) || [];
 
-  // Estados locales solo para los inputs nuevos
   const [newTelefono, setNewTelefono] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newDireccion, setNewDireccion] = useState("");
 
-  // Determinar si estamos en modo vista (no editing y hay familiar seleccionado)
   const isViewMode = selectedFamiliar && !isEditing;
 
-  // Limpiar inputs nuevos cuando se cierra/abre el diálogo
   useEffect(() => {
     if (open) {
       setNewTelefono("");
@@ -72,7 +79,6 @@ export default function PersonaFormDialog({
       const updatedTelefonos = [...editTelefonos, newTelefono.trim()];
       onEditTelefonosChange(updatedTelefonos);
 
-      // Si estamos editando, actualizar en Redux
       if (selectedFamiliar && isEditing) {
         dispatch(
           addTelefonoToPersona({
@@ -89,7 +95,6 @@ export default function PersonaFormDialog({
     const updatedTelefonos = editTelefonos.filter((_, i) => i !== index);
     onEditTelefonosChange(updatedTelefonos);
 
-    // Si estamos editando, actualizar en Redux
     if (selectedFamiliar && isEditing) {
       dispatch(
         removeTelefonoFromPersona({
@@ -162,20 +167,37 @@ export default function PersonaFormDialog({
     }
   };
 
-  // Handler para cambios en el formulario - DIRECTO AL PADRE
-  const handleFormChange = (field, value) => {
-    onFormChange(field, value);
+  const handleAddSituacion = (nombre) => {
+    onEditSituacionesChange([...(editSituaciones || []), nombre]);
+    if (selectedFamiliar && isEditing) {
+      dispatch(
+        addSituacionTerapeuticaToPersona({
+          personaId: selectedFamiliar.id,
+          situacion: nombre,
+        })
+      );
+    }
   };
 
-  // Handler específico para parentesco
-  const handleParentescoChange = (e) => {
+  const handleRemoveSituacion = (idx) => {
+    onEditSituacionesChange(
+      (editSituaciones || []).filter((_, i) => i !== idx)
+    );
+    if (selectedFamiliar && isEditing) {
+      dispatch(
+        removeSituacionTerapeuticaFromPersona({
+          personaId: selectedFamiliar.id,
+          situacionIndex: idx,
+        })
+      );
+    }
+  };
+
+  const handleFormChange = (field, value) => onFormChange(field, value);
+  const handleParentescoChange = (e) =>
     handleFormChange("parentesco", parseInt(e.target.value));
-  };
-
-  // Handler específico para tipo de documento
-  const handleTipoDocumentoChange = (e) => {
+  const handleTipoDocumentoChange = (e) =>
     handleFormChange("tipoDocumento", e.target.value);
-  };
 
   const getParentescoNombre = (parentescoId) => {
     const parentesco = parentescos.find((p) => p.id === parentescoId);
@@ -191,20 +213,30 @@ export default function PersonaFormDialog({
             : "Detalle de la Persona"
           : "Agregar Persona al Grupo Familiar"}
       </DialogTitle>
+
       <DialogContent>
         {isViewMode ? (
-          // MODO VISTA (SOLO LECTURA)
           <Box sx={{ pt: 2 }}>
             <Typography variant="h6" gutterBottom>
               {selectedFamiliar.apellido}, {selectedFamiliar.nombre}
             </Typography>
+
+            <Typography variant="body2" gutterBottom>
+              <strong>Credencial:</strong>{" "}
+              {selectedAfiliado
+                ? `${padNumeroAfiliado(
+                    selectedAfiliado.numeroAfiliado
+                  )}-${padIntegrante(selectedFamiliar.numeroIntegrante)}`
+                : padIntegrante(selectedFamiliar.numeroIntegrante)}
+            </Typography>
+
             <Typography variant="body2" gutterBottom>
               <strong>Documento:</strong> {selectedFamiliar.tipoDocumento}{" "}
               {selectedFamiliar.numeroDocumento}
             </Typography>
             <Typography variant="body2" gutterBottom>
               <strong>Número de Integrante:</strong>{" "}
-              {selectedFamiliar.numeroIntegrante}
+              {padIntegrante(selectedFamiliar.numeroIntegrante)}
             </Typography>
             <Typography variant="body2" gutterBottom>
               <strong>Parentesco:</strong>{" "}
@@ -319,30 +351,18 @@ export default function PersonaFormDialog({
                     ml: 2,
                   }}
                 >
-                  {selectedFamiliar.situacionesTerapeuticas?.map(
-                    (situacion, index) => (
-                      <Typography key={index} variant="body2">
-                        • {situacion}
-                      </Typography>
-                    )
-                  )}
+                  {selectedFamiliar.situacionesTerapeuticas.map((s, i) => (
+                    <Typography key={i} variant="body2">
+                      • {s}
+                    </Typography>
+                  ))}
                 </Box>
               </Box>
             )}
           </Box>
         ) : (
-          // MODO EDICIÓN/CREACIÓN
           <Box sx={{ pt: 2 }}>
-            {selectedAfiliado && (
-              <Typography
-                variant="body2"
-                color="textSecondary"
-                gutterBottom
-                sx={{ mb: 3 }}
-              >
-                Grupo Familiar: {selectedAfiliado.numeroAfiliado}
-              </Typography>
-            )}
+            {/* Nota: NO mostramos el número de afiliado en creación/edición (requerido) */}
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12} sm={6}>
@@ -422,7 +442,7 @@ export default function PersonaFormDialog({
                     onChange={handleParentescoChange}
                   >
                     {parentescos
-                      .filter((p) => p.id !== 1) // Excluir Titular
+                      .filter((p) => p.id !== 1)
                       .map((parentesco) => (
                         <MenuItem key={parentesco.id} value={parentesco.id}>
                           {parentesco.nombre}
@@ -477,6 +497,18 @@ export default function PersonaFormDialog({
                   onNewValueChange={setNewDireccion}
                   onAdd={handleAddDireccion}
                   onRemove={handleRemoveDireccion}
+                  disabled={isViewMode}
+                />
+              </Grid>
+            </Grid>
+
+            <Grid container spacing={2} sx={{ mt: 3 }}>
+              <Grid item xs={12}>
+                <SituacionesSelector
+                  items={editSituaciones || []}
+                  opciones={situacionesCatalogo}
+                  onAdd={handleAddSituacion}
+                  onRemove={handleRemoveSituacion}
                   disabled={isViewMode}
                 />
               </Grid>

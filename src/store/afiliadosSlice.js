@@ -5,26 +5,29 @@ const initialState = {
     {
       id: "1",
       numeroAfiliado: 1,
-      titularId: "1", // ID de la persona que es el titular
+      titularId: "1",
       planMedicoId: 1,
       alta: "2024-01-15",
       baja: null,
+      situacionesTerapeuticas: [],
     },
     {
       id: "2",
       numeroAfiliado: 2,
-      titularId: "4", // ID de la persona que es el titular
+      titularId: "4",
       planMedicoId: 4,
       alta: "2024-02-01",
       baja: null,
+      situacionesTerapeuticas: [],
     },
     {
       id: "3",
       numeroAfiliado: 3,
-      titularId: "6", // ID de la persona que es el titular
+      titularId: "6",
       planMedicoId: 3,
       alta: "2024-01-25",
       baja: "2024-12-31",
+      situacionesTerapeuticas: [],
     },
   ],
   planesMedicos: [
@@ -40,42 +43,31 @@ const afiliadosSlice = createSlice({
   initialState,
   reducers: {
     addAfiliado: (state, action) => {
-      state.afiliados.push(action.payload);
+      state.afiliados.unshift(action.payload);
     },
     updateAfiliado: (state, action) => {
-      const index = state.afiliados.findIndex(
-        (a) => a.id === action.payload.id
-      );
-      if (index !== -1) {
-        state.afiliados[index] = action.payload;
-      }
+      const idx = state.afiliados.findIndex((a) => a.id === action.payload.id);
+      if (idx !== -1)
+        state.afiliados[idx] = { ...state.afiliados[idx], ...action.payload };
     },
     setBajaAfiliado: (state, action) => {
       const { afiliadoId, fechaBaja } = action.payload;
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado) {
-        afiliado.baja = fechaBaja;
-      }
+      if (afiliado) afiliado.baja = fechaBaja;
     },
     cancelBajaAfiliado: (state, action) => {
       const afiliado = state.afiliados.find((a) => a.id === action.payload);
-      if (afiliado) {
-        afiliado.baja = null;
-      }
+      if (afiliado) afiliado.baja = null;
     },
-    // Nueva acción para actualizar solo el plan médico
     updatePlanMedicoAfiliado: (state, action) => {
       const { afiliadoId, planMedicoId } = action.payload;
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado) {
-        afiliado.planMedicoId = planMedicoId;
-      }
+      if (afiliado) afiliado.planMedicoId = planMedicoId;
     },
     programarAltaAfiliado: (state, action) => {
       const { afiliadoId, fechaAlta } = action.payload;
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
       if (afiliado) {
-        // Si programamos una alta, cancelamos cualquier baja existente
         afiliado.baja = null;
         afiliado.alta = fechaAlta;
       }
@@ -83,32 +75,52 @@ const afiliadosSlice = createSlice({
     cancelarAltaProgramada: (state, action) => {
       const { afiliadoId, fechaAltaInmediata } = action.payload;
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado) {
-        // Si cancelamos alta programada, ponemos alta inmediata o mantenemos la actual
-        if (fechaAltaInmediata) {
-          afiliado.alta = fechaAltaInmediata;
-        }
-        // Nota: No restauramos la baja aquí, eso se maneja por separado
-      }
+      if (afiliado && fechaAltaInmediata) afiliado.alta = fechaAltaInmediata;
     },
-    // Acción para reactivar inmediatamente (alta inmediata)
     reactivarAfiliado: (state, action) => {
       const { afiliadoId } = action.payload;
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
       if (afiliado) {
-        const hoy = new Date().toLocaleDateString("es-AR", {
-          timeZone: "UTC",
-        });
+        const hoyISO = new Date().toISOString().split("T")[0];
         afiliado.baja = null;
-        afiliado.alta = hoy;
+        afiliado.alta = hoyISO;
       }
     },
     updateAltaAfiliado: (state, action) => {
       const { afiliadoId, fechaAlta } = action.payload;
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
+      if (afiliado) afiliado.alta = fechaAlta;
+    },
+
+    // ---- NUEVAS ACCIONES para situaciones sobre afiliado ----
+    addSituacionAfiliado: (state, action) => {
+      const { afiliadoId, situacionNombre } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
       if (afiliado) {
-        afiliado.alta = fechaAlta;
+        const exists = afiliado.situacionesTerapeuticas?.some(
+          (s) => s?.toLowerCase?.() === String(situacionNombre).toLowerCase()
+        );
+        if (!exists) {
+          afiliado.situacionesTerapeuticas = [
+            ...(afiliado.situacionesTerapeuticas || []),
+            situacionNombre,
+          ];
+        }
       }
+    },
+    removeSituacionAfiliado: (state, action) => {
+      const { afiliadoId, index } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
+      if (afiliado) {
+        afiliado.situacionesTerapeuticas = (
+          afiliado.situacionesTerapeuticas || []
+        ).filter((_, i) => i !== index);
+      }
+    },
+    setSituacionesAfiliado: (state, action) => {
+      const { afiliadoId, situaciones } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
+      if (afiliado) afiliado.situacionesTerapeuticas = situaciones || [];
     },
   },
 });
@@ -123,6 +135,12 @@ export const {
   cancelarAltaProgramada,
   reactivarAfiliado,
   updateAltaAfiliado,
+  addSituacionAfiliado,
+  removeSituacionAfiliado,
+  setSituacionesAfiliado,
 } = afiliadosSlice.actions;
+
+export const selectAfiliados = (state) => state.afiliados.afiliados;
+export const selectPlanesMedicos = (state) => state.afiliados.planesMedicos;
 
 export default afiliadosSlice.reducer;

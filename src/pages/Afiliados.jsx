@@ -1,3 +1,4 @@
+// pages/Afiliados.jsx
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Box, Typography, Fab, Snackbar, Alert } from "@mui/material";
@@ -5,64 +6,60 @@ import { Add as AddIcon, Person as PersonIcon } from "@mui/icons-material";
 import {
   setBajaAfiliado,
   cancelBajaAfiliado,
-  addAfiliado,
-  updatePlanMedicoAfiliado,
   programarAltaAfiliado,
   cancelarAltaProgramada,
   reactivarAfiliado,
-  updateAltaAfiliado,
 } from "../store/afiliadosSlice";
 import {
   addPersona,
   updatePersona,
   deletePersona,
-  updateAltaPersona,
 } from "../store/personasSlice";
 import AdvancedSearchBar from "../components/Afiliados/AdvancedSearchBar";
 import AfiliadoCard from "../components/Afiliados/AfiliadosCard";
 import AfiliadoFormDialog from "../components/Afiliados/AfiliadoFormDialog";
 import PersonaFormDialog from "../components/Afiliados/PersonaFormDialog";
 import BajaDialog from "../components/Afiliados/BajaDialog";
-import AltaDialog from "../components/Afiliados/AltaDialog"; // Asegúrate de importar AltaDialog
+import AltaDialog from "../components/Afiliados/AltaDialog";
+import { AfiliadosService } from "../services/afiliadosService";
+import { selectSituaciones } from "../store/situacionesTerapeuticasSlice";
 
-// Funciones helper
+const startOfDay = (d) => {
+  const dt = new Date(d);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+};
+const hoyISO = () => new Date().toISOString().split("T")[0];
+
 const estaActivo = (alta, baja) => {
-  const hoy = new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
-  if (baja && new Date(baja) <= new Date(hoy)) return false;
-  if (new Date(alta) > new Date(hoy)) return false;
+  const hoy = startOfDay(new Date());
+  if (baja) {
+    const fechaBaja = startOfDay(new Date(baja));
+    if (fechaBaja <= hoy) return false;
+  }
+  if (alta) {
+    const fechaAlta = startOfDay(new Date(alta));
+    if (fechaAlta > hoy) return false;
+  }
   return true;
 };
 
 const tieneBajaProgramada = (baja) => {
-  return baja && new Date(baja) > new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
+  if (!baja) return false;
+  return startOfDay(new Date(baja)) > startOfDay(new Date());
 };
 
-const tieneAltaProgramada = (alta, baja) => {
-  // Si tiene baja pero la alta es futura, es una alta programada que cancela la baja
-  if (baja && new Date(alta) > new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              })) return true;
-  // Si no tiene baja pero la alta es futura, también es alta programada
-  if (!baja && new Date(alta) > new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              })) return true;
-  return false;
+const tieneAltaProgramada = (alta) => {
+  if (!alta) return false;
+  return startOfDay(new Date(alta)) > startOfDay(new Date());
 };
 
-const getTitularDelAfiliado = (afiliado, personas) => {
-  return personas.find((p) => p.id === afiliado.titularId);
-};
-
-const getFamiliaresDelAfiliado = (afiliado, personas) => {
-  return personas.filter(
+const getTitularDelAfiliado = (afiliado, personas) =>
+  personas.find((p) => p.id === afiliado.titularId);
+const getFamiliaresDelAfiliado = (afiliado, personas) =>
+  personas.filter(
     (p) => p.afiliadoId === afiliado.id && p.id !== afiliado.titularId
   );
-};
-
 const getPlanMedicoNombre = (planMedicoId, planesMedicos) => {
   const plan = planesMedicos.find((p) => p.id === planMedicoId);
   return plan ? plan.nombre : "Desconocido";
@@ -74,8 +71,8 @@ export default function Afiliados() {
   const planesMedicos = useSelector((state) => state.afiliados.planesMedicos);
   const personas = useSelector((state) => state.personas.personas);
   const parentescos = useSelector((state) => state.personas.parentescos);
+  const situacionesCatalogo = useSelector(selectSituaciones); // ahora sí se usa (se pasa a los diálogos)
 
-  // Estados
   const [filteredAfiliados, setFilteredAfiliados] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedAfiliado, setSelectedAfiliado] = useState(null);
@@ -84,16 +81,16 @@ export default function Afiliados() {
   const [selectedFamiliar, setSelectedFamiliar] = useState(null);
   const [isEditingFamiliar, setIsEditingFamiliar] = useState(false);
   const [openBajaDialog, setOpenBajaDialog] = useState(false);
-  const [openAltaDialog, setOpenAltaDialog] = useState(false); // Nuevo estado para AltaDialog
+  const [openAltaDialog, setOpenAltaDialog] = useState(false);
   const [afiliadoParaBaja, setAfiliadoParaBaja] = useState(null);
-  const [afiliadoParaAlta, setAfiliadoParaAlta] = useState(null); // Nuevo estado para alta
+  const [afiliadoParaAlta, setAfiliadoParaAlta] = useState(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
     severity: "success",
   });
 
-  // Estados para formularios
+  // Form states
   const [formAfiliado, setFormAfiliado] = useState({
     nombre: "",
     apellido: "",
@@ -101,9 +98,7 @@ export default function Afiliados() {
     numeroDocumento: "",
     fechaNacimiento: "",
     planMedicoId: 1,
-    alta: new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              }),
+    alta: hoyISO(),
   });
 
   const [formFamiliar, setFormFamiliar] = useState({
@@ -113,24 +108,20 @@ export default function Afiliados() {
     numeroDocumento: "",
     fechaNacimiento: "",
     parentesco: 2,
-    alta: new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              }),
+    alta: hoyISO(),
   });
 
   const [editTelefonos, setEditTelefonos] = useState([]);
   const [editEmails, setEditEmails] = useState([]);
   const [editDirecciones, setEditDirecciones] = useState([]);
+  const [editSituaciones, setEditSituaciones] = useState([]);
 
-  useEffect(() => {
-    setFilteredAfiliados(afiliados);
-  }, [afiliados]);
+  useEffect(() => setFilteredAfiliados(afiliados), [afiliados]);
 
-  const showSnackbar = (message, severity = "success") => {
+  const showSnackbar = (message, severity = "success") =>
     setSnackbar({ open: true, message, severity });
-  };
 
-  // Handlers para Afiliados
+  // Afiliado handlers
   const handleAddAfiliado = () => {
     setSelectedAfiliado(null);
     setIsEditing(false);
@@ -141,20 +132,18 @@ export default function Afiliados() {
       numeroDocumento: "",
       fechaNacimiento: "",
       planMedicoId: 1,
-      alta: new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              }),
+      alta: hoyISO(),
     });
     setEditTelefonos([]);
     setEditEmails([]);
     setEditDirecciones([]);
+    setEditSituaciones([]);
     setOpenDialog(true);
   };
 
   const handleEditAfiliado = (afiliado) => {
     const titular = getTitularDelAfiliado(afiliado, personas);
     if (!titular) return;
-
     setSelectedAfiliado(afiliado);
     setIsEditing(true);
     setFormAfiliado({
@@ -169,12 +158,15 @@ export default function Afiliados() {
     setEditTelefonos([...titular.telefonos]);
     setEditEmails([...titular.emails]);
     setEditDirecciones([...titular.direcciones]);
+    setEditSituaciones([...(titular.situacionesTerapeuticas || [])]);
     setOpenDialog(true);
   };
 
   const handleViewAfiliado = (afiliado) => {
     setSelectedAfiliado(afiliado);
     setIsEditing(false);
+    const titular = getTitularDelAfiliado(afiliado, personas);
+    setEditSituaciones([...(titular?.situacionesTerapeuticas || [])]);
     setOpenDialog(true);
   };
 
@@ -191,80 +183,28 @@ export default function Afiliados() {
     }
 
     if (selectedAfiliado && isEditing) {
-      // Actualizar existente
-      dispatch(
-        updatePlanMedicoAfiliado({
-          afiliadoId: selectedAfiliado.id,
-          planMedicoId: formAfiliado.planMedicoId,
-        })
+      // delegar a service
+      AfiliadosService.updateAfiliadoExisting(
+        dispatch,
+        selectedAfiliado,
+        formAfiliado,
+        editTelefonos,
+        editEmails,
+        editDirecciones,
+        editSituaciones,
+        personas
       );
-
-      if (formAfiliado.alta !== selectedAfiliado.alta) {
-        dispatch(
-          updateAltaAfiliado({
-            afiliadoId: selectedAfiliado.id,
-            fechaAlta: formAfiliado.alta,
-          })
-        );
-      }
-
-      const titular = getTitularDelAfiliado(selectedAfiliado, personas);
-      if (titular) {
-        dispatch(
-          updatePersona({
-            ...titular,
-            nombre: formAfiliado.nombre,
-            apellido: formAfiliado.apellido,
-            fechaNacimiento: formAfiliado.fechaNacimiento,
-            telefonos: editTelefonos,
-            emails: editEmails,
-            direcciones: editDirecciones,
-          })
-        );
-      }
       showSnackbar("Afiliado actualizado");
     } else {
-      // Crear nuevo
-      const maxNumeroAfiliado = Math.max(
-        ...afiliados.map((a) => a.numeroAfiliado),
-        0
+      AfiliadosService.createAfiliado(
+        dispatch,
+        formAfiliado,
+        editTelefonos,
+        editEmails,
+        editDirecciones,
+        editSituaciones,
+        afiliados
       );
-      const nuevaPersonaId = `p${Date.now()}`;
-      const nuevoAfiliadoId = `a${Date.now()}`;
-
-      // Crear persona
-      dispatch(
-        addPersona({
-          id: nuevaPersonaId,
-          numeroIntegrante: 1,
-          nombre: formAfiliado.nombre,
-          apellido: formAfiliado.apellido,
-          tipoDocumento: formAfiliado.tipoDocumento,
-          numeroDocumento: formAfiliado.numeroDocumento,
-          fechaNacimiento: formAfiliado.fechaNacimiento,
-          parentesco: 1,
-          alta: formAfiliado.alta,
-          baja: null,
-          telefonos: editTelefonos,
-          emails: editEmails,
-          direcciones: editDirecciones,
-          situacionesTerapeuticas: [],
-          afiliadoId: nuevoAfiliadoId,
-        })
-      );
-
-      // Crear afiliado
-      dispatch(
-        addAfiliado({
-          id: nuevoAfiliadoId,
-          numeroAfiliado: maxNumeroAfiliado + 1,
-          titularId: nuevaPersonaId,
-          planMedicoId: formAfiliado.planMedicoId,
-          alta: formAfiliado.alta,
-          baja: null,
-        })
-      );
-
       showSnackbar("Afiliado creado");
     }
 
@@ -272,71 +212,31 @@ export default function Afiliados() {
     setSelectedAfiliado(null);
   };
 
-  // NUEVOS HANDLERS PARA ALTAS PROGRAMADAS
+  // Altas programadas / reactivación
   const handleProgramarAltaAfiliado = (afiliado, fechaAlta) => {
-    dispatch(
-      programarAltaAfiliado({
-        afiliadoId: afiliado.id,
-        fechaAlta,
-      })
-    );
-
-    // También actualizar la fecha de alta del titular
+    dispatch(programarAltaAfiliado({ afiliadoId: afiliado.id, fechaAlta }));
     const titular = getTitularDelAfiliado(afiliado, personas);
-    if (titular) {
-      dispatch(
-        updateAltaPersona({
-          personaId: titular.id,
-          fechaAlta: fechaAlta,
-        })
-      );
-    }
-
+    if (titular) dispatch(updatePersona({ ...titular, alta: fechaAlta }));
     showSnackbar("Alta programada correctamente");
   };
 
   const handleCancelarAltaProgramada = (afiliado) => {
-    const hoy = new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
+    const hoy = hoyISO();
     dispatch(
       cancelarAltaProgramada({
         afiliadoId: afiliado.id,
         fechaAltaInmediata: hoy,
       })
     );
-
-    // También actualizar la fecha de alta del titular
     const titular = getTitularDelAfiliado(afiliado, personas);
-    if (titular) {
-      dispatch(
-        updateAltaPersona({
-          personaId: titular.id,
-          fechaAlta: hoy,
-        })
-      );
-    }
-
+    if (titular) dispatch(updatePersona({ ...titular, alta: hoy }));
     showSnackbar("Alta programada cancelada");
   };
 
   const handleReactivarInmediatamente = (afiliado) => {
     dispatch(reactivarAfiliado({ afiliadoId: afiliado.id }));
-
-    // También actualizar la fecha de alta del titular
     const titular = getTitularDelAfiliado(afiliado, personas);
-    if (titular) {
-      const hoy = new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              });
-      dispatch(
-        updateAltaPersona({
-          personaId: titular.id,
-          fechaAlta: hoy,
-        })
-      );
-    }
-
+    if (titular) dispatch(updatePersona({ ...titular, alta: hoyISO() }));
     showSnackbar("Afiliado reactivado inmediatamente");
   };
 
@@ -345,7 +245,7 @@ export default function Afiliados() {
     setOpenAltaDialog(true);
   };
 
-  // Handlers para Familiares
+  // Familiares
   const handleAddFamiliar = (afiliado) => {
     setSelectedAfiliado(afiliado);
     setSelectedFamiliar(null);
@@ -357,15 +257,15 @@ export default function Afiliados() {
       numeroDocumento: "",
       fechaNacimiento: "",
       parentesco: 2,
-      alta: new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              }),
+      alta: hoyISO(),
     });
     setEditTelefonos([]);
     setEditEmails([]);
     setEditDirecciones([]);
+    setEditSituaciones([]);
     setOpenFamiliarDialog(true);
   };
+
   const handleEditFamiliar = (familiar, afiliado) => {
     setSelectedAfiliado(afiliado);
     setSelectedFamiliar(familiar);
@@ -382,6 +282,7 @@ export default function Afiliados() {
     setEditTelefonos([...familiar.telefonos]);
     setEditEmails([...familiar.emails]);
     setEditDirecciones([...familiar.direcciones]);
+    setEditSituaciones([...(familiar.situacionesTerapeuticas || [])]);
     setOpenFamiliarDialog(true);
   };
 
@@ -389,6 +290,7 @@ export default function Afiliados() {
     setSelectedAfiliado(afiliado);
     setSelectedFamiliar(familiar);
     setIsEditingFamiliar(false);
+    setEditSituaciones([...(familiar.situacionesTerapeuticas || [])]);
     setOpenFamiliarDialog(true);
   };
 
@@ -418,6 +320,7 @@ export default function Afiliados() {
           telefonos: editTelefonos,
           emails: editEmails,
           direcciones: editDirecciones,
+          situacionesTerapeuticas: editSituaciones,
         })
       );
       showSnackbar("Familiar actualizado");
@@ -427,10 +330,9 @@ export default function Afiliados() {
         personas
       );
       const maxIntegrante = Math.max(
-        ...familiaresDelGrupo.map((f) => f.numeroIntegrante),
+        ...familiaresDelGrupo.map((f) => Number(f.numeroIntegrante) || 1),
         1
       );
-
       dispatch(
         addPersona({
           id: `f${Date.now()}`,
@@ -447,7 +349,7 @@ export default function Afiliados() {
           telefonos: editTelefonos,
           emails: editEmails,
           direcciones: editDirecciones,
-          situacionesTerapeuticas: [],
+          situacionesTerapeuticas: editSituaciones,
         })
       );
       showSnackbar("Familiar agregado");
@@ -466,7 +368,7 @@ export default function Afiliados() {
     }
   };
 
-  // Handlers para Bajas
+  // Bajas
   const handleOpenBajaDialog = (afiliado) => {
     setAfiliadoParaBaja(afiliado);
     setOpenBajaDialog(true);
@@ -474,30 +376,25 @@ export default function Afiliados() {
 
   const handleSetBajaAfiliado = (afiliado, fechaBaja) => {
     dispatch(setBajaAfiliado({ afiliadoId: afiliado.id, fechaBaja }));
+    const titular = getTitularDelAfiliado(afiliado, personas);
+    if (titular) dispatch(updatePersona({ ...titular, baja: fechaBaja }));
     showSnackbar("Baja programada");
   };
 
   const handleCancelBajaAfiliado = (afiliado) => {
     dispatch(cancelBajaAfiliado(afiliado.id));
+    const titular = getTitularDelAfiliado(afiliado, personas);
+    if (titular) dispatch(updatePersona({ ...titular, baja: null }));
     showSnackbar("Baja cancelada");
   };
 
-  // Funciones de estilo
+  // Style helpers
   const getParentescoColor = (parentescoId) =>
-    ({
-      1: "#1976d2",
-      2: "#2e7d32",
-      3: "#f57c00",
-      4: "#757575",
-    }[parentescoId] || "#757575");
-
+    ({ 1: "#1976d2", 2: "#2e7d32", 3: "#f57c00", 4: "#757575" }[parentescoId] ||
+    "#757575");
   const getPlanColor = (planMedicoId) =>
-    ({
-      1: "#cd7f32",
-      2: "#c0c0c0",
-      3: "#ffd700",
-      4: "#e5e4e2",
-    }[planMedicoId] || "#757575");
+    ({ 1: "#cd7f32", 2: "#c0c0c0", 3: "#ffd700", 4: "#e5e4e2" }[planMedicoId] ||
+    "#757575");
 
   return (
     <Box>
@@ -524,7 +421,6 @@ export default function Afiliados() {
           const titular = getTitularDelAfiliado(afiliado, personas);
           const familiares = getFamiliaresDelAfiliado(afiliado, personas);
           if (!titular) return null;
-
           return (
             <AfiliadoCard
               key={afiliado.id}
@@ -537,14 +433,11 @@ export default function Afiliados() {
               )}
               estaActivo={estaActivo(afiliado.alta, afiliado.baja)}
               tieneBajaProgramada={tieneBajaProgramada(afiliado.baja)}
-              tieneAltaProgramada={tieneAltaProgramada(
-                afiliado.alta,
-                afiliado.baja
-              )}
+              tieneAltaProgramada={tieneAltaProgramada(afiliado.alta)}
               onView={handleViewAfiliado}
               onEdit={handleEditAfiliado}
               onSetBaja={handleOpenBajaDialog}
-              onSetAlta={handleOpenAltaDialog} // Nueva prop para abrir AltaDialog
+              onSetAlta={handleOpenAltaDialog}
               onAddFamiliar={handleAddFamiliar}
               onViewFamiliar={handleViewFamiliar}
               onEditFamiliar={handleEditFamiliar}
@@ -581,20 +474,20 @@ export default function Afiliados() {
         formData={formAfiliado}
         planesMedicos={planesMedicos}
         personas={personas}
+        situacionesCatalogo={situacionesCatalogo} // <-- pasamos catálogo
         editTelefonos={editTelefonos}
         editEmails={editEmails}
         editDirecciones={editDirecciones}
+        editSituaciones={editSituaciones}
         onEditTelefonosChange={setEditTelefonos}
         onEditEmailsChange={setEditEmails}
         onEditDireccionesChange={setEditDirecciones}
+        onEditSituacionesChange={setEditSituaciones}
         onClose={() => setOpenDialog(false)}
         onSave={handleSaveAfiliado}
-        onFormChange={(field, value) => {
-          setFormAfiliado((prev) => ({
-            ...prev,
-            [field]: value,
-          }));
-        }}
+        onFormChange={(field, value) =>
+          setFormAfiliado((prev) => ({ ...prev, [field]: value }))
+        }
       />
 
       <PersonaFormDialog
@@ -604,20 +497,20 @@ export default function Afiliados() {
         isEditing={isEditingFamiliar}
         formData={formFamiliar}
         parentescos={parentescos}
+        situacionesCatalogo={situacionesCatalogo} // <-- pasamos catálogo
         editTelefonos={editTelefonos}
         editEmails={editEmails}
         editDirecciones={editDirecciones}
+        editSituaciones={editSituaciones}
         onEditTelefonosChange={setEditTelefonos}
         onEditEmailsChange={setEditEmails}
         onEditDireccionesChange={setEditDirecciones}
+        onEditSituacionesChange={setEditSituaciones}
         onClose={() => setOpenFamiliarDialog(false)}
         onSave={handleSaveFamiliar}
-        onFormChange={(field, value) => {
-          setFormFamiliar((prev) => ({
-            ...prev,
-            [field]: value,
-          }));
-        }}
+        onFormChange={(field, value) =>
+          setFormFamiliar((prev) => ({ ...prev, [field]: value }))
+        }
       />
 
       <BajaDialog
@@ -628,7 +521,6 @@ export default function Afiliados() {
         onCancelBaja={handleCancelBajaAfiliado}
       />
 
-      {/* NUEVO: Dialog para Altas Programadas */}
       <AltaDialog
         open={openAltaDialog}
         afiliado={afiliadoParaAlta}

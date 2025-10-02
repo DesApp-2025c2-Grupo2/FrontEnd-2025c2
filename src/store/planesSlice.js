@@ -50,7 +50,7 @@ const initialState = {
 };
 
 export const cargarPlanes = createAsyncThunk('planes/cargar', async () => {
-  // Semilla inicial si localStorage está vacío
+  // Semilla inicial si sessionStorage está vacío
   const data = await planesService.ensureSeed(initialState.items);
   // Normalizar/migrar: asegurar id único y tipos correctos
   const fixed = data.map((p) => ({

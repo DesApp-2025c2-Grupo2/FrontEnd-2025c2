@@ -21,6 +21,14 @@ import {
   Home as HomeIcon,
 } from "@mui/icons-material";
 import ContactInfoEditor from "./ContactInfoEditor";
+import SituacionesSelector from "./SituacionesSelector";
+import { useSelector } from "react-redux";
+import { selectSituaciones } from "../../store/situacionesTerapeuticasSlice";
+
+const hoyISO = () => new Date().toISOString().split("T")[0];
+
+const padNumeroAfiliado = (n) => String(Number(n) || 0).padStart(7, "0");
+const padIntegrante = (n) => String(Number(n) || 0).padStart(2, "0");
 
 export default function AfiliadoFormDialog({
   open,
@@ -31,20 +39,23 @@ export default function AfiliadoFormDialog({
   editTelefonos,
   editEmails,
   editDirecciones,
+  editSituaciones,
   onEditTelefonosChange,
   onEditEmailsChange,
   onEditDireccionesChange,
+  onEditSituacionesChange,
   onClose,
   onSave,
   onEdit,
   onFormChange,
-  personas,
+  personas = [],
 }) {
   const [newTelefono, setNewTelefono] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newDireccion, setNewDireccion] = useState("");
 
-  // Limpiar inputs nuevos cuando se cierra/abre el diálogo
+  const situacionesCatalogo = useSelector(selectSituaciones) || [];
+
   useEffect(() => {
     if (open) {
       setNewTelefono("");
@@ -53,70 +64,39 @@ export default function AfiliadoFormDialog({
     }
   }, [open]);
 
-  // Obtener el titular del afiliado
-  const getTitularDelAfiliado = (afiliado) => {
-    return personas.find((p) => p.id === afiliado.titularId);
-  };
+  const getTitularDelAfiliado = (afiliado) =>
+    personas.find((p) => p.id === afiliado.titularId);
 
   const handleAddTelefono = () => {
     if (newTelefono.trim()) {
-      const updatedTelefonos = [...editTelefonos, newTelefono.trim()];
-      onEditTelefonosChange(updatedTelefonos);
+      onEditTelefonosChange([...editTelefonos, newTelefono.trim()]);
       setNewTelefono("");
     }
   };
-
-  const handleRemoveTelefono = (index) => {
-    const updatedTelefonos = editTelefonos.filter((_, i) => i !== index);
-    onEditTelefonosChange(updatedTelefonos);
-  };
-
+  const handleRemoveTelefono = (index) =>
+    onEditTelefonosChange(editTelefonos.filter((_, i) => i !== index));
   const handleAddEmail = () => {
     if (newEmail.trim()) {
-      const updatedEmails = [...editEmails, newEmail.trim()];
-      onEditEmailsChange(updatedEmails);
+      onEditEmailsChange([...editEmails, newEmail.trim()]);
       setNewEmail("");
     }
   };
-
-  const handleRemoveEmail = (index) => {
-    const updatedEmails = editEmails.filter((_, i) => i !== index);
-    onEditEmailsChange(updatedEmails);
-  };
-
+  const handleRemoveEmail = (index) =>
+    onEditEmailsChange(editEmails.filter((_, i) => i !== index));
   const handleAddDireccion = () => {
     if (newDireccion.trim()) {
-      const updatedDirecciones = [...editDirecciones, newDireccion.trim()];
-      onEditDireccionesChange(updatedDirecciones);
+      onEditDireccionesChange([...editDirecciones, newDireccion.trim()]);
       setNewDireccion("");
     }
   };
+  const handleRemoveDireccion = (index) =>
+    onEditDireccionesChange(editDirecciones.filter((_, i) => i !== index));
 
-  const handleRemoveDireccion = (index) => {
-    const updatedDirecciones = editDirecciones.filter((_, i) => i !== index);
-    onEditDireccionesChange(updatedDirecciones);
-  };
-
-  const getPlanMedicoNombre = (planMedicoId) => {
-    const plan = planesMedicos.find((p) => p.id === planMedicoId);
-    return plan ? plan.nombre : "Desconocido";
-  };
-
-  // Handler para cambios en el formulario - DIRECTO AL PADRE
-  const handleFormChange = (field, value) => {
-    onFormChange(field, value);
-  };
-
-  // Handler específico para plan médico
-  const handlePlanMedicoChange = (e) => {
-    const value = parseInt(e.target.value);
-    handleFormChange("planMedicoId", value);
-  };
-
-  // Handler específico para tipo de documento
-  const handleTipoDocumentoChange = (e) => {
+  const handleFormChange = (field, value) => onFormChange(field, value);
+  const handlePlanMedicoChange = (e) =>
+    handleFormChange("planMedicoId", Number(e.target.value));
+  const handleTipoDocumentoChange = (e) =>
     handleFormChange("tipoDocumento", e.target.value);
-  };
 
   const titular = selectedAfiliado
     ? getTitularDelAfiliado(selectedAfiliado)
@@ -131,44 +111,59 @@ export default function AfiliadoFormDialog({
             : "Detalle del Afiliado Titular"
           : "Nuevo Afiliado Titular"}
       </DialogTitle>
+
       <DialogContent>
         {selectedAfiliado && !isEditing ? (
-          // MODO VISTA (SOLO LECTURA)
           <Box sx={{ pt: 2 }}>
             {titular ? (
               <>
                 <Typography variant="h6" gutterBottom>
                   {titular.apellido}, {titular.nombre}
                 </Typography>
+
                 <Typography variant="body2" gutterBottom>
-                  <strong>Número de Afiliado:</strong>{" "}
-                  {selectedAfiliado.numeroAfiliado}
+                  <strong>Credencial:</strong>{" "}
+                  {padNumeroAfiliado(afiliadoNumero(selectedAfiliado))}-
+                  {padIntegrante(titular.numeroIntegrante)}
                 </Typography>
+
                 <Typography variant="body2" gutterBottom>
                   <strong>Documento:</strong> {titular.tipoDocumento}{" "}
                   {titular.numeroDocumento}
                 </Typography>
+
                 <Typography variant="body2" gutterBottom>
                   <strong>Plan Médico:</strong>{" "}
-                  {getPlanMedicoNombre(selectedAfiliado.planMedicoId)}
+                  {planesMedicos.find(
+                    (p) => p.id === selectedAfiliado.planMedicoId
+                  )?.nombre || "Desconocido"}
                 </Typography>
+
                 <Typography variant="body2" gutterBottom>
                   <strong>Fecha de Nacimiento:</strong>{" "}
-                  {new Date(titular.fechaNacimiento).toLocaleDateString(
-                    "es-AR"
-                  )}
+                  {titular.fechaNacimiento
+                    ? new Date(titular.fechaNacimiento).toLocaleDateString(
+                        "es-AR"
+                      )
+                    : ""}
                 </Typography>
+
                 <Typography variant="body2" gutterBottom>
                   <strong>Fecha de Alta:</strong>{" "}
-                  {new Date(selectedAfiliado.alta).toLocaleDateString("es-AR", {
-                    timeZone: "UTC",
-                  })}
+                  {selectedAfiliado.alta
+                    ? new Date(selectedAfiliado.alta).toLocaleDateString(
+                        "es-AR",
+                        { timeZone: "UTC" }
+                      )
+                    : ""}
                 </Typography>
+
                 {selectedAfiliado.baja && (
                   <Typography variant="body2" gutterBottom>
                     <strong>Fecha de Baja:</strong>{" "}
                     {new Date(selectedAfiliado.baja).toLocaleDateString(
-                      "es-AR"
+                      "es-AR",
+                      { timeZone: "UTC" }
                     )}
                   </Typography>
                 )}
@@ -190,16 +185,17 @@ export default function AfiliadoFormDialog({
                       ml: 2,
                     }}
                   >
-                    {titular.telefonos?.map((telefono, index) => (
-                      <Box
-                        key={index}
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <PhoneIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                        <Typography variant="body2">{telefono}</Typography>
-                      </Box>
-                    ))}
-                    {(!titular.telefonos || titular.telefonos.length === 0) && (
+                    {titular.telefonos?.length ? (
+                      titular.telefonos.map((t, i) => (
+                        <Box
+                          key={i}
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <PhoneIcon sx={{ fontSize: 16, color: "#1976d2" }} />
+                          <Typography variant="body2">{t}</Typography>
+                        </Box>
+                      ))
+                    ) : (
                       <Typography variant="body2" color="textSecondary">
                         No hay teléfonos registrados
                       </Typography>
@@ -222,16 +218,17 @@ export default function AfiliadoFormDialog({
                       ml: 2,
                     }}
                   >
-                    {titular.emails?.map((email, index) => (
-                      <Box
-                        key={index}
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <EmailIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                        <Typography variant="body2">{email}</Typography>
-                      </Box>
-                    ))}
-                    {(!titular.emails || titular.emails.length === 0) && (
+                    {titular.emails?.length ? (
+                      titular.emails.map((e, i) => (
+                        <Box
+                          key={i}
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <EmailIcon sx={{ fontSize: 16, color: "#1976d2" }} />
+                          <Typography variant="body2">{e}</Typography>
+                        </Box>
+                      ))
+                    ) : (
                       <Typography variant="body2" color="textSecondary">
                         No hay emails registrados
                       </Typography>
@@ -254,23 +251,48 @@ export default function AfiliadoFormDialog({
                       ml: 2,
                     }}
                   >
-                    {titular.direcciones?.map((direccion, index) => (
-                      <Box
-                        key={index}
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <HomeIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                        <Typography variant="body2">{direccion}</Typography>
-                      </Box>
-                    ))}
-                    {(!titular.direcciones ||
-                      titular.direcciones.length === 0) && (
+                    {titular.direcciones?.length ? (
+                      titular.direcciones.map((d, i) => (
+                        <Box
+                          key={i}
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
+                          <HomeIcon sx={{ fontSize: 16, color: "#1976d2" }} />
+                          <Typography variant="body2">{d}</Typography>
+                        </Box>
+                      ))
+                    ) : (
                       <Typography variant="body2" color="textSecondary">
                         No hay direcciones registradas
                       </Typography>
                     )}
                   </Box>
                 </Box>
+
+                {titular.situacionesTerapeuticas?.length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: "bold", mb: 1 }}
+                    >
+                      Situaciones Terapéuticas:
+                    </Typography>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 0.5,
+                        ml: 2,
+                      }}
+                    >
+                      {titular.situacionesTerapeuticas.map((s, i) => (
+                        <Typography key={i} variant="body2">
+                          • {s}
+                        </Typography>
+                      ))}
+                    </Box>
+                  </Box>
+                )}
               </>
             ) : (
               <Typography color="error">
@@ -279,7 +301,6 @@ export default function AfiliadoFormDialog({
             )}
           </Box>
         ) : (
-          // MODO EDICIÓN/CREACIÓN
           <Box sx={{ pt: 2 }}>
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12} sm={6}>
@@ -316,6 +337,7 @@ export default function AfiliadoFormDialog({
                   </Select>
                 </FormControl>
               </Grid>
+
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
@@ -343,6 +365,7 @@ export default function AfiliadoFormDialog({
                   required
                 />
               </Grid>
+
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
@@ -352,7 +375,7 @@ export default function AfiliadoFormDialog({
                   value={
                     formData.alta
                       ? new Date(formData.alta).toISOString().split("T")[0]
-                      : ""
+                      : hoyISO()
                   }
                   onChange={(e) => handleFormChange("alta", e.target.value)}
                   required
@@ -424,9 +447,30 @@ export default function AfiliadoFormDialog({
                 />
               </Grid>
             </Grid>
+
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid item xs={12}>
+                <SituacionesSelector
+                  items={editSituaciones || []}
+                  opciones={situacionesCatalogo}
+                  onAdd={(nombre) =>
+                    onEditSituacionesChange([
+                      ...(editSituaciones || []),
+                      nombre,
+                    ])
+                  }
+                  onRemove={(idx) =>
+                    onEditSituacionesChange(
+                      (editSituaciones || []).filter((_, i) => i !== idx)
+                    )
+                  }
+                />
+              </Grid>
+            </Grid>
           </Box>
         )}
       </DialogContent>
+
       <DialogActions>
         <Button variant="outlined" onClick={onClose}>
           {selectedAfiliado && !isEditing ? "Cerrar" : "Cancelar"}
@@ -444,4 +488,13 @@ export default function AfiliadoFormDialog({
       </DialogActions>
     </Dialog>
   );
+}
+
+/**
+ * Helper local: obtiene número de afiliado (por si selectedAfiliado.numeroAfiliado pudiera venir como string)
+ * definido abajo para evitar repetir coerciones en JSX
+ */
+function afiliadoNumero(afiliado) {
+  if (!afiliado) return 0;
+  return Number(afiliado.numeroAfiliado) || 0;
 }

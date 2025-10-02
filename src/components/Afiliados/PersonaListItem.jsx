@@ -5,6 +5,15 @@ import {
   Visibility as VisibilityIcon,
 } from "@mui/icons-material";
 
+const startOfDay = (d) => {
+  const dt = new Date(d);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+};
+
+const padIntegrante = (n) => String(Number(n) || 0).padStart(2, "0");
+const padAfiliado = (n) => String(Number(n) || 0).padStart(7, "0");
+
 export default function PersonaListItem({
   persona,
   afiliado,
@@ -14,14 +23,16 @@ export default function PersonaListItem({
   getParentescoColor,
   getParentescoNombre,
 }) {
+  const hoy = startOfDay(new Date());
+  const tieneBaja = Boolean(persona?.baja);
+  const bajaEsFutura = tieneBaja && startOfDay(new Date(persona.baja)) > hoy;
+
   return (
     <Card
       sx={{
         p: 2,
         backgroundColor: "#f8f9fa",
-        opacity: !persona.baja || new Date(persona.baja) > new Date().toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              }) ? 1 : 0.6,
+        opacity: !tieneBaja || bajaEsFutura ? 1 : 0.6,
       }}
     >
       <Box
@@ -36,11 +47,15 @@ export default function PersonaListItem({
             {persona.nombre} {persona.apellido}
           </Typography>
           <Typography variant="body2" color="textSecondary">
-            <strong>Integrante Nº:</strong> {persona.numeroIntegrante} |{" "}
+            <strong>Afiliado Nº:</strong>{" "}
+            {padAfiliado(afiliado?.numeroAfiliado)}-
+            {padIntegrante(persona.numeroIntegrante)} |{" "}
             <strong>Nacimiento:</strong>{" "}
-            {new Date(persona.fechaNacimiento).toLocaleDateString("es-AR", {
-                timeZone: "UTC",
-              })}
+            {persona.fechaNacimiento
+              ? new Date(persona.fechaNacimiento).toLocaleDateString("es-AR", {
+                  timeZone: "UTC",
+                })
+              : ""}
           </Typography>
           <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
             <Chip
