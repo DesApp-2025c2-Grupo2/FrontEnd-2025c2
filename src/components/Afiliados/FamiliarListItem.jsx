@@ -4,12 +4,14 @@ import {
   Edit as EditIcon,
   ToggleOff as ToggleOffIcon,
   ToggleOn as ToggleOnIcon,
+  Visibility as VisibilityIcon,
 } from "@mui/icons-material";
 
 export default function FamiliarListItem({
   familiar,
   afiliado,
   onEdit,
+  onView,
   onToggleActive,
   onDelete,
   getParentescoColor,
@@ -40,7 +42,11 @@ export default function FamiliarListItem({
           </Typography>
           <Box sx={{ mt: 1 }}>
             <Chip
-              label={familiar.parentesco === "ACargo" ? "A Cargo" : familiar.parentesco}
+              label={
+                familiar.parentesco === "ACargo"
+                  ? "A Cargo"
+                  : familiar.parentesco
+              }
               size="small"
               sx={{
                 backgroundColor: getParentescoColor(familiar.parentesco),
@@ -53,10 +59,17 @@ export default function FamiliarListItem({
         <Box sx={{ display: "flex", gap: 1 }}>
           <IconButton
             size="small"
+            onClick={() => onView(familiar, afiliado)}
+            color="info"
+          >
+            <VisibilityIcon />
+          </IconButton>
+          <IconButton
+            size="small"
             onClick={() => onEdit(familiar, afiliado)}
             color="black"
           >
-            <EditIcon/>
+            <EditIcon />
           </IconButton>
           <IconButton
             size="small"

@@ -1,4 +1,4 @@
-import { createSlice } from "@reduxjs/toolkit"
+import { createSlice } from "@reduxjs/toolkit";
 
 const initialState = {
   afiliados: [
@@ -12,8 +12,16 @@ const initialState = {
       apellido: "Gómez",
       fechaNacimiento: "1980-05-15",
       telefonos: ["11-1234-5678", "11-9876-5432", "15-5555-1234"],
-      emails: ["pedro.gomez@email.com", "pedro.trabajo@empresa.com", "pgomez@gmail.com"],
-      direcciones: ["Av. Corrientes 1234, CABA", "San Martín 890, Vicente López", "Rivadavia 456, Quilmes"],
+      emails: [
+        "pedro.gomez@email.com",
+        "pedro.trabajo@empresa.com",
+        "pgomez@gmail.com",
+      ],
+      direcciones: [
+        "Av. Corrientes 1234, CABA",
+        "San Martín 890, Vicente López",
+        "Rivadavia 456, Quilmes",
+      ],
       parentesco: "Titular",
       situacionesTerapeuticas: [],
       planMedico: "Plan Bronce",
@@ -60,46 +68,98 @@ const initialState = {
       familiaresIds: [],
     },
   ],
-}
+};
 
 const afiliadosSlice = createSlice({
   name: "afiliados",
   initialState,
   reducers: {
     addAfiliado: (state, action) => {
-      state.afiliados.push(action.payload)
+      state.afiliados.push(action.payload);
     },
     updateAfiliado: (state, action) => {
-      const index = state.afiliados.findIndex((a) => a.id === action.payload.id)
+      const index = state.afiliados.findIndex(
+        (a) => a.id === action.payload.id
+      );
       if (index !== -1) {
-        state.afiliados[index] = action.payload
+        state.afiliados[index] = action.payload;
       }
     },
     deleteAfiliado: (state, action) => {
-      state.afiliados = state.afiliados.filter((a) => a.id !== action.payload)
+      state.afiliados = state.afiliados.filter((a) => a.id !== action.payload);
     },
     toggleAfiliadoActive: (state, action) => {
-      const afiliado = state.afiliados.find((a) => a.id === action.payload)
+      const afiliado = state.afiliados.find((a) => a.id === action.payload);
       if (afiliado) {
-        afiliado.activo = !afiliado.activo
+        afiliado.activo = !afiliado.activo;
       }
     },
     addFamiliarToAfiliado: (state, action) => {
-      const { afiliadoId, familiarId } = action.payload
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId)
+      const { afiliadoId, familiarId } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
       if (afiliado && !afiliado.familiaresIds.includes(familiarId)) {
-        afiliado.familiaresIds.push(familiarId)
+        afiliado.familiaresIds.push(familiarId);
       }
     },
     removeFamiliarFromAfiliado: (state, action) => {
-      const { afiliadoId, familiarId } = action.payload
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId)
+      const { afiliadoId, familiarId } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
       if (afiliado) {
-        afiliado.familiaresIds = afiliado.familiaresIds.filter((id) => id !== familiarId)
+        afiliado.familiaresIds = afiliado.familiaresIds.filter(
+          (id) => id !== familiarId
+        );
+      }
+    },
+    addTelefonoToAfiliado: (state, action) => {
+      const { afiliadoId, telefono } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
+      if (afiliado && !afiliado.telefonos.includes(telefono)) {
+        afiliado.telefonos.push(telefono);
+      }
+    },
+    removeTelefonoFromAfiliado: (state, action) => {
+      const { afiliadoId, telefonoIndex } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
+      if (afiliado) {
+        afiliado.telefonos = afiliado.telefonos.filter(
+          (_, index) => index !== telefonoIndex
+        );
+      }
+    },
+    addEmailToAfiliado: (state, action) => {
+      const { afiliadoId, email } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
+      if (afiliado && !afiliado.emails.includes(email)) {
+        afiliado.emails.push(email);
+      }
+    },
+    removeEmailFromAfiliado: (state, action) => {
+      const { afiliadoId, emailIndex } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
+      if (afiliado) {
+        afiliado.emails = afiliado.emails.filter(
+          (_, index) => index !== emailIndex
+        );
+      }
+    },
+    addDireccionToAfiliado: (state, action) => {
+      const { afiliadoId, direccion } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
+      if (afiliado && !afiliado.direcciones.includes(direccion)) {
+        afiliado.direcciones.push(direccion);
+      }
+    },
+    removeDireccionFromAfiliado: (state, action) => {
+      const { afiliadoId, direccionIndex } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
+      if (afiliado) {
+        afiliado.direcciones = afiliado.direcciones.filter(
+          (_, index) => index !== direccionIndex
+        );
       }
     },
   },
-})
+});
 
 export const {
   addAfiliado,
@@ -108,6 +168,12 @@ export const {
   toggleAfiliadoActive,
   addFamiliarToAfiliado,
   removeFamiliarFromAfiliado,
-} = afiliadosSlice.actions
+  addTelefonoToAfiliado,
+  removeTelefonoFromAfiliado,
+  addEmailToAfiliado,
+  removeEmailFromAfiliado,
+  addDireccionToAfiliado,
+  removeDireccionFromAfiliado,
+} = afiliadosSlice.actions;
 
-export default afiliadosSlice.reducer
+export default afiliadosSlice.reducer;

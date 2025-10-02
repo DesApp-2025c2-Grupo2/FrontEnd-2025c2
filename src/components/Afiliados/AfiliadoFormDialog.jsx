@@ -1,3 +1,5 @@
+import { useState, useEffect } from "react";
+import { useDispatch } from "react-redux";
 import {
   Dialog,
   DialogTitle,
@@ -20,6 +22,14 @@ import {
   Home as HomeIcon,
 } from "@mui/icons-material";
 import ContactInfoEditor from "./ContactInfoEditor";
+import {
+  addTelefonoToAfiliado,
+  removeTelefonoFromAfiliado,
+  addEmailToAfiliado,
+  removeEmailFromAfiliado,
+  addDireccionToAfiliado,
+  removeDireccionFromAfiliado,
+} from "../../store/afiliadosSlice";
 
 export default function AfiliadoFormDialog({
   open,
@@ -29,23 +39,130 @@ export default function AfiliadoFormDialog({
   editTelefonos,
   editEmails,
   editDirecciones,
-  newTelefono,
-  newEmail,
-  newDireccion,
+  onEditTelefonosChange,
+  onEditEmailsChange,
+  onEditDireccionesChange,
   onClose,
   onSave,
   onEdit,
   onFormChange,
-  onNewTelefonoChange,
-  onNewEmailChange,
-  onNewDireccionChange,
-  onAddTelefono,
-  onAddEmail,
-  onAddDireccion,
-  onRemoveTelefono,
-  onRemoveEmail,
-  onRemoveDireccion,
 }) {
+  const dispatch = useDispatch();
+
+  const [newTelefono, setNewTelefono] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newDireccion, setNewDireccion] = useState("");
+
+  // Limpiar inputs nuevos cuando se cierra/abre el diálogo
+  useEffect(() => {
+    setNewTelefono("");
+    setNewEmail("");
+    setNewDireccion("");
+  }, [open]);
+
+  const handleAddTelefono = () => {
+    if (newTelefono.trim()) {
+      const updatedTelefonos = [...editTelefonos, newTelefono.trim()];
+      onEditTelefonosChange(updatedTelefonos);
+
+      if (selectedAfiliado && isEditing) {
+        dispatch(
+          addTelefonoToAfiliado({
+            afiliadoId: selectedAfiliado.id,
+            telefono: newTelefono.trim(),
+          })
+        );
+      }
+      setNewTelefono("");
+    }
+  };
+
+  const handleRemoveTelefono = (index) => {
+    const updatedTelefonos = editTelefonos.filter((_, i) => i !== index);
+    onEditTelefonosChange(updatedTelefonos);
+
+    // Si estamos editando, actualizar en Redux
+    if (selectedAfiliado && isEditing) {
+      dispatch(
+        removeTelefonoFromAfiliado({
+          afiliadoId: selectedAfiliado.id,
+          telefonoIndex: index,
+        })
+      );
+    }
+  };
+
+  const handleAddEmail = () => {
+    if (newEmail.trim()) {
+      const updatedEmails = [...editEmails, newEmail.trim()];
+      onEditEmailsChange(updatedEmails);
+
+      if (selectedAfiliado && isEditing) {
+        dispatch(
+          addEmailToAfiliado({
+            afiliadoId: selectedAfiliado.id,
+            email: newEmail.trim(),
+          })
+        );
+      }
+      setNewEmail("");
+    }
+  };
+
+  const handleRemoveEmail = (index) => {
+    const updatedEmails = editEmails.filter((_, i) => i !== index);
+    onEditEmailsChange(updatedEmails);
+
+    if (selectedAfiliado && isEditing) {
+      dispatch(
+        removeEmailFromAfiliado({
+          afiliadoId: selectedAfiliado.id,
+          emailIndex: index,
+        })
+      );
+    }
+  };
+
+  const handleAddDireccion = () => {
+    if (newDireccion.trim()) {
+      const updatedDirecciones = [...editDirecciones, newDireccion.trim()];
+      onEditDireccionesChange(updatedDirecciones);
+
+      if (selectedAfiliado && isEditing) {
+        dispatch(
+          addDireccionToAfiliado({
+            afiliadoId: selectedAfiliado.id,
+            direccion: newDireccion.trim(),
+          })
+        );
+      }
+      setNewDireccion("");
+    }
+  };
+
+  const handleRemoveDireccion = (index) => {
+    const updatedDirecciones = editDirecciones.filter((_, i) => i !== index);
+    onEditDireccionesChange(updatedDirecciones);
+
+    if (selectedAfiliado && isEditing) {
+      dispatch(
+        removeDireccionFromAfiliado({
+          afiliadoId: selectedAfiliado.id,
+          direccionIndex: index,
+        })
+      );
+    }
+  };
+
+  const handleSaveWithContacts = () => {
+    // Para nuevos afiliados, pasar los contactos en el objeto
+    if (!selectedAfiliado) {
+      // Los contactos se manejarán en el componente principal a través del formData
+      // editTelefonos, editEmails, editDirecciones contienen los datos
+    }
+    onSave();
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
@@ -101,7 +218,7 @@ export default function AfiliadoFormDialog({
                   ml: 2,
                 }}
               >
-                {selectedAfiliado.telefonos.map((telefono, index) => (
+                {selectedAfiliado.telefonos?.map((telefono, index) => (
                   <Box
                     key={index}
                     sx={{ display: "flex", alignItems: "center", gap: 1 }}
@@ -125,7 +242,7 @@ export default function AfiliadoFormDialog({
                   ml: 2,
                 }}
               >
-                {selectedAfiliado.emails.map((email, index) => (
+                {selectedAfiliado.emails?.map((email, index) => (
                   <Box
                     key={index}
                     sx={{ display: "flex", alignItems: "center", gap: 1 }}
@@ -149,7 +266,7 @@ export default function AfiliadoFormDialog({
                   ml: 2,
                 }}
               >
-                {selectedAfiliado.direcciones.map((direccion, index) => (
+                {selectedAfiliado.direcciones?.map((direccion, index) => (
                   <Box
                     key={index}
                     sx={{ display: "flex", alignItems: "center", gap: 1 }}
@@ -266,9 +383,9 @@ export default function AfiliadoFormDialog({
                   items={editTelefonos}
                   newValue={newTelefono}
                   placeholder="Agregar teléfono"
-                  onNewValueChange={onNewTelefonoChange}
-                  onAdd={onAddTelefono}
-                  onRemove={onRemoveTelefono}
+                  onNewValueChange={setNewTelefono}
+                  onAdd={handleAddTelefono}
+                  onRemove={handleRemoveTelefono}
                 />
               </Grid>
             </Grid>
@@ -282,9 +399,9 @@ export default function AfiliadoFormDialog({
                   newValue={newEmail}
                   placeholder="Agregar email"
                   inputType="email"
-                  onNewValueChange={onNewEmailChange}
-                  onAdd={onAddEmail}
-                  onRemove={onRemoveEmail}
+                  onNewValueChange={setNewEmail}
+                  onAdd={handleAddEmail}
+                  onRemove={handleRemoveEmail}
                 />
               </Grid>
             </Grid>
@@ -297,9 +414,9 @@ export default function AfiliadoFormDialog({
                   items={editDirecciones}
                   newValue={newDireccion}
                   placeholder="Agregar dirección"
-                  onNewValueChange={onNewDireccionChange}
-                  onAdd={onAddDireccion}
-                  onRemove={onRemoveDireccion}
+                  onNewValueChange={setNewDireccion}
+                  onAdd={handleAddDireccion}
+                  onRemove={handleRemoveDireccion}
                 />
               </Grid>
             </Grid>
@@ -311,7 +428,11 @@ export default function AfiliadoFormDialog({
           {selectedAfiliado && !isEditing ? "Cerrar" : "Cancelar"}
         </Button>
         {(!selectedAfiliado || isEditing) && (
-          <Button variant="contained" color="secondary" onClick={onSave}>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={handleSaveWithContacts}
+          >
             {selectedAfiliado ? "Guardar Cambios" : "Crear Afiliado"}
           </Button>
         )}

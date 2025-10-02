@@ -1,5 +1,3 @@
-"use client";
-
 import { Box, Typography, Card, TextField, IconButton } from "@mui/material";
 import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 
@@ -31,7 +29,7 @@ export default function ContactInfoEditor({
           onChange={(e) => onNewValueChange(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && onAdd()}
         />
-        <IconButton onClick={onAdd} color="primary">
+        <IconButton onClick={onAdd} color="secondary">
           <AddIcon />
         </IconButton>
       </Box>

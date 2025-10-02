@@ -27,6 +27,7 @@ export default function AfiliadoCard({
   onToggleActive,
   onAddFamiliar,
   onEditFamiliar,
+  onViewFamiliar,
   onToggleFamiliarActive,
   onDeleteFamiliar,
   getParentescoColor,
@@ -169,6 +170,7 @@ export default function AfiliadoCard({
                   familiar={familiar}
                   afiliado={afiliado}
                   onEdit={onEditFamiliar}
+                  onView={onViewFamiliar}
                   onToggleActive={onToggleFamiliarActive}
                   onDelete={onDeleteFamiliar}
                   getParentescoColor={getParentescoColor}

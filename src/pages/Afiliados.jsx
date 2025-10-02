@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Box, Typography, Fab, Snackbar, Alert } from "@mui/material";
 import { Add as AddIcon, Person as PersonIcon } from "@mui/icons-material";
@@ -15,7 +15,7 @@ import {
   deleteFamiliar,
   toggleFamiliarActive,
 } from "../store/familiaresSlice";
-import SearchBar from "../components/Afiliados/SearchBar";
+import AdvancedSearchBar from "../components/Afiliados/AdvancedSearchBar";
 import AfiliadoCard from "../components/Afiliados/AfiliadosCard";
 import AfiliadoFormDialog from "../components/Afiliados/AfiliadoFormDialog";
 import FamiliarFormDialog from "../components/Afiliados/FamiliarFormDialog";
@@ -25,8 +25,10 @@ export default function Afiliados() {
   const afiliados = useSelector((state) => state.afiliados.afiliados);
   const familiares = useSelector((state) => state.familiares.familiares);
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [activeFilters, setActiveFilters] = useState([]);
+  const [editTelefonos, setEditTelefonos] = useState([]);
+  const [editEmails, setEditEmails] = useState([]);
+  const [editDirecciones, setEditDirecciones] = useState([]);
+  const [filteredAfiliados, setFilteredAfiliados] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedAfiliado, setSelectedAfiliado] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -39,13 +41,6 @@ export default function Afiliados() {
   const [openFamiliarDialog, setOpenFamiliarDialog] = useState(false);
   const [selectedFamiliar, setSelectedFamiliar] = useState(null);
   const [isEditingFamiliar, setIsEditingFamiliar] = useState(false);
-
-  const [newTelefono, setNewTelefono] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newDireccion, setNewDireccion] = useState("");
-  const [editTelefonos, setEditTelefonos] = useState([]);
-  const [editEmails, setEditEmails] = useState([]);
-  const [editDirecciones, setEditDirecciones] = useState([]);
 
   const [formAfiliado, setFormAfiliado] = useState({
     nombre: "",
@@ -67,6 +62,10 @@ export default function Afiliados() {
     parentesco: "Cónyuge",
   });
 
+  useEffect(() => {
+    setFilteredAfiliados(afiliados);
+  }, [afiliados]);
+
   const getTodayDate = () => new Date().toISOString().split("T")[0];
 
   const showSnackbar = (message, severity = "success") => {
@@ -78,49 +77,6 @@ export default function Afiliados() {
     const action = afiliado.activo ? "desactivado" : "activado";
     showSnackbar(`Afiliado ${action} exitosamente`);
   };
-
-  const handleKeyPress = (e) => {
-    if (
-      e.key === "Enter" &&
-      searchTerm.trim() &&
-      !activeFilters.includes(searchTerm.trim())
-    ) {
-      setActiveFilters([...activeFilters, searchTerm.trim()]);
-      setSearchTerm("");
-    }
-  };
-
-  const removeFilter = (filterToRemove) => {
-    setActiveFilters(
-      activeFilters.filter((filter) => filter !== filterToRemove)
-    );
-  };
-
-  const clearAllFilters = () => {
-    setActiveFilters([]);
-    setSearchTerm("");
-  };
-
-  const filteredAfiliados = afiliados.filter((afiliado) => {
-    const searchFields = [
-      afiliado.apellido.toLowerCase(),
-      afiliado.nombre.toLowerCase(),
-      afiliado.numeroDocumento,
-      `${afiliado.numeroAfiliado}-${afiliado.numeroIntegrante}`,
-      afiliado.parentesco.toLowerCase(),
-      afiliado.planMedico.toLowerCase(),
-    ].join(" ");
-
-    const matchesCurrentSearch =
-      searchTerm === "" || searchFields.includes(searchTerm.toLowerCase());
-    const matchesActiveFilters =
-      activeFilters.length === 0 ||
-      activeFilters.every((filter) =>
-        searchFields.includes(filter.toLowerCase())
-      );
-
-    return matchesCurrentSearch && matchesActiveFilters;
-  });
 
   const handleAddAfiliado = () => {
     setSelectedAfiliado(null);
@@ -250,6 +206,26 @@ export default function Afiliados() {
     setOpenFamiliarDialog(true);
   };
 
+  const handleViewFamiliar = (familiar, afiliado) => {
+    setSelectedAfiliado(afiliado);
+    setSelectedFamiliar(familiar);
+    setIsEditingFamiliar(false); // Modo vista, no edición
+    setFormFamiliar({
+      nombre: familiar.nombre,
+      apellido: familiar.apellido,
+      tipoDocumento: familiar.tipoDocumento,
+      numeroDocumento: familiar.numeroDocumento,
+      fechaNacimiento: familiar.fechaNacimiento,
+      fechaAlta: familiar.fechaAlta,
+      parentesco: familiar.parentesco,
+    });
+    // Cargar contactos existentes para mostrar en vista
+    setEditTelefonos([...familiar.telefonos]);
+    setEditEmails([...familiar.emails]);
+    setEditDirecciones([...familiar.direcciones]);
+    setOpenFamiliarDialog(true);
+  };
+
   const handleSaveFamiliar = () => {
     if (
       !selectedAfiliado ||
@@ -354,39 +330,6 @@ export default function Afiliados() {
     return colors[plan] || "#757575";
   };
 
-  const addTelefono = () => {
-    if (newTelefono.trim()) {
-      setEditTelefonos([...editTelefonos, newTelefono.trim()]);
-      setNewTelefono("");
-    }
-  };
-
-  const removeTelefono = (index) => {
-    setEditTelefonos(editTelefonos.filter((_, i) => i !== index));
-  };
-
-  const addEmail = () => {
-    if (newEmail.trim()) {
-      setEditEmails([...editEmails, newEmail.trim()]);
-      setNewEmail("");
-    }
-  };
-
-  const removeEmail = (index) => {
-    setEditEmails(editEmails.filter((_, i) => i !== index));
-  };
-
-  const addDireccion = () => {
-    if (newDireccion.trim()) {
-      setEditDirecciones([...editDirecciones, newDireccion.trim()]);
-      setNewDireccion("");
-    }
-  };
-
-  const removeDireccion = (index) => {
-    setEditDirecciones(editDirecciones.filter((_, i) => i !== index));
-  };
-
   const getFamiliaresDelAfiliado = (afiliado) => {
     return afiliado.familiaresIds
       .map((id) => familiares.find((f) => f.id === id))
@@ -410,13 +353,9 @@ export default function Afiliados() {
         Gestión de afiliados y sus grupos familiares
       </Typography>
 
-      <SearchBar
-        searchTerm={searchTerm}
-        activeFilters={activeFilters}
-        onSearchChange={setSearchTerm}
-        onKeyPress={handleKeyPress}
-        onRemoveFilter={removeFilter}
-        onClearAll={clearAllFilters}
+      <AdvancedSearchBar
+        afiliados={afiliados}
+        onFilteredAfiliadosChange={setFilteredAfiliados}
       />
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -432,6 +371,7 @@ export default function Afiliados() {
               onEdit={handleEditAfiliado}
               onToggleActive={handleToggleActive}
               onAddFamiliar={handleAddFamiliar}
+              onViewFamiliar={handleViewFamiliar}
               onEditFamiliar={handleEditFamiliar}
               onToggleFamiliarActive={handleToggleFamiliarActive}
               onDeleteFamiliar={handleDeleteFamiliar}
@@ -449,9 +389,9 @@ export default function Afiliados() {
             No se encontraron afiliados
           </Typography>
           <Typography variant="body2" color="textSecondary">
-            {searchTerm || activeFilters.length > 0
-              ? "Intenta con otros términos de búsqueda"
-              : "No hay afiliados registrados"}
+            {afiliados.length === 0
+              ? "No hay afiliados registrados"
+              : "Intenta con otros términos de búsqueda"}
           </Typography>
         </Box>
       )}
@@ -473,24 +413,15 @@ export default function Afiliados() {
         editTelefonos={editTelefonos}
         editEmails={editEmails}
         editDirecciones={editDirecciones}
-        newTelefono={newTelefono}
-        newEmail={newEmail}
-        newDireccion={newDireccion}
+        onEditTelefonosChange={setEditTelefonos}
+        onEditEmailsChange={setEditEmails}
+        onEditDireccionesChange={setEditDirecciones}
         onClose={() => setOpenDialog(false)}
         onSave={handleSaveAfiliado}
         onEdit={() => setIsEditing(true)}
         onFormChange={(field, value) =>
           setFormAfiliado({ ...formAfiliado, [field]: value })
         }
-        onNewTelefonoChange={setNewTelefono}
-        onNewEmailChange={setNewEmail}
-        onNewDireccionChange={setNewDireccion}
-        onAddTelefono={addTelefono}
-        onAddEmail={addEmail}
-        onAddDireccion={addDireccion}
-        onRemoveTelefono={removeTelefono}
-        onRemoveEmail={removeEmail}
-        onRemoveDireccion={removeDireccion}
       />
 
       <FamiliarFormDialog
@@ -502,23 +433,14 @@ export default function Afiliados() {
         editTelefonos={editTelefonos}
         editEmails={editEmails}
         editDirecciones={editDirecciones}
-        newTelefono={newTelefono}
-        newEmail={newEmail}
-        newDireccion={newDireccion}
+        onEditTelefonosChange={setEditTelefonos}
+        onEditEmailsChange={setEditEmails}
+        onEditDireccionesChange={setEditDirecciones}
         onClose={() => setOpenFamiliarDialog(false)}
         onSave={handleSaveFamiliar}
         onFormChange={(field, value) =>
           setFormFamiliar({ ...formFamiliar, [field]: value })
         }
-        onNewTelefonoChange={setNewTelefono}
-        onNewEmailChange={setNewEmail}
-        onNewDireccionChange={setNewDireccion}
-        onAddTelefono={addTelefono}
-        onAddEmail={addEmail}
-        onAddDireccion={addDireccion}
-        onRemoveTelefono={removeTelefono}
-        onRemoveEmail={removeEmail}
-        onRemoveDireccion={removeDireccion}
       />
 
       <Snackbar
