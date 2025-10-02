@@ -65,7 +65,7 @@ function Dashboard() {
     <Container maxWidth="xl" sx={{ py: 3 }}>
       <Box>
         <SeccionAccionesRapidas actions={actions} />
-        <SeccionEstadisticasRecientes stats={recentStats} />
+        {/*<SeccionEstadisticasRecientes stats={recentStats} />*/}
       </Box>
 
       {/* Modal Nuevo Prestador */}

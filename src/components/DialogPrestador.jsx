@@ -1042,16 +1042,16 @@ export default function DialogPrestador({ abierto, valorInicial, onCerrar, onGua
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={onCerrar} sx={{ fontWeight: 700, textTransform: 'none' }}>
-          Cancelar
+        <Button color='secondary' variant='outlined' onClick={onCerrar} sx={{ fontWeight: 700, textTransform: 'none' }}>
+          CANCELAR
         </Button>
         <Button
-          variant="contained"
-          color="primary"
+        variant='contained'
+          color="secondary"
           onClick={guardar}
           sx={{ fontWeight: 700, textTransform: 'none' }}
         >
-          {form.id ? 'Guardar Cambios' : 'Crear Prestador'}
+          {form.id ? 'GUARDAR CAMBIOS' : 'CREAR PRESTADOR'}
         </Button>
       </DialogActions>
     </Dialog>
