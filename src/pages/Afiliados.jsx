@@ -10,7 +10,6 @@ import {
   reactivarAfiliado,
 } from "../store/afiliadosSlice";
 import {
-
   addPersona,
   updatePersona,
   deletePersona,
@@ -23,6 +22,7 @@ import BajaDialog from "../components/Afiliados/BajaDialog";
 import AltaDialog from "../components/Afiliados/AltaDialog";
 import { AfiliadosService } from "../services/afiliadosService";
 import { selectSituaciones } from "../store/situacionesTerapeuticasSlice";
+import { selectPlanes } from "../store/planesSlice";
 
 const startOfDay = (d) => {
   const dt = new Date(d);
@@ -54,24 +54,32 @@ const tieneAltaProgramada = (alta) => {
   return startOfDay(new Date(alta)) > startOfDay(new Date());
 };
 
-const getTitularDelAfiliado = (afiliado, personas) =>
-  personas.find((p) => p.id === afiliado.titularId);
-const getFamiliaresDelAfiliado = (afiliado, personas) =>
-  personas.filter(
+// MEJORADA: Agregar validación para afiliado null
+const getTitularDelAfiliado = (afiliado, personas) => {
+  if (!afiliado || !afiliado.titularId) return null;
+  return personas.find((p) => p.id === afiliado.titularId);
+};
+
+// MEJORADA: Agregar validación para afiliado null
+const getFamiliaresDelAfiliado = (afiliado, personas) => {
+  if (!afiliado) return [];
+  return personas.filter(
     (p) => p.afiliadoId === afiliado.id && p.id !== afiliado.titularId
   );
+};
+
 const getPlanMedicoNombre = (planMedicoId, planesMedicos) => {
-  const plan = planesMedicos.find((p) => p.id === planMedicoId);
+  const plan = planesMedicos.find((p) => String(p.id) === String(planMedicoId));
   return plan ? plan.nombre : "Desconocido";
 };
 
 export default function Afiliados() {
   const dispatch = useDispatch();
   const afiliados = useSelector((state) => state.afiliados.afiliados);
-  const planesMedicos = useSelector((state) => state.afiliados.planesMedicos);
+  const planesMedicos = useSelector(selectPlanes) || [];
   const personas = useSelector((state) => state.personas.personas);
   const parentescos = useSelector((state) => state.personas.parentescos);
-  const situacionesCatalogo = useSelector(selectSituaciones); // ahora sí se usa (se pasa a los diálogos)
+  const situacionesCatalogo = useSelector(selectSituaciones);
 
   const [filteredAfiliados, setFilteredAfiliados] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -97,7 +105,7 @@ export default function Afiliados() {
     tipoDocumento: "DNI",
     numeroDocumento: "",
     fechaNacimiento: "",
-    planMedicoId: 1,
+    planMedicoId: "1", // Cambiado a string para consistencia
     alta: hoyISO(),
   });
 
@@ -131,7 +139,7 @@ export default function Afiliados() {
       tipoDocumento: "DNI",
       numeroDocumento: "",
       fechaNacimiento: "",
-      planMedicoId: 1,
+      planMedicoId: "1", // Cambiado a string
       alta: hoyISO(),
     });
     setEditTelefonos([]);
@@ -141,9 +149,19 @@ export default function Afiliados() {
     setOpenDialog(true);
   };
 
+  // MEJORADA: Agregar validación para afiliado null
   const handleEditAfiliado = (afiliado) => {
+    if (!afiliado) {
+      console.error("No se proporcionó un afiliado para editar");
+      return;
+    }
+
     const titular = getTitularDelAfiliado(afiliado, personas);
-    if (!titular) return;
+    if (!titular) {
+      console.error("No se encontró el titular del afiliado");
+      return;
+    }
+
     setSelectedAfiliado(afiliado);
     setIsEditing(true);
     setFormAfiliado({
@@ -467,6 +485,7 @@ export default function Afiliados() {
         <AddIcon />
       </Fab>
 
+      {/* CORREGIDO: onEdit ahora usa arrow function */}
       <AfiliadoFormDialog
         open={openDialog}
         selectedAfiliado={selectedAfiliado}
@@ -474,7 +493,7 @@ export default function Afiliados() {
         formData={formAfiliado}
         planesMedicos={planesMedicos}
         personas={personas}
-        situacionesCatalogo={situacionesCatalogo} // <-- pasamos catálogo
+        situacionesCatalogo={situacionesCatalogo}
         editTelefonos={editTelefonos}
         editEmails={editEmails}
         editDirecciones={editDirecciones}
@@ -485,6 +504,7 @@ export default function Afiliados() {
         onEditSituacionesChange={setEditSituaciones}
         onClose={() => setOpenDialog(false)}
         onSave={handleSaveAfiliado}
+        onEdit={() => handleEditAfiliado(selectedAfiliado)}
         onFormChange={(field, value) =>
           setFormAfiliado((prev) => ({ ...prev, [field]: value }))
         }
@@ -497,7 +517,7 @@ export default function Afiliados() {
         isEditing={isEditingFamiliar}
         formData={formFamiliar}
         parentescos={parentescos}
-        situacionesCatalogo={situacionesCatalogo} // <-- pasamos catálogo
+        situacionesCatalogo={situacionesCatalogo}
         editTelefonos={editTelefonos}
         editEmails={editEmails}
         editDirecciones={editDirecciones}
