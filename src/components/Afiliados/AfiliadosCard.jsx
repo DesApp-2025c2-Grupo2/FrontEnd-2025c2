@@ -12,32 +12,53 @@ import {
   Person as PersonIcon,
   Visibility as VisibilityIcon,
   Edit as EditIcon,
-  ToggleOff as ToggleOffIcon,
-  ToggleOn as ToggleOnIcon,
   ExpandMore as ExpandMoreIcon,
   PersonAdd as PersonAddIcon,
+  Schedule as ScheduleIcon,
+  ArrowUpward as ArrowUpwardIcon,
 } from "@mui/icons-material";
-import FamiliarListItem from "./FamiliarListItem";
+import PersonaListItem from "./PersonaListItem";
 
-export default function AfiliadoCard({
+export default function AfiliadosCard({
   afiliado,
+  titular,
   familiares,
+  planMedico,
+  estaActivo,
+  tieneBajaProgramada,
+  tieneAltaProgramada,
   onView,
   onEdit,
-  onToggleActive,
+  onSetBaja,
+  onSetAlta,
   onAddFamiliar,
   onEditFamiliar,
   onViewFamiliar,
-  onToggleFamiliarActive,
   onDeleteFamiliar,
   getParentescoColor,
   getPlanColor,
+  parentescos,
 }) {
+  const getParentescoNombre = (parentescoId) => {
+    const parentesco = parentescos.find((p) => p.id === parentescoId);
+    return parentesco ? parentesco.nombre : "Desconocido";
+  };
+
   return (
     <Card
       sx={{
         p: 2,
-        opacity: afiliado.activo ? 1 : 0.6,
+        opacity: estaActivo ? 1 : 0.6,
+        border: tieneBajaProgramada
+          ? "2px solid #ff9800"
+          : tieneAltaProgramada
+          ? "2px solid #4caf50"
+          : "1px solid #e0e0e0",
+        backgroundColor: tieneBajaProgramada
+          ? "#fff3e0"
+          : tieneAltaProgramada
+          ? "#e8f5e8"
+          : "white",
       }}
     >
       <Box sx={{ display: "flex", alignItems: "center" }}>
@@ -50,17 +71,43 @@ export default function AfiliadoCard({
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
             <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-              {afiliado.apellido}, {afiliado.nombre}
+              {titular.apellido}, {titular.nombre}
             </Typography>
             <Chip
-              label={`${afiliado.planMedico}`}
+              label={planMedico}
               size="small"
               sx={{
-                backgroundColor: getPlanColor(afiliado.planMedico),
+                backgroundColor: getPlanColor(afiliado.planMedicoId),
                 color: "white",
                 fontWeight: "bold",
               }}
             />
+            {tieneBajaProgramada && (
+              <Chip
+                icon={<ScheduleIcon />}
+                label="Baja Programada"
+                size="small"
+                color="warning"
+                variant="outlined"
+              />
+            )}
+            {tieneAltaProgramada && (
+              <Chip
+                icon={<ArrowUpwardIcon />}
+                label="Alta Programada"
+                size="small"
+                color="success"
+                variant="outlined"
+              />
+            )}
+            {!estaActivo && !tieneBajaProgramada && !tieneAltaProgramada && (
+              <Chip
+                label="Inactivo"
+                size="small"
+                color="error"
+                variant="outlined"
+              />
+            )}
           </Box>
 
           <Box
@@ -72,18 +119,24 @@ export default function AfiliadoCard({
             }}
           >
             <Typography variant="body2" color="textSecondary">
-              <strong>Credencial:</strong> {afiliado.numeroAfiliado}-
-              {afiliado.numeroIntegrante}
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              <strong>DNI:</strong> {afiliado.numeroDocumento}
+              <strong>Afiliado Nº:</strong> {afiliado.numeroAfiliado}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               <strong>Alta:</strong>{" "}
-              {new Date(afiliado.fechaAlta).toLocaleDateString("es-AR")}
+              {new Date(afiliado.alta).toLocaleDateString("es-AR", {
+                timeZone: "UTC",
+              })}
             </Typography>
+            {afiliado.baja && (
+              <Typography variant="body2" color="textSecondary">
+                <strong>Baja:</strong>{" "}
+                {new Date(afiliado.baja).toLocaleDateString("es-AR", {
+                  timeZone: "UTC",
+                })}
+              </Typography>
+            )}
             <Typography variant="body2" color="textSecondary">
-              <strong>Familiares:</strong> {familiares.length}
+              <strong>Integrantes:</strong> {familiares.length + 1}
             </Typography>
           </Box>
 
@@ -96,15 +149,15 @@ export default function AfiliadoCard({
             }}
           >
             <Chip
-              label={afiliado.parentesco}
+              label={getParentescoNombre(titular.parentesco)}
               size="small"
               sx={{
-                backgroundColor: getParentescoColor(afiliado.parentesco),
+                backgroundColor: getParentescoColor(titular.parentesco),
                 color: "white",
                 fontWeight: "bold",
               }}
             />
-            {afiliado.situacionesTerapeuticas.map((situacion, index) => (
+            {titular.situacionesTerapeuticas?.map((situacion, index) => (
               <Chip
                 key={index}
                 label={situacion}
@@ -142,16 +195,31 @@ export default function AfiliadoCard({
           >
             Editar
           </Button>
-          <Button
-            size="small"
-            startIcon={afiliado.activo ? <ToggleOffIcon /> : <ToggleOnIcon />}
-            color={afiliado.activo ? "error" : "success"}
-            onClick={() => onToggleActive(afiliado)}
-            variant="outlined"
-            fullWidth
-          >
-            {afiliado.activo ? "Dar de baja" : "Rehabilitar"}
-          </Button>
+
+          {/* Botón condicional para Alta/Baja */}
+          {!estaActivo || tieneBajaProgramada || tieneAltaProgramada ? (
+            <Button
+              size="small"
+              startIcon={<ArrowUpwardIcon />}
+              color="success"
+              onClick={() => onSetAlta(afiliado)}
+              variant="outlined"
+              fullWidth
+            >
+              {tieneAltaProgramada ? "Gestionar Alta" : "Programar Alta"}
+            </Button>
+          ) : (
+            <Button
+              size="small"
+              startIcon={<ScheduleIcon />}
+              color="error"
+              onClick={() => onSetBaja(afiliado)}
+              variant="outlined"
+              fullWidth
+            >
+              Programar Baja
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -159,21 +227,21 @@ export default function AfiliadoCard({
         <Accordion sx={{ mt: 2 }}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Typography variant="subtitle2">
-              Ver Familiares ({familiares.length})
+              Ver Integrantes del Grupo Familiar ({familiares.length})
             </Typography>
           </AccordionSummary>
           <AccordionDetails>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {familiares.map((familiar) => (
-                <FamiliarListItem
+                <PersonaListItem
                   key={familiar.id}
-                  familiar={familiar}
+                  persona={familiar}
                   afiliado={afiliado}
                   onEdit={onEditFamiliar}
                   onView={onViewFamiliar}
-                  onToggleActive={onToggleFamiliarActive}
                   onDelete={onDeleteFamiliar}
                   getParentescoColor={getParentescoColor}
+                  getParentescoNombre={getParentescoNombre}
                 />
               ))}
               <Button
@@ -183,7 +251,7 @@ export default function AfiliadoCard({
                 size="small"
                 sx={{ mt: 1 }}
               >
-                Agregar Familiar
+                Agregar Integrante
               </Button>
             </Box>
           </AccordionDetails>
@@ -198,7 +266,7 @@ export default function AfiliadoCard({
             variant="outlined"
             size="small"
           >
-            Agregar Familiar
+            Agregar Integrante al Grupo Familiar
           </Button>
         </Box>
       )}

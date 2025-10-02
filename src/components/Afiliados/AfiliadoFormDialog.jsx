@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useDispatch } from "react-redux";
 import {
   Dialog,
   DialogTitle,
@@ -22,20 +21,13 @@ import {
   Home as HomeIcon,
 } from "@mui/icons-material";
 import ContactInfoEditor from "./ContactInfoEditor";
-import {
-  addTelefonoToAfiliado,
-  removeTelefonoFromAfiliado,
-  addEmailToAfiliado,
-  removeEmailFromAfiliado,
-  addDireccionToAfiliado,
-  removeDireccionFromAfiliado,
-} from "../../store/afiliadosSlice";
 
 export default function AfiliadoFormDialog({
   open,
   selectedAfiliado,
   isEditing,
   formData,
+  planesMedicos,
   editTelefonos,
   editEmails,
   editDirecciones,
@@ -46,33 +38,30 @@ export default function AfiliadoFormDialog({
   onSave,
   onEdit,
   onFormChange,
+  personas,
 }) {
-  const dispatch = useDispatch();
-
   const [newTelefono, setNewTelefono] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newDireccion, setNewDireccion] = useState("");
 
   // Limpiar inputs nuevos cuando se cierra/abre el diálogo
   useEffect(() => {
-    setNewTelefono("");
-    setNewEmail("");
-    setNewDireccion("");
+    if (open) {
+      setNewTelefono("");
+      setNewEmail("");
+      setNewDireccion("");
+    }
   }, [open]);
+
+  // Obtener el titular del afiliado
+  const getTitularDelAfiliado = (afiliado) => {
+    return personas.find((p) => p.id === afiliado.titularId);
+  };
 
   const handleAddTelefono = () => {
     if (newTelefono.trim()) {
       const updatedTelefonos = [...editTelefonos, newTelefono.trim()];
       onEditTelefonosChange(updatedTelefonos);
-
-      if (selectedAfiliado && isEditing) {
-        dispatch(
-          addTelefonoToAfiliado({
-            afiliadoId: selectedAfiliado.id,
-            telefono: newTelefono.trim(),
-          })
-        );
-      }
       setNewTelefono("");
     }
   };
@@ -80,31 +69,12 @@ export default function AfiliadoFormDialog({
   const handleRemoveTelefono = (index) => {
     const updatedTelefonos = editTelefonos.filter((_, i) => i !== index);
     onEditTelefonosChange(updatedTelefonos);
-
-    // Si estamos editando, actualizar en Redux
-    if (selectedAfiliado && isEditing) {
-      dispatch(
-        removeTelefonoFromAfiliado({
-          afiliadoId: selectedAfiliado.id,
-          telefonoIndex: index,
-        })
-      );
-    }
   };
 
   const handleAddEmail = () => {
     if (newEmail.trim()) {
       const updatedEmails = [...editEmails, newEmail.trim()];
       onEditEmailsChange(updatedEmails);
-
-      if (selectedAfiliado && isEditing) {
-        dispatch(
-          addEmailToAfiliado({
-            afiliadoId: selectedAfiliado.id,
-            email: newEmail.trim(),
-          })
-        );
-      }
       setNewEmail("");
     }
   };
@@ -112,30 +82,12 @@ export default function AfiliadoFormDialog({
   const handleRemoveEmail = (index) => {
     const updatedEmails = editEmails.filter((_, i) => i !== index);
     onEditEmailsChange(updatedEmails);
-
-    if (selectedAfiliado && isEditing) {
-      dispatch(
-        removeEmailFromAfiliado({
-          afiliadoId: selectedAfiliado.id,
-          emailIndex: index,
-        })
-      );
-    }
   };
 
   const handleAddDireccion = () => {
     if (newDireccion.trim()) {
       const updatedDirecciones = [...editDirecciones, newDireccion.trim()];
       onEditDireccionesChange(updatedDirecciones);
-
-      if (selectedAfiliado && isEditing) {
-        dispatch(
-          addDireccionToAfiliado({
-            afiliadoId: selectedAfiliado.id,
-            direccion: newDireccion.trim(),
-          })
-        );
-      }
       setNewDireccion("");
     }
   };
@@ -143,150 +95,199 @@ export default function AfiliadoFormDialog({
   const handleRemoveDireccion = (index) => {
     const updatedDirecciones = editDirecciones.filter((_, i) => i !== index);
     onEditDireccionesChange(updatedDirecciones);
-
-    if (selectedAfiliado && isEditing) {
-      dispatch(
-        removeDireccionFromAfiliado({
-          afiliadoId: selectedAfiliado.id,
-          direccionIndex: index,
-        })
-      );
-    }
   };
 
-  const handleSaveWithContacts = () => {
-    // Para nuevos afiliados, pasar los contactos en el objeto
-    if (!selectedAfiliado) {
-      // Los contactos se manejarán en el componente principal a través del formData
-      // editTelefonos, editEmails, editDirecciones contienen los datos
-    }
-    onSave();
+  const getPlanMedicoNombre = (planMedicoId) => {
+    const plan = planesMedicos.find((p) => p.id === planMedicoId);
+    return plan ? plan.nombre : "Desconocido";
   };
+
+  // Handler para cambios en el formulario - DIRECTO AL PADRE
+  const handleFormChange = (field, value) => {
+    onFormChange(field, value);
+  };
+
+  // Handler específico para plan médico
+  const handlePlanMedicoChange = (e) => {
+    const value = parseInt(e.target.value);
+    handleFormChange("planMedicoId", value);
+  };
+
+  // Handler específico para tipo de documento
+  const handleTipoDocumentoChange = (e) => {
+    handleFormChange("tipoDocumento", e.target.value);
+  };
+
+  const titular = selectedAfiliado
+    ? getTitularDelAfiliado(selectedAfiliado)
+    : null;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         {selectedAfiliado
           ? isEditing
-            ? "Editar Afiliado"
-            : "Detalle del Afiliado"
+            ? "Editar Afiliado Titular"
+            : "Detalle del Afiliado Titular"
           : "Nuevo Afiliado Titular"}
       </DialogTitle>
       <DialogContent>
         {selectedAfiliado && !isEditing ? (
+          // MODO VISTA (SOLO LECTURA)
           <Box sx={{ pt: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              {selectedAfiliado.apellido}, {selectedAfiliado.nombre}
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Credencial:</strong> {selectedAfiliado.numeroAfiliado}-
-              {selectedAfiliado.numeroIntegrante}
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Tipo y Nº de Documento:</strong>{" "}
-              {selectedAfiliado.tipoDocumento}{" "}
-              {selectedAfiliado.numeroDocumento}
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Fecha de Nacimiento:</strong>{" "}
-              {new Date(selectedAfiliado.fechaNacimiento).toLocaleDateString(
-                "es-AR"
-              )}
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Fecha de Alta:</strong>{" "}
-              {new Date(selectedAfiliado.fechaAlta).toLocaleDateString("es-AR")}
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Parentesco:</strong> {selectedAfiliado.parentesco}
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Plan Médico:</strong> {selectedAfiliado.planMedico}
-            </Typography>
+            {titular ? (
+              <>
+                <Typography variant="h6" gutterBottom>
+                  {titular.apellido}, {titular.nombre}
+                </Typography>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Número de Afiliado:</strong>{" "}
+                  {selectedAfiliado.numeroAfiliado}
+                </Typography>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Documento:</strong> {titular.tipoDocumento}{" "}
+                  {titular.numeroDocumento}
+                </Typography>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Plan Médico:</strong>{" "}
+                  {getPlanMedicoNombre(selectedAfiliado.planMedicoId)}
+                </Typography>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Fecha de Nacimiento:</strong>{" "}
+                  {new Date(titular.fechaNacimiento).toLocaleDateString(
+                    "es-AR"
+                  )}
+                </Typography>
+                <Typography variant="body2" gutterBottom>
+                  <strong>Fecha de Alta:</strong>{" "}
+                  {new Date(selectedAfiliado.alta).toLocaleDateString("es-AR", {
+                    timeZone: "UTC",
+                  })}
+                </Typography>
+                {selectedAfiliado.baja && (
+                  <Typography variant="body2" gutterBottom>
+                    <strong>Fecha de Baja:</strong>{" "}
+                    {new Date(selectedAfiliado.baja).toLocaleDateString(
+                      "es-AR"
+                    )}
+                  </Typography>
+                )}
 
-            <Divider sx={{ my: 2 }} />
+                <Divider sx={{ my: 2 }} />
 
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
-                Teléfonos:
-              </Typography>
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 0.5,
-                  ml: 2,
-                }}
-              >
-                {selectedAfiliado.telefonos?.map((telefono, index) => (
-                  <Box
-                    key={index}
-                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                <Box sx={{ mb: 2 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: "bold", mb: 1 }}
                   >
-                    <PhoneIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                    <Typography variant="body2">{telefono}</Typography>
-                  </Box>
-                ))}
-              </Box>
-            </Box>
-
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
-                Emails:
-              </Typography>
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 0.5,
-                  ml: 2,
-                }}
-              >
-                {selectedAfiliado.emails?.map((email, index) => (
+                    Teléfonos:
+                  </Typography>
                   <Box
-                    key={index}
-                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 0.5,
+                      ml: 2,
+                    }}
                   >
-                    <EmailIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                    <Typography variant="body2">{email}</Typography>
+                    {titular.telefonos?.map((telefono, index) => (
+                      <Box
+                        key={index}
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <PhoneIcon sx={{ fontSize: 16, color: "#1976d2" }} />
+                        <Typography variant="body2">{telefono}</Typography>
+                      </Box>
+                    ))}
+                    {(!titular.telefonos || titular.telefonos.length === 0) && (
+                      <Typography variant="body2" color="textSecondary">
+                        No hay teléfonos registrados
+                      </Typography>
+                    )}
                   </Box>
-                ))}
-              </Box>
-            </Box>
+                </Box>
 
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
-                Direcciones:
-              </Typography>
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 0.5,
-                  ml: 2,
-                }}
-              >
-                {selectedAfiliado.direcciones?.map((direccion, index) => (
-                  <Box
-                    key={index}
-                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                <Box sx={{ mb: 2 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: "bold", mb: 1 }}
                   >
-                    <HomeIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                    <Typography variant="body2">{direccion}</Typography>
+                    Emails:
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 0.5,
+                      ml: 2,
+                    }}
+                  >
+                    {titular.emails?.map((email, index) => (
+                      <Box
+                        key={index}
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <EmailIcon sx={{ fontSize: 16, color: "#1976d2" }} />
+                        <Typography variant="body2">{email}</Typography>
+                      </Box>
+                    ))}
+                    {(!titular.emails || titular.emails.length === 0) && (
+                      <Typography variant="body2" color="textSecondary">
+                        No hay emails registrados
+                      </Typography>
+                    )}
                   </Box>
-                ))}
-              </Box>
-            </Box>
+                </Box>
+
+                <Box sx={{ mb: 2 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: "bold", mb: 1 }}
+                  >
+                    Direcciones:
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 0.5,
+                      ml: 2,
+                    }}
+                  >
+                    {titular.direcciones?.map((direccion, index) => (
+                      <Box
+                        key={index}
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <HomeIcon sx={{ fontSize: 16, color: "#1976d2" }} />
+                        <Typography variant="body2">{direccion}</Typography>
+                      </Box>
+                    ))}
+                    {(!titular.direcciones ||
+                      titular.direcciones.length === 0) && (
+                      <Typography variant="body2" color="textSecondary">
+                        No hay direcciones registradas
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </>
+            ) : (
+              <Typography color="error">
+                No se encontraron datos del titular
+              </Typography>
+            )}
           </Box>
         ) : (
+          // MODO EDICIÓN/CREACIÓN
           <Box sx={{ pt: 2 }}>
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Nombre"
-                  value={formData.nombre}
-                  onChange={(e) => onFormChange("nombre", e.target.value)}
+                  value={formData.nombre || ""}
+                  onChange={(e) => handleFormChange("nombre", e.target.value)}
                   required
                 />
               </Grid>
@@ -294,8 +295,8 @@ export default function AfiliadoFormDialog({
                 <TextField
                   fullWidth
                   label="Apellido"
-                  value={formData.apellido}
-                  onChange={(e) => onFormChange("apellido", e.target.value)}
+                  value={formData.apellido || ""}
+                  onChange={(e) => handleFormChange("apellido", e.target.value)}
                   required
                 />
               </Grid>
@@ -306,14 +307,11 @@ export default function AfiliadoFormDialog({
                 <FormControl fullWidth>
                   <InputLabel>Tipo de Documento</InputLabel>
                   <Select
-                    value={formData.tipoDocumento}
-                    onChange={(e) =>
-                      onFormChange("tipoDocumento", e.target.value)
-                    }
+                    value={formData.tipoDocumento || ""}
+                    label="Tipo de Documento"
+                    onChange={handleTipoDocumentoChange}
                   >
                     <MenuItem value="DNI">DNI</MenuItem>
-                    <MenuItem value="LC">LC</MenuItem>
-                    <MenuItem value="LE">LE</MenuItem>
                     <MenuItem value="Pasaporte">Pasaporte</MenuItem>
                   </Select>
                 </FormControl>
@@ -322,9 +320,9 @@ export default function AfiliadoFormDialog({
                 <TextField
                   fullWidth
                   label="Número de Documento"
-                  value={formData.numeroDocumento}
+                  value={formData.numeroDocumento || ""}
                   onChange={(e) =>
-                    onFormChange("numeroDocumento", e.target.value)
+                    handleFormChange("numeroDocumento", e.target.value)
                   }
                   required
                 />
@@ -338,9 +336,9 @@ export default function AfiliadoFormDialog({
                   label="Fecha de Nacimiento"
                   type="date"
                   InputLabelProps={{ shrink: true }}
-                  value={formData.fechaNacimiento}
+                  value={formData.fechaNacimiento || ""}
                   onChange={(e) =>
-                    onFormChange("fechaNacimiento", e.target.value)
+                    handleFormChange("fechaNacimiento", e.target.value)
                   }
                   required
                 />
@@ -351,8 +349,12 @@ export default function AfiliadoFormDialog({
                   label="Fecha de Alta"
                   type="date"
                   InputLabelProps={{ shrink: true }}
-                  value={formData.fechaAlta}
-                  onChange={(e) => onFormChange("fechaAlta", e.target.value)}
+                  value={
+                    formData.alta
+                      ? new Date(formData.alta).toISOString().split("T")[0]
+                      : ""
+                  }
+                  onChange={(e) => handleFormChange("alta", e.target.value)}
                   required
                 />
               </Grid>
@@ -363,13 +365,15 @@ export default function AfiliadoFormDialog({
                 <FormControl fullWidth>
                   <InputLabel>Plan Médico</InputLabel>
                   <Select
-                    value={formData.planMedico}
-                    onChange={(e) => onFormChange("planMedico", e.target.value)}
+                    value={formData.planMedicoId || ""}
+                    label="Plan Médico"
+                    onChange={handlePlanMedicoChange}
                   >
-                    <MenuItem value="Plan Bronce">Plan Bronce</MenuItem>
-                    <MenuItem value="Plan Plata">Plan Plata</MenuItem>
-                    <MenuItem value="Plan Oro">Plan Oro</MenuItem>
-                    <MenuItem value="Plan Platino">Plan Platino</MenuItem>
+                    {planesMedicos.map((plan) => (
+                      <MenuItem key={plan.id} value={plan.id}>
+                        {plan.nombre}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>
@@ -428,11 +432,7 @@ export default function AfiliadoFormDialog({
           {selectedAfiliado && !isEditing ? "Cerrar" : "Cancelar"}
         </Button>
         {(!selectedAfiliado || isEditing) && (
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={handleSaveWithContacts}
-          >
+          <Button variant="contained" color="secondary" onClick={onSave}>
             {selectedAfiliado ? "Guardar Cambios" : "Crear Afiliado"}
           </Button>
         )}

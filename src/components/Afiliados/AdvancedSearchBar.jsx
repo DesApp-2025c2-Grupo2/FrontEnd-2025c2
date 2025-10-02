@@ -18,23 +18,29 @@ import {
   Search as SearchIcon,
   Clear as ClearIcon,
   ExpandMore as ExpandMoreIcon,
-  FilterList as FilterListIcon,
 } from "@mui/icons-material";
 
 export default function AdvancedSearchBar({
   afiliados,
+  personas,
+  planesMedicos,
   onFilteredAfiliadosChange,
+  estaActivo,
+  tieneBajaProgramada,
+  tieneAltaProgramada,
 }) {
   const [expanded, setExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilters, setActiveFilters] = useState([]);
   const [filterState, setFilterState] = useState({
     estado: "todos",
-    dni: "",
-    credencial: "",
-    direccion: "",
-    fechaNacimientoDesde: "",
-    fechaNacimientoHasta: "",
+    estadoBaja: "todos",
+    estadoAlta: "todos",
+    planMedico: "todos",
+    fechaAltaDesde: "",
+    fechaAltaHasta: "",
+    fechaBajaDesde: "",
+    fechaBajaHasta: "",
     orden: "",
   });
 
@@ -44,14 +50,17 @@ export default function AdvancedSearchBar({
 
     return afiliados
       .filter((afiliado) => {
+        // Obtener el titular del afiliado para búsqueda
+        const titular = personas.find((p) => p.id === afiliado.titularId);
+        if (!titular) return false;
+
         // Filtro por búsqueda rápida
         const searchFields = [
-          afiliado.apellido.toLowerCase(),
-          afiliado.nombre.toLowerCase(),
-          afiliado.numeroDocumento,
-          `${afiliado.numeroAfiliado}-${afiliado.numeroIntegrante}`,
-          afiliado.parentesco.toLowerCase(),
-          afiliado.planMedico.toLowerCase(),
+          titular.nombre.toLowerCase(),
+          titular.apellido.toLowerCase(),
+          titular.tipoDocumento?.toLowerCase() || "",
+          titular.numeroDocumento?.toLowerCase() || "",
+          afiliado.numeroAfiliado.toString(),
         ].join(" ");
 
         const matchesCurrentSearch =
@@ -62,52 +71,67 @@ export default function AdvancedSearchBar({
             searchFields.includes(filter.toLowerCase())
           );
 
-        // Filtro por estado
+        // Filtro por estado (activo/inactivo)
         const matchesEstado =
           filterState.estado === "todos" ||
-          (filterState.estado === "activo" && afiliado.activo) ||
-          (filterState.estado === "inactivo" && !afiliado.activo);
+          (filterState.estado === "activos" &&
+            estaActivo(afiliado.alta, afiliado.baja)) ||
+          (filterState.estado === "inactivos" &&
+            !estaActivo(afiliado.alta, afiliado.baja));
 
-        // Filtro por DNI
-        const matchesDni =
-          !filterState.dni ||
-          afiliado.numeroDocumento.includes(filterState.dni);
+        // Filtro por estado de baja
+        const matchesEstadoBaja =
+          filterState.estadoBaja === "todos" ||
+          (filterState.estadoBaja === "conBajaProgramada" &&
+            tieneBajaProgramada(afiliado.baja)) ||
+          (filterState.estadoBaja === "sinBaja" && !afiliado.baja) ||
+          (filterState.estadoBaja === "conBajaEfectiva" &&
+            afiliado.baja &&
+            !tieneBajaProgramada(afiliado.baja));
 
-        // Filtro por credencial
-        const matchesCredencial =
-          !filterState.credencial ||
-          `${afiliado.numeroAfiliado}-${afiliado.numeroIntegrante}`.includes(
-            filterState.credencial
-          );
+        const matchesEstadoAlta =
+          filterState.estadoAlta === "todos" ||
+          (filterState.estadoAlta === "conAltaProgramada" &&
+            tieneAltaProgramada(afiliado.alta, afiliado.baja)) ||
+          (filterState.estadoAlta === "sinAltaProgramada" &&
+            !tieneAltaProgramada(afiliado.alta, afiliado.baja));
 
-        // Filtro por dirección
-        const matchesDireccion =
-          !filterState.direccion ||
-          afiliado.direcciones.some((direccion) =>
-            direccion
-              .toLowerCase()
-              .includes(filterState.direccion.toLowerCase())
-          );
+        // Filtro por plan médico
+        const matchesPlanMedico =
+          filterState.planMedico === "todos" ||
+          afiliado.planMedicoId.toString() === filterState.planMedico;
 
-        // Filtro por fecha de nacimiento
-        const fechaNacimiento = new Date(afiliado.fechaNacimiento);
-        const matchesFechaNacimientoDesde =
-          !filterState.fechaNacimientoDesde ||
-          fechaNacimiento >= new Date(filterState.fechaNacimientoDesde);
+        // Filtro por fecha de alta
+        const fechaAlta = new Date(afiliado.alta);
+        const matchesFechaAltaDesde =
+          !filterState.fechaAltaDesde ||
+          fechaAlta >= new Date(filterState.fechaAltaDesde);
 
-        const matchesFechaNacimientoHasta =
-          !filterState.fechaNacimientoHasta ||
-          fechaNacimiento <= new Date(filterState.fechaNacimientoHasta);
+        const matchesFechaAltaHasta =
+          !filterState.fechaAltaHasta ||
+          fechaAlta <= new Date(filterState.fechaAltaHasta);
+
+        // Filtro por fecha de baja
+        const fechaBaja = afiliado.baja ? new Date(afiliado.baja) : null;
+        const matchesFechaBajaDesde =
+          !filterState.fechaBajaDesde ||
+          (fechaBaja && fechaBaja >= new Date(filterState.fechaBajaDesde));
+
+        const matchesFechaBajaHasta =
+          !filterState.fechaBajaHasta ||
+          (fechaBaja && fechaBaja <= new Date(filterState.fechaBajaHasta));
 
         return (
           matchesCurrentSearch &&
           matchesActiveFilters &&
           matchesEstado &&
-          matchesDni &&
-          matchesCredencial &&
-          matchesDireccion &&
-          matchesFechaNacimientoDesde &&
-          matchesFechaNacimientoHasta
+          matchesEstadoBaja &&
+          matchesEstadoAlta &&
+          matchesPlanMedico &&
+          matchesFechaAltaDesde &&
+          matchesFechaAltaHasta &&
+          matchesFechaBajaDesde &&
+          matchesFechaBajaHasta
         );
       })
       .sort((a, b) => {
@@ -116,18 +140,37 @@ export default function AdvancedSearchBar({
 
         switch (filterState.orden) {
           case "fechaAlta-asc":
-            return new Date(a.fechaAlta) - new Date(b.fechaAlta);
+            return new Date(a.alta) - new Date(b.alta);
           case "fechaAlta-desc":
-            return new Date(b.fechaAlta) - new Date(a.fechaAlta);
-          case "apellido-asc":
-            return a.apellido.localeCompare(b.apellido);
-          case "apellido-desc":
-            return b.apellido.localeCompare(a.apellido);
+            return new Date(b.alta) - new Date(a.alta);
+          case "fechaBaja-asc":
+            return (
+              (a.baja ? new Date(a.baja) : new Date("9999-12-31")) -
+              (b.baja ? new Date(b.baja) : new Date("9999-12-31"))
+            );
+          case "fechaBaja-desc":
+            return (
+              (b.baja ? new Date(b.baja) : new Date("9999-12-31")) -
+              (a.baja ? new Date(a.baja) : new Date("9999-12-31"))
+            );
+          case "numeroAfiliado-asc":
+            return a.numeroAfiliado - b.numeroAfiliado;
+          case "numeroAfiliado-desc":
+            return b.numeroAfiliado - a.numeroAfiliado;
           default:
             return 0;
         }
       });
-  }, [afiliados, searchTerm, activeFilters, filterState]);
+  }, [
+    afiliados,
+    personas,
+    searchTerm,
+    activeFilters,
+    filterState,
+    estaActivo,
+    tieneBajaProgramada,
+    tieneAltaProgramada,
+  ]);
 
   // Notificar al componente padre cuando cambien los afiliados filtrados
   useEffect(() => {
@@ -157,11 +200,13 @@ export default function AdvancedSearchBar({
     setSearchTerm("");
     setFilterState({
       estado: "todos",
-      dni: "",
-      credencial: "",
-      direccion: "",
-      fechaNacimientoDesde: "",
-      fechaNacimientoHasta: "",
+      estadoBaja: "todos",
+      estadoAlta: "todos",
+      planMedico: "todos",
+      fechaAltaDesde: "",
+      fechaAltaHasta: "",
+      fechaBajaDesde: "",
+      fechaBajaHasta: "",
       orden: "",
     });
   };
@@ -176,16 +221,43 @@ export default function AdvancedSearchBar({
   const getFilterDisplayText = (filterType, value) => {
     const labels = {
       estado:
-        value === "activo"
-          ? "Habilitados"
-          : value === "inactivo"
-          ? "Deshabilitados"
+        value === "activos"
+          ? "Activos"
+          : value === "inactivos"
+          ? "Inactivos"
           : "Todos",
+      estadoBaja:
+        value === "conBajaProgramada"
+          ? "Con baja programada"
+          : value === "sinBaja"
+          ? "Sin baja"
+          : value === "conBajaEfectiva"
+          ? "Con baja efectiva"
+          : "Todos",
+      estadoAlta:
+        value === "conAltaProgramada"
+          ? "Con alta programada"
+          : value === "sinAltaProgramada"
+          ? "Sin alta programada"
+          : "Todos",
+      planMedico:
+        value === "todos"
+          ? "Todos los planes"
+          : planesMedicos.find((p) => p.id.toString() === value)?.nombre ||
+            value,
       orden:
         value === "fechaAlta-asc"
           ? "Fecha Alta (Asc)"
           : value === "fechaAlta-desc"
           ? "Fecha Alta (Desc)"
+          : value === "fechaBaja-asc"
+          ? "Fecha Baja (Asc)"
+          : value === "fechaBaja-desc"
+          ? "Fecha Baja (Desc)"
+          : value === "numeroAfiliado-asc"
+          ? "Nº Afiliado (Asc)"
+          : value === "numeroAfiliado-desc"
+          ? "Nº Afiliado (Desc)"
           : "Sin orden",
     };
     return labels[filterType] || value;
@@ -197,7 +269,7 @@ export default function AdvancedSearchBar({
       <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start", mb: 2 }}>
         <TextField
           fullWidth
-          placeholder="Buscar por nombre, apellido, DNI, credencial..."
+          placeholder="Buscar por nombre, apellido, número de afiliado..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyPress={handleKeyPress}
@@ -208,9 +280,7 @@ export default function AdvancedSearchBar({
               </InputAdornment>
             ),
           }}
-          sx={{ maxWidth: 500,
-            bgcolor: "#ffffff",
-           }}
+          sx={{ maxWidth: 500, bgcolor: "#ffffff" }}
         />
       </Box>
 
@@ -221,7 +291,7 @@ export default function AdvancedSearchBar({
         </AccordionSummary>
         <AccordionDetails>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
-            {/* Filtro por estado */}
+            {/* Filtro por estado activo/inactivo */}
             <FormControl sx={{ minWidth: 150 }}>
               <InputLabel>Estado</InputLabel>
               <Select
@@ -230,52 +300,105 @@ export default function AdvancedSearchBar({
                 onChange={(e) => handleFilterChange("estado", e.target.value)}
               >
                 <MenuItem value="todos">Todos</MenuItem>
-                <MenuItem value="activo">Habilitados</MenuItem>
-                <MenuItem value="inactivo">Deshabilitados</MenuItem>
+                <MenuItem value="activos">Activos</MenuItem>
+                <MenuItem value="inactivos">Inactivos</MenuItem>
               </Select>
             </FormControl>
 
-            {/* Filtro por DNI */}
-            <TextField
-              label="Buscar por DNI"
-              value={filterState.dni}
-              onChange={(e) => handleFilterChange("dni", e.target.value)}
-              sx={{ minWidth: 150 }}
-            />
+            {/* Filtro por estado de baja */}
+            <FormControl sx={{ minWidth: 180 }}>
+              <InputLabel>Estado de baja</InputLabel>
+              <Select
+                value={filterState.estadoBaja}
+                label="Estado de baja"
+                onChange={(e) =>
+                  handleFilterChange("estadoBaja", e.target.value)
+                }
+              >
+                <MenuItem value="todos">Todos</MenuItem>
+                <MenuItem value="sinBaja">Sin baja</MenuItem>
+                <MenuItem value="conBajaProgramada">
+                  Con baja programada
+                </MenuItem>
+                <MenuItem value="conBajaEfectiva">Con baja efectiva</MenuItem>
+              </Select>
+            </FormControl>
 
-            {/* Filtro por credencial */}
-            <TextField
-              label="Buscar por credencial"
-              value={filterState.credencial}
-              onChange={(e) => handleFilterChange("credencial", e.target.value)}
-              sx={{ minWidth: 150 }}
-              placeholder="0000001-01"
-            />
+            {/* Filtro por estado de alta */}
+            <FormControl sx={{ minWidth: 180 }}>
+              <InputLabel>Estado de alta</InputLabel>
+              <Select
+                value={filterState.estadoAlta}
+                label="Estado de alta"
+                onChange={(e) =>
+                  handleFilterChange("estadoAlta", e.target.value)
+                }
+              >
+                <MenuItem value="todos">Todos</MenuItem>
+                <MenuItem value="conAltaProgramada">
+                  Con alta programada
+                </MenuItem>
+                <MenuItem value="sinAltaProgramada">
+                  Sin alta programada
+                </MenuItem>
+              </Select>
+            </FormControl>
 
-            {/* Filtro por dirección */}
-            <TextField
-              label="Buscar por dirección"
-              value={filterState.direccion}
-              onChange={(e) => handleFilterChange("direccion", e.target.value)}
-              sx={{ minWidth: 200 }}
-            />
+            {/* Filtro por plan médico */}
+            <FormControl sx={{ minWidth: 150 }}>
+              <InputLabel>Plan Médico</InputLabel>
+              <Select
+                value={filterState.planMedico}
+                label="Plan Médico"
+                onChange={(e) =>
+                  handleFilterChange("planMedico", e.target.value)
+                }
+              >
+                <MenuItem value="todos">Todos</MenuItem>
+                {planesMedicos.map((plan) => (
+                  <MenuItem key={plan.id} value={plan.id.toString()}>
+                    {plan.nombre}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
 
-            {/* Filtro por fecha de nacimiento */}
+            {/* Filtro por fecha de alta */}
             <TextField
-              label="Fecha nacimiento desde"
+              label="Alta desde"
               type="date"
-              value={filterState.fechaNacimientoDesde}
+              value={filterState.fechaAltaDesde}
               onChange={(e) =>
-                handleFilterChange("fechaNacimientoDesde", e.target.value)
+                handleFilterChange("fechaAltaDesde", e.target.value)
               }
               InputLabelProps={{ shrink: true }}
             />
             <TextField
-              label="Fecha nacimiento hasta"
+              label="Alta hasta"
               type="date"
-              value={filterState.fechaNacimientoHasta}
+              value={filterState.fechaAltaHasta}
               onChange={(e) =>
-                handleFilterChange("fechaNacimientoHasta", e.target.value)
+                handleFilterChange("fechaAltaHasta", e.target.value)
+              }
+              InputLabelProps={{ shrink: true }}
+            />
+
+            {/* Filtro por fecha de baja */}
+            <TextField
+              label="Baja desde"
+              type="date"
+              value={filterState.fechaBajaDesde}
+              onChange={(e) =>
+                handleFilterChange("fechaBajaDesde", e.target.value)
+              }
+              InputLabelProps={{ shrink: true }}
+            />
+            <TextField
+              label="Baja hasta"
+              type="date"
+              value={filterState.fechaBajaHasta}
+              onChange={(e) =>
+                handleFilterChange("fechaBajaHasta", e.target.value)
               }
               InputLabelProps={{ shrink: true }}
             />
@@ -295,8 +418,18 @@ export default function AdvancedSearchBar({
                 <MenuItem value="fechaAlta-desc">
                   Fecha Alta (Descendente)
                 </MenuItem>
-                <MenuItem value="apellido-asc">Apellido (A-Z)</MenuItem>
-                <MenuItem value="apellido-desc">Apellido (Z-A)</MenuItem>
+                <MenuItem value="fechaBaja-asc">
+                  Fecha Baja (Ascendente)
+                </MenuItem>
+                <MenuItem value="fechaBaja-desc">
+                  Fecha Baja (Descendente)
+                </MenuItem>
+                <MenuItem value="numeroAfiliado-asc">
+                  Nº Afiliado (Ascendente)
+                </MenuItem>
+                <MenuItem value="numeroAfiliado-desc">
+                  Nº Afiliado (Descendente)
+                </MenuItem>
               </Select>
             </FormControl>
           </Box>
@@ -315,12 +448,13 @@ export default function AdvancedSearchBar({
       {/* Chips de filtros activos */}
       {(activeFilters.length > 0 ||
         filterState.estado !== "todos" ||
+        filterState.estadoBaja !== "todos" ||
+        filterState.planMedico !== "todos" ||
         filterState.orden ||
-        filterState.dni ||
-        filterState.credencial ||
-        filterState.direccion ||
-        filterState.fechaNacimientoDesde ||
-        filterState.fechaNacimientoHasta) && (
+        filterState.fechaAltaDesde ||
+        filterState.fechaAltaHasta ||
+        filterState.fechaBajaDesde ||
+        filterState.fechaBajaHasta) && (
         <Box
           sx={{
             mt: 2,
@@ -355,46 +489,64 @@ export default function AdvancedSearchBar({
             />
           )}
 
-          {filterState.dni && (
+          {filterState.estadoBaja !== "todos" && (
             <Chip
-              label={`DNI: ${filterState.dni}`}
-              onDelete={() => handleFilterChange("dni", "")}
+              label={getFilterDisplayText("estadoBaja", filterState.estadoBaja)}
+              onDelete={() => handleFilterChange("estadoBaja", "todos")}
               variant="outlined"
               size="small"
             />
           )}
 
-          {filterState.credencial && (
+          {filterState.estadoAlta !== "todos" && (
             <Chip
-              label={`Credencial: ${filterState.credencial}`}
-              onDelete={() => handleFilterChange("credencial", "")}
+              label={getFilterDisplayText("estadoAlta", filterState.estadoAlta)}
+              onDelete={() => handleFilterChange("estadoAlta", "todos")}
               variant="outlined"
               size="small"
             />
           )}
 
-          {filterState.direccion && (
+          {filterState.planMedico !== "todos" && (
             <Chip
-              label={`Dirección: ${filterState.direccion}`}
-              onDelete={() => handleFilterChange("direccion", "")}
+              label={getFilterDisplayText("planMedico", filterState.planMedico)}
+              onDelete={() => handleFilterChange("planMedico", "todos")}
               variant="outlined"
               size="small"
             />
           )}
 
-          {filterState.fechaNacimientoDesde && (
+          {filterState.fechaAltaDesde && (
             <Chip
-              label={`Nac. desde: ${filterState.fechaNacimientoDesde}`}
-              onDelete={() => handleFilterChange("fechaNacimientoDesde", "")}
+              label={`Alta desde: ${filterState.fechaAltaDesde}`}
+              onDelete={() => handleFilterChange("fechaAltaDesde", "")}
               variant="outlined"
               size="small"
             />
           )}
 
-          {filterState.fechaNacimientoHasta && (
+          {filterState.fechaAltaHasta && (
             <Chip
-              label={`Nac. hasta: ${filterState.fechaNacimientoHasta}`}
-              onDelete={() => handleFilterChange("fechaNacimientoHasta", "")}
+              label={`Alta hasta: ${filterState.fechaAltaHasta}`}
+              onDelete={() => handleFilterChange("fechaAltaHasta", "")}
+              variant="outlined"
+              size="small"
+            />
+          )}
+
+          {filterState.fechaBajaDesde && (
+            <Chip
+              label={`Baja desde: ${filterState.fechaBajaDesde}`}
+              onDelete={() => handleFilterChange("fechaBajaDesde", "")}
+              variant="outlined"
+              size="small"
+            />
+          )}
+
+          {filterState.fechaBajaHasta && (
+            <Chip
+              label={`Baja hasta: ${filterState.fechaBajaHasta}`}
+              onDelete={() => handleFilterChange("fechaBajaHasta", "")}
               variant="outlined"
               size="small"
             />

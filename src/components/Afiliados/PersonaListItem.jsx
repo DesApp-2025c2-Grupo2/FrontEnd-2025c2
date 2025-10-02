@@ -2,26 +2,26 @@ import { Box, Typography, Card, Chip, IconButton } from "@mui/material";
 import {
   Delete as DeleteIcon,
   Edit as EditIcon,
-  ToggleOff as ToggleOffIcon,
-  ToggleOn as ToggleOnIcon,
   Visibility as VisibilityIcon,
 } from "@mui/icons-material";
 
-export default function FamiliarListItem({
-  familiar,
+export default function PersonaListItem({
+  persona,
   afiliado,
   onEdit,
   onView,
-  onToggleActive,
   onDelete,
   getParentescoColor,
+  getParentescoNombre,
 }) {
   return (
     <Card
       sx={{
         p: 2,
         backgroundColor: "#f8f9fa",
-        opacity: familiar.activo ? 1 : 0.6,
+        opacity: !persona.baja || new Date(persona.baja) > new Date().toLocaleDateString("es-AR", {
+                timeZone: "UTC",
+              }) ? 1 : 0.6,
       }}
     >
       <Box
@@ -31,56 +31,51 @@ export default function FamiliarListItem({
           justifyContent: "space-between",
         }}
       >
-        <Box>
+        <Box sx={{ flexGrow: 1 }}>
           <Typography variant="body1" sx={{ fontWeight: "bold" }}>
-            {familiar.nombre} {familiar.apellido}
+            {persona.nombre} {persona.apellido}
           </Typography>
           <Typography variant="body2" color="textSecondary">
-            <strong>DNI:</strong> {familiar.numeroDocumento} |{" "}
-            <strong>Credencial:</strong> {familiar.numeroAfiliado}-
-            {familiar.numeroIntegrante}
+            <strong>Integrante Nº:</strong> {persona.numeroIntegrante} |{" "}
+            <strong>Nacimiento:</strong>{" "}
+            {new Date(persona.fechaNacimiento).toLocaleDateString("es-AR", {
+                timeZone: "UTC",
+              })}
           </Typography>
-          <Box sx={{ mt: 1 }}>
+          <Box sx={{ mt: 1, display: "flex", gap: 1, flexWrap: "wrap" }}>
             <Chip
-              label={
-                familiar.parentesco === "ACargo"
-                  ? "A Cargo"
-                  : familiar.parentesco
-              }
+              label={getParentescoNombre(persona.parentesco)}
               size="small"
               sx={{
-                backgroundColor: getParentescoColor(familiar.parentesco),
+                backgroundColor: getParentescoColor(persona.parentesco),
                 color: "white",
                 fontWeight: "bold",
               }}
             />
+            {persona.situacionesTerapeuticas?.map((situacion, index) => (
+              <Chip
+                key={index}
+                label={situacion}
+                size="small"
+                color="warning"
+              />
+            ))}
           </Box>
         </Box>
         <Box sx={{ display: "flex", gap: 1 }}>
           <IconButton
             size="small"
-            onClick={() => onView(familiar, afiliado)}
+            onClick={() => onView(persona, afiliado)}
             color="info"
           >
             <VisibilityIcon />
           </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => onEdit(familiar, afiliado)}
-            color="black"
-          >
+          <IconButton size="small" onClick={() => onEdit(persona, afiliado)}>
             <EditIcon />
           </IconButton>
           <IconButton
             size="small"
-            onClick={() => onToggleActive(familiar)}
-            color={familiar.activo ? "error" : "success"}
-          >
-            {familiar.activo ? <ToggleOffIcon /> : <ToggleOnIcon />}
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => onDelete(familiar, afiliado)}
+            onClick={() => onDelete(persona, afiliado)}
             color="error"
           >
             <DeleteIcon />

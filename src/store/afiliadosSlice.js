@@ -4,69 +4,34 @@ const initialState = {
   afiliados: [
     {
       id: "1",
-      numeroAfiliado: "0000001",
-      numeroIntegrante: "01",
-      tipoDocumento: "DNI",
-      numeroDocumento: "12345678",
-      nombre: "Pedro",
-      apellido: "Gómez",
-      fechaNacimiento: "1980-05-15",
-      telefonos: ["11-1234-5678", "11-9876-5432", "15-5555-1234"],
-      emails: [
-        "pedro.gomez@email.com",
-        "pedro.trabajo@empresa.com",
-        "pgomez@gmail.com",
-      ],
-      direcciones: [
-        "Av. Corrientes 1234, CABA",
-        "San Martín 890, Vicente López",
-        "Rivadavia 456, Quilmes",
-      ],
-      parentesco: "Titular",
-      situacionesTerapeuticas: [],
-      planMedico: "Plan Bronce",
-      fechaAlta: "2024-01-15",
-      activo: true,
-      familiaresIds: ["f1", "f2"],
+      numeroAfiliado: 1,
+      titularId: "1", // ID de la persona que es el titular
+      planMedicoId: 1,
+      alta: "2024-01-15",
+      baja: null,
     },
     {
       id: "2",
-      numeroAfiliado: "0000002",
-      numeroIntegrante: "01",
-      tipoDocumento: "DNI",
-      numeroDocumento: "11223344",
-      nombre: "Ana",
-      apellido: "López",
-      fechaNacimiento: "1975-12-10",
-      telefonos: ["11-2233-4455", "11-7777-8888"],
-      emails: ["ana.lopez@email.com", "ana.trabajo@consultora.com"],
-      direcciones: ["Belgrano 567, CABA", "Libertador 1200, San Isidro"],
-      parentesco: "Titular",
-      situacionesTerapeuticas: ["Diabetes"],
-      planMedico: "Plan Platino",
-      fechaAlta: "2024-02-01",
-      activo: true,
-      familiaresIds: ["f3"],
+      numeroAfiliado: 2,
+      titularId: "4", // ID de la persona que es el titular
+      planMedicoId: 4,
+      alta: "2024-02-01",
+      baja: null,
     },
     {
       id: "3",
-      numeroAfiliado: "0000003",
-      numeroIntegrante: "01",
-      tipoDocumento: "DNI",
-      numeroDocumento: "55667788",
-      nombre: "Roberto",
-      apellido: "Fernández",
-      fechaNacimiento: "1982-09-18",
-      telefonos: ["11-5566-7788"],
-      emails: ["roberto.fernandez@email.com"],
-      direcciones: ["Mitre 789, Avellaneda"],
-      parentesco: "Titular",
-      situacionesTerapeuticas: [],
-      planMedico: "Plan Oro",
-      fechaAlta: "2024-01-25",
-      activo: true,
-      familiaresIds: [],
+      numeroAfiliado: 3,
+      titularId: "6", // ID de la persona que es el titular
+      planMedicoId: 3,
+      alta: "2024-01-25",
+      baja: "2024-12-31",
     },
+  ],
+  planesMedicos: [
+    { id: 1, nombre: "Plan Bronce" },
+    { id: 2, nombre: "Plan Plata" },
+    { id: 3, nombre: "Plan Oro" },
+    { id: 4, nombre: "Plan Platino" },
   ],
 };
 
@@ -85,77 +50,64 @@ const afiliadosSlice = createSlice({
         state.afiliados[index] = action.payload;
       }
     },
-    deleteAfiliado: (state, action) => {
-      state.afiliados = state.afiliados.filter((a) => a.id !== action.payload);
+    setBajaAfiliado: (state, action) => {
+      const { afiliadoId, fechaBaja } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
+      if (afiliado) {
+        afiliado.baja = fechaBaja;
+      }
     },
-    toggleAfiliadoActive: (state, action) => {
+    cancelBajaAfiliado: (state, action) => {
       const afiliado = state.afiliados.find((a) => a.id === action.payload);
       if (afiliado) {
-        afiliado.activo = !afiliado.activo;
+        afiliado.baja = null;
       }
     },
-    addFamiliarToAfiliado: (state, action) => {
-      const { afiliadoId, familiarId } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado && !afiliado.familiaresIds.includes(familiarId)) {
-        afiliado.familiaresIds.push(familiarId);
-      }
-    },
-    removeFamiliarFromAfiliado: (state, action) => {
-      const { afiliadoId, familiarId } = action.payload;
+    // Nueva acción para actualizar solo el plan médico
+    updatePlanMedicoAfiliado: (state, action) => {
+      const { afiliadoId, planMedicoId } = action.payload;
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
       if (afiliado) {
-        afiliado.familiaresIds = afiliado.familiaresIds.filter(
-          (id) => id !== familiarId
-        );
+        afiliado.planMedicoId = planMedicoId;
       }
     },
-    addTelefonoToAfiliado: (state, action) => {
-      const { afiliadoId, telefono } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado && !afiliado.telefonos.includes(telefono)) {
-        afiliado.telefonos.push(telefono);
-      }
-    },
-    removeTelefonoFromAfiliado: (state, action) => {
-      const { afiliadoId, telefonoIndex } = action.payload;
+    programarAltaAfiliado: (state, action) => {
+      const { afiliadoId, fechaAlta } = action.payload;
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
       if (afiliado) {
-        afiliado.telefonos = afiliado.telefonos.filter(
-          (_, index) => index !== telefonoIndex
-        );
+        // Si programamos una alta, cancelamos cualquier baja existente
+        afiliado.baja = null;
+        afiliado.alta = fechaAlta;
       }
     },
-    addEmailToAfiliado: (state, action) => {
-      const { afiliadoId, email } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado && !afiliado.emails.includes(email)) {
-        afiliado.emails.push(email);
-      }
-    },
-    removeEmailFromAfiliado: (state, action) => {
-      const { afiliadoId, emailIndex } = action.payload;
+    cancelarAltaProgramada: (state, action) => {
+      const { afiliadoId, fechaAltaInmediata } = action.payload;
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
       if (afiliado) {
-        afiliado.emails = afiliado.emails.filter(
-          (_, index) => index !== emailIndex
-        );
+        // Si cancelamos alta programada, ponemos alta inmediata o mantenemos la actual
+        if (fechaAltaInmediata) {
+          afiliado.alta = fechaAltaInmediata;
+        }
+        // Nota: No restauramos la baja aquí, eso se maneja por separado
       }
     },
-    addDireccionToAfiliado: (state, action) => {
-      const { afiliadoId, direccion } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado && !afiliado.direcciones.includes(direccion)) {
-        afiliado.direcciones.push(direccion);
-      }
-    },
-    removeDireccionFromAfiliado: (state, action) => {
-      const { afiliadoId, direccionIndex } = action.payload;
+    // Acción para reactivar inmediatamente (alta inmediata)
+    reactivarAfiliado: (state, action) => {
+      const { afiliadoId } = action.payload;
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
       if (afiliado) {
-        afiliado.direcciones = afiliado.direcciones.filter(
-          (_, index) => index !== direccionIndex
-        );
+        const hoy = new Date().toLocaleDateString("es-AR", {
+          timeZone: "UTC",
+        });
+        afiliado.baja = null;
+        afiliado.alta = hoy;
+      }
+    },
+    updateAltaAfiliado: (state, action) => {
+      const { afiliadoId, fechaAlta } = action.payload;
+      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
+      if (afiliado) {
+        afiliado.alta = fechaAlta;
       }
     },
   },
@@ -164,16 +116,13 @@ const afiliadosSlice = createSlice({
 export const {
   addAfiliado,
   updateAfiliado,
-  deleteAfiliado,
-  toggleAfiliadoActive,
-  addFamiliarToAfiliado,
-  removeFamiliarFromAfiliado,
-  addTelefonoToAfiliado,
-  removeTelefonoFromAfiliado,
-  addEmailToAfiliado,
-  removeEmailFromAfiliado,
-  addDireccionToAfiliado,
-  removeDireccionFromAfiliado,
+  setBajaAfiliado,
+  cancelBajaAfiliado,
+  updatePlanMedicoAfiliado,
+  programarAltaAfiliado,
+  cancelarAltaProgramada,
+  reactivarAfiliado,
+  updateAltaAfiliado,
 } = afiliadosSlice.actions;
 
 export default afiliadosSlice.reducer;

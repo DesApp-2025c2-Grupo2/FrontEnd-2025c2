@@ -23,20 +23,21 @@ import {
 } from "@mui/icons-material";
 import ContactInfoEditor from "./ContactInfoEditor";
 import {
-  addTelefonoToFamiliar,
-  removeTelefonoFromFamiliar,
-  addEmailToFamiliar,
-  removeEmailFromFamiliar,
-  addDireccionToFamiliar,
-  removeDireccionFromFamiliar,
-} from "../../store/familiaresSlice";
+  addTelefonoToPersona,
+  removeTelefonoFromPersona,
+  addEmailToPersona,
+  removeEmailFromPersona,
+  addDireccionToPersona,
+  removeDireccionFromPersona,
+} from "../../store/personasSlice";
 
-export default function FamiliarFormDialog({
+export default function PersonaFormDialog({
   open,
   selectedAfiliado,
   selectedFamiliar,
   isEditing,
   formData,
+  parentescos,
   editTelefonos,
   editEmails,
   editDirecciones,
@@ -59,9 +60,11 @@ export default function FamiliarFormDialog({
 
   // Limpiar inputs nuevos cuando se cierra/abre el diálogo
   useEffect(() => {
-    setNewTelefono("");
-    setNewEmail("");
-    setNewDireccion("");
+    if (open) {
+      setNewTelefono("");
+      setNewEmail("");
+      setNewDireccion("");
+    }
   }, [open]);
 
   const handleAddTelefono = () => {
@@ -72,8 +75,8 @@ export default function FamiliarFormDialog({
       // Si estamos editando, actualizar en Redux
       if (selectedFamiliar && isEditing) {
         dispatch(
-          addTelefonoToFamiliar({
-            familiarId: selectedFamiliar.id,
+          addTelefonoToPersona({
+            personaId: selectedFamiliar.id,
             telefono: newTelefono.trim(),
           })
         );
@@ -89,8 +92,8 @@ export default function FamiliarFormDialog({
     // Si estamos editando, actualizar en Redux
     if (selectedFamiliar && isEditing) {
       dispatch(
-        removeTelefonoFromFamiliar({
-          familiarId: selectedFamiliar.id,
+        removeTelefonoFromPersona({
+          personaId: selectedFamiliar.id,
           telefonoIndex: index,
         })
       );
@@ -104,8 +107,8 @@ export default function FamiliarFormDialog({
 
       if (selectedFamiliar && isEditing) {
         dispatch(
-          addEmailToFamiliar({
-            familiarId: selectedFamiliar.id,
+          addEmailToPersona({
+            personaId: selectedFamiliar.id,
             email: newEmail.trim(),
           })
         );
@@ -120,8 +123,8 @@ export default function FamiliarFormDialog({
 
     if (selectedFamiliar && isEditing) {
       dispatch(
-        removeEmailFromFamiliar({
-          familiarId: selectedFamiliar.id,
+        removeEmailFromPersona({
+          personaId: selectedFamiliar.id,
           emailIndex: index,
         })
       );
@@ -135,8 +138,8 @@ export default function FamiliarFormDialog({
 
       if (selectedFamiliar && isEditing) {
         dispatch(
-          addDireccionToFamiliar({
-            familiarId: selectedFamiliar.id,
+          addDireccionToPersona({
+            personaId: selectedFamiliar.id,
             direccion: newDireccion.trim(),
           })
         );
@@ -151,12 +154,32 @@ export default function FamiliarFormDialog({
 
     if (selectedFamiliar && isEditing) {
       dispatch(
-        removeDireccionFromFamiliar({
-          familiarId: selectedFamiliar.id,
+        removeDireccionFromPersona({
+          personaId: selectedFamiliar.id,
           direccionIndex: index,
         })
       );
     }
+  };
+
+  // Handler para cambios en el formulario - DIRECTO AL PADRE
+  const handleFormChange = (field, value) => {
+    onFormChange(field, value);
+  };
+
+  // Handler específico para parentesco
+  const handleParentescoChange = (e) => {
+    handleFormChange("parentesco", parseInt(e.target.value));
+  };
+
+  // Handler específico para tipo de documento
+  const handleTipoDocumentoChange = (e) => {
+    handleFormChange("tipoDocumento", e.target.value);
+  };
+
+  const getParentescoNombre = (parentescoId) => {
+    const parentesco = parentescos.find((p) => p.id === parentescoId);
+    return parentesco ? parentesco.nombre : "Desconocido";
   };
 
   return (
@@ -164,9 +187,9 @@ export default function FamiliarFormDialog({
       <DialogTitle>
         {selectedFamiliar
           ? isEditing
-            ? "Editar Familiar"
-            : "Detalle del Familiar"
-          : "Agregar Familiar"}
+            ? "Editar Persona"
+            : "Detalle de la Persona"
+          : "Agregar Persona al Grupo Familiar"}
       </DialogTitle>
       <DialogContent>
         {isViewMode ? (
@@ -176,29 +199,22 @@ export default function FamiliarFormDialog({
               {selectedFamiliar.apellido}, {selectedFamiliar.nombre}
             </Typography>
             <Typography variant="body2" gutterBottom>
-              <strong>Credencial:</strong> {selectedFamiliar.numeroAfiliado}-
+              <strong>Documento:</strong> {selectedFamiliar.tipoDocumento}{" "}
+              {selectedFamiliar.numeroDocumento}
+            </Typography>
+            <Typography variant="body2" gutterBottom>
+              <strong>Número de Integrante:</strong>{" "}
               {selectedFamiliar.numeroIntegrante}
             </Typography>
             <Typography variant="body2" gutterBottom>
-              <strong>Tipo y Nº de Documento:</strong>{" "}
-              {selectedFamiliar.tipoDocumento}{" "}
-              {selectedFamiliar.numeroDocumento}
+              <strong>Parentesco:</strong>{" "}
+              {getParentescoNombre(selectedFamiliar.parentesco)}
             </Typography>
             <Typography variant="body2" gutterBottom>
               <strong>Fecha de Nacimiento:</strong>{" "}
               {new Date(selectedFamiliar.fechaNacimiento).toLocaleDateString(
                 "es-AR"
               )}
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Fecha de Alta:</strong>{" "}
-              {new Date(selectedFamiliar.fechaAlta).toLocaleDateString("es-AR")}
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Parentesco:</strong> {selectedFamiliar.parentesco}
-            </Typography>
-            <Typography variant="body2" gutterBottom>
-              <strong>Plan Médico:</strong> {selectedFamiliar.planMedico}
             </Typography>
 
             <Divider sx={{ my: 2 }} />
@@ -224,6 +240,11 @@ export default function FamiliarFormDialog({
                     <Typography variant="body2">{telefono}</Typography>
                   </Box>
                 ))}
+                {selectedFamiliar.telefonos?.length === 0 && (
+                  <Typography variant="body2" color="textSecondary">
+                    No hay teléfonos registrados
+                  </Typography>
+                )}
               </Box>
             </Box>
 
@@ -248,6 +269,11 @@ export default function FamiliarFormDialog({
                     <Typography variant="body2">{email}</Typography>
                   </Box>
                 ))}
+                {selectedFamiliar.emails?.length === 0 && (
+                  <Typography variant="body2" color="textSecondary">
+                    No hay emails registrados
+                  </Typography>
+                )}
               </Box>
             </Box>
 
@@ -272,8 +298,37 @@ export default function FamiliarFormDialog({
                     <Typography variant="body2">{direccion}</Typography>
                   </Box>
                 ))}
+                {selectedFamiliar.direcciones?.length === 0 && (
+                  <Typography variant="body2" color="textSecondary">
+                    No hay direcciones registradas
+                  </Typography>
+                )}
               </Box>
             </Box>
+
+            {selectedFamiliar.situacionesTerapeuticas?.length > 0 && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
+                  Situaciones Terapéuticas:
+                </Typography>
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 0.5,
+                    ml: 2,
+                  }}
+                >
+                  {selectedFamiliar.situacionesTerapeuticas?.map(
+                    (situacion, index) => (
+                      <Typography key={index} variant="body2">
+                        • {situacion}
+                      </Typography>
+                    )
+                  )}
+                </Box>
+              </Box>
+            )}
           </Box>
         ) : (
           // MODO EDICIÓN/CREACIÓN
@@ -285,8 +340,7 @@ export default function FamiliarFormDialog({
                 gutterBottom
                 sx={{ mb: 3 }}
               >
-                Grupo Familiar: {selectedAfiliado.apellido} - Credencial:{" "}
-                {selectedAfiliado.numeroAfiliado}
+                Grupo Familiar: {selectedAfiliado.numeroAfiliado}
               </Typography>
             )}
 
@@ -295,35 +349,34 @@ export default function FamiliarFormDialog({
                 <TextField
                   fullWidth
                   label="Nombre"
-                  value={formData.nombre}
-                  onChange={(e) => onFormChange("nombre", e.target.value)}
+                  value={formData.nombre || ""}
+                  onChange={(e) => handleFormChange("nombre", e.target.value)}
                   required
+                  disabled={isViewMode}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
                   label="Apellido"
-                  value={formData.apellido}
-                  onChange={(e) => onFormChange("apellido", e.target.value)}
+                  value={formData.apellido || ""}
+                  onChange={(e) => handleFormChange("apellido", e.target.value)}
                   required
+                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
+                <FormControl fullWidth disabled={isViewMode}>
                   <InputLabel>Tipo de Documento</InputLabel>
                   <Select
-                    value={formData.tipoDocumento}
-                    onChange={(e) =>
-                      onFormChange("tipoDocumento", e.target.value)
-                    }
+                    value={formData.tipoDocumento || ""}
+                    label="Tipo de Documento"
+                    onChange={handleTipoDocumentoChange}
                   >
                     <MenuItem value="DNI">DNI</MenuItem>
-                    <MenuItem value="LC">LC</MenuItem>
-                    <MenuItem value="LE">LE</MenuItem>
                     <MenuItem value="Pasaporte">Pasaporte</MenuItem>
                   </Select>
                 </FormControl>
@@ -332,11 +385,12 @@ export default function FamiliarFormDialog({
                 <TextField
                   fullWidth
                   label="Número de Documento"
-                  value={formData.numeroDocumento}
+                  value={formData.numeroDocumento || ""}
                   onChange={(e) =>
-                    onFormChange("numeroDocumento", e.target.value)
+                    handleFormChange("numeroDocumento", e.target.value)
                   }
                   required
+                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
@@ -348,37 +402,32 @@ export default function FamiliarFormDialog({
                   label="Fecha de Nacimiento"
                   type="date"
                   InputLabelProps={{ shrink: true }}
-                  value={formData.fechaNacimiento}
+                  value={formData.fechaNacimiento || ""}
                   onChange={(e) =>
-                    onFormChange("fechaNacimiento", e.target.value)
+                    handleFormChange("fechaNacimiento", e.target.value)
                   }
                   required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Fecha de Alta"
-                  type="date"
-                  InputLabelProps={{ shrink: true }}
-                  value={formData.fechaAlta}
-                  onChange={(e) => onFormChange("fechaAlta", e.target.value)}
-                  required
+                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12}>
-                <FormControl fullWidth>
+                <FormControl fullWidth disabled={isViewMode}>
                   <InputLabel>Parentesco</InputLabel>
                   <Select
-                    value={formData.parentesco}
-                    onChange={(e) => onFormChange("parentesco", e.target.value)}
+                    value={formData.parentesco || ""}
+                    label="Parentesco"
+                    onChange={handleParentescoChange}
                   >
-                    <MenuItem value="Cónyuge">Cónyuge</MenuItem>
-                    <MenuItem value="Hijo">Hijo</MenuItem>
-                    <MenuItem value="ACargo">A Cargo</MenuItem>
+                    {parentescos
+                      .filter((p) => p.id !== 1) // Excluir Titular
+                      .map((parentesco) => (
+                        <MenuItem key={parentesco.id} value={parentesco.id}>
+                          {parentesco.nombre}
+                        </MenuItem>
+                      ))}
                   </Select>
                 </FormControl>
               </Grid>
@@ -395,6 +444,7 @@ export default function FamiliarFormDialog({
                   onNewValueChange={setNewTelefono}
                   onAdd={handleAddTelefono}
                   onRemove={handleRemoveTelefono}
+                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
@@ -411,6 +461,7 @@ export default function FamiliarFormDialog({
                   onNewValueChange={setNewEmail}
                   onAdd={handleAddEmail}
                   onRemove={handleRemoveEmail}
+                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
@@ -426,6 +477,7 @@ export default function FamiliarFormDialog({
                   onNewValueChange={setNewDireccion}
                   onAdd={handleAddDireccion}
                   onRemove={handleRemoveDireccion}
+                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
@@ -440,7 +492,7 @@ export default function FamiliarFormDialog({
           <Button variant="contained" color="secondary" onClick={onSave}>
             {selectedFamiliar && isEditing
               ? "Guardar Cambios"
-              : "Agregar Familiar"}
+              : "Agregar Persona"}
           </Button>
         )}
       </DialogActions>
