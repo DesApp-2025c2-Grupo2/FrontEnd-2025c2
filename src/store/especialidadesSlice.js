@@ -1,24 +1,30 @@
 import { createSlice, createAsyncThunk, createSelector } from '@reduxjs/toolkit';
-
-const initialEspecialidades = [
-  { id: 1, nombre: 'Cardiología', descripcion: 'Especialidad médica que se ocupa del corazón', activa: false },
-  { id: 2, nombre: 'Traumatología', descripcion: 'Trata lesiones del sistema musculoesquelético', activa: true },
-  { id: 3, nombre: 'Medicina General', descripcion: 'Atención médica integral y continua', activa: true },
-  { id: 4, nombre: 'Pediatría', descripcion: 'Salud de bebés, niños y adolescentes', activa: true },
-];
+import * as especialidadesService from '../services/especialidadesService';
 
 const initialState = {
-  especialidades: initialEspecialidades,
+  especialidades: [],
   loading: false,
   error: null,
 };
+
+export const cargarEspecialidades = createAsyncThunk(
+  'especialidades/cargar',
+  async (_, { rejectWithValue }) => {
+    try {
+      const data = await especialidadesService.ensureSeed();
+      return data;
+    } catch (e) {
+      return rejectWithValue(e.message || 'Error al cargar');
+    }
+  }
+);
 
 export const toggleEspecialidadStatus = createAsyncThunk(
   'especialidades/toggleStatus',
   async ({ id, activa }, { rejectWithValue }) => {
     try {
-      await new Promise(r => setTimeout(r, 500));
-      return { id, activa: !activa };
+      const res = await especialidadesService.toggle(id);
+      return res;
     } catch (e) {
       return rejectWithValue('Error al cambiar estado');
     }
@@ -29,18 +35,26 @@ export const addEspecialidad = createAsyncThunk(
   'especialidades/add',
   async ({ nombre, descripcion }, { rejectWithValue, getState }) => {
     try {
-      await new Promise(r => setTimeout(r, 400));
-    
-      const state = getState();
-      const maxId = Math.max(...state.especialidades.especialidades.map(e => e.id), 0);
-      const newId = maxId + 1;
-      
-      return { id: newId, nombre, descripcion, activa: true };
+      const created = await especialidadesService.create({ nombre, descripcion });
+      return created;
     } catch (e) {
-      return rejectWithValue('Error al agregar');
+      return rejectWithValue(e.message || 'Error al agregar');
     }
   }
 );
+
+export const updateEspecialidad = createAsyncThunk(
+  'especialidades/update',
+  async (partial, { rejectWithValue }) => {
+    try {
+      const updated = await especialidadesService.update(partial);
+      return updated;
+    } catch (e) {
+      return rejectWithValue(e.message || 'Error al actualizar');
+    }
+  }
+);
+
 
 const slice = createSlice({
   name: 'especialidades',
@@ -48,7 +62,10 @@ const slice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(toggleEspecialidadStatus.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(cargarEspecialidades.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(cargarEspecialidades.fulfilled, (state, action) => { state.loading = false; state.especialidades = action.payload || []; })
+      .addCase(cargarEspecialidades.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+      .addCase(toggleEspecialidadStatus.pending, (state) => { state.error = null; })
       .addCase(toggleEspecialidadStatus.fulfilled, (state, action) => {
         state.loading = false;
         const { id, activa } = action.payload;
@@ -56,9 +73,16 @@ const slice = createSlice({
         if (esp) esp.activa = activa;
       })
       .addCase(toggleEspecialidadStatus.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(addEspecialidad.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(addEspecialidad.pending, (state) => { state.error = null; })
       .addCase(addEspecialidad.fulfilled, (state, action) => { state.loading = false; state.especialidades.push(action.payload); })
-      .addCase(addEspecialidad.rejected, (state, action) => { state.loading = false; state.error = action.payload; });
+      .addCase(addEspecialidad.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+      .addCase(updateEspecialidad.pending, (state) => { state.error = null; })
+      .addCase(updateEspecialidad.fulfilled, (state, action) => {
+        state.loading = false;
+        const idx = state.especialidades.findIndex(e => e.id === action.payload.id);
+        if (idx !== -1) state.especialidades[idx] = action.payload;
+      })
+      .addCase(updateEspecialidad.rejected, (state, action) => { state.loading = false; state.error = action.payload; });
   }
 });
 

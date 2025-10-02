@@ -1,106 +1,144 @@
-import React, { useState } from 'react'; // Importa React y useState
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
 import {
-  Box, // Contenedor principal
-  Typography, // Componente de texto
-  TextField, // Campo de entrada
-  InputAdornment, // Adorno del campo
-  Card, // Tarjeta
-  CardContent, // Contenido de tarjeta
-  Grid, // Sistema de grilla
-  Button, // Botón
-  Chip, // Etiqueta
-  Divider, // Separador
-  Fab // Botón flotante
+  Box,
+  Typography,
+  TextField,
+  InputAdornment,
+  Divider,
+  Fab,
+  CircularProgress,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import {
-  Search as SearchIcon, // Ícono de búsqueda
-  Visibility as VisibilityIcon, // Ícono de ver
-  Edit as EditIcon, // Ícono de editar
-  PowerSettingsNew as PowerSettingsNewIcon, // Ícono de estado
-  Person as PersonIcon, // Ícono de persona
-  Add as AddIcon // Ícono de agregar
+  Search as SearchIcon,
+  Add as AddIcon
 } from '@mui/icons-material';
+import TarjetaPrestadorSimple from '../components/TarjetaPrestadorSimple';
+import DialogPrestador from '../components/DialogPrestador';
+import DialogVerPrestador from '../components/DialogVerPrestador';
+import {
+  selectPrestadoresFiltrados,
+  selectPrestadoresLoading,
+  selectPrestadoresError,
+  cargarPrestadores,
+  crearPrestador,
+  editarPrestador,
+  toggleActivoPrestador
+} from '../store/prestadoresSlice';
 
-function Prestadores() { // Componente principal
-  const [searchTerm, setSearchTerm] = useState(''); // Estado de búsqueda
+function Prestadores() {
+  const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Estados locales
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dialogoAgregar, setDialogoAgregar] = useState(false);
+  const [dialogoEditar, setDialogoEditar] = useState(false);
+  const [dialogoVer, setDialogoVer] = useState(false);
+  const [prestadorSeleccionado, setPrestadorSeleccionado] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  // Array de prestadores con estado controlado
-  const [prestadores, setPrestadores] = useState([
-    {
-      id: 1, // ID único
-      nombre: 'Dra. Tita Merello', // Nombre del prestador
-      tipo: 'Profesional Independiente', // Tipo de prestador
-      estado: 'Activo', // Estado actual
-      cuit: '20-12345678-9', // CUIT/CUIL
-      direcciones: 1, // Cantidad de direcciones
-      especialidades: ['Cardiología', 'Medicina General'] // Especialidades
-    },
-    {
-      id: 2,
-      nombre: 'Dr. Carlos Mendez',
-      tipo: 'Profesional Independiente',
-      estado: 'Activo',
-      cuit: '20-98765432-1',
-      direcciones: 1,
-      especialidades: ['Traumatología']
-    },
-    {
-      id: 3,
-      nombre: 'Centro Médico San Juan',
-      tipo: 'Centro Médico',
-      estado: 'Activo',
-      cuit: '30-11223344-5',
-      direcciones: 1,
-      especialidades: ['Múltiples']
+  // Selectores de Redux
+  const prestadoresFiltrados = useSelector(selectPrestadoresFiltrados(searchTerm));
+  const loading = useSelector(selectPrestadoresLoading);
+  const error = useSelector(selectPrestadoresError);
+
+  // Cargar prestadores al montar el componente
+  useEffect(() => {
+    dispatch(cargarPrestadores());
+  }, [dispatch]);
+
+  // Abrir modal si viene ?nuevo=1
+  useEffect(() => {
+    if (searchParams.get('nuevo') === '1') {
+      setPrestadorSeleccionado(null);
+      setDialogoAgregar(true);
+      // limpiar query para evitar reabrir al navegar dentro
+      searchParams.delete('nuevo');
+      setSearchParams(searchParams, { replace: true });
     }
-  ]);
+  }, [searchParams, setSearchParams]);
 
-  // Función para cambiar el estado del prestador
-  const handleCambiarEstado = (id) => {
-    setPrestadores(prevPrestadores =>
-      prevPrestadores.map(prestador =>
-        prestador.id === id
-          ? {
-              ...prestador,
-              estado: prestador.estado === 'Activo' ? 'Inactivo' : 'Activo'
-            }
-          : prestador
-      )
-    );
+  // Handlers para los botones
+  const handleVer = (prestador) => {
+    setPrestadorSeleccionado(prestador);
+    setDialogoVer(true);
   };
 
-  // Función que retorna el color según el tipo
-  const getTipoColor = (tipo) => {
-    const tipoColors = {
-      'Profesional Independiente': '#2196f3', // Azul para profesionales
-      'Centro Médico': '#9c27b0' // Morado para centros
-    };
-    return tipoColors[tipo] || '#2196f3';
+  const handleEditar = (prestador) => {
+    setPrestadorSeleccionado(prestador);
+    setDialogoEditar(true);
   };
 
-  // Función que retorna el color según el estado
-  const getEstadoColor = (estado) => {
-    const estadoColors = {
-      'Activo': '#4caf50', // Verde para activo
-      'Inactivo': '#f44336', // Rojo para inactivo
-      'Pendiente': '#ff9800' // Naranja para pendiente
-    };
-    return estadoColors[estado] || '#4caf50';
+  const handleToggleActivo = async (prestador) => {
+    try {
+      await dispatch(toggleActivoPrestador(prestador.id)).unwrap();
+      setSnackbar({
+        open: true,
+        message: `Prestador ${prestador.activo ? 'dado de baja' : 'rehabilitado'} exitosamente`,
+        severity: 'success'
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error || 'Error al cambiar estado del prestador',
+        severity: 'error'
+      });
+    }
   };
 
-  // Función que retorna el color según la especialidad
-  const getEspecialidadColor = (especialidad) => {
-    const especialidadColors = {
-      'Cardiología': '#e3f2fd', // Azul claro
-      'Traumatología': '#f3e5f5', // Morado claro
-      'Medicina General': '#e8f5e8', // Verde claro
-      'Múltiples': '#fff3e0' // Naranja claro
-    };
-    return especialidadColors[especialidad] || '#e3f2fd';
+  const handleAgregar = () => {
+    setPrestadorSeleccionado(null);
+    setDialogoAgregar(true);
+  };
+
+  // Handlers para los diálogos
+  const handleGuardarNuevo = async (nuevoPrestador) => {
+    try {
+      await dispatch(crearPrestador(nuevoPrestador)).unwrap();
+      setDialogoAgregar(false);
+      setSnackbar({
+        open: true,
+        message: 'Prestador creado exitosamente',
+        severity: 'success'
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error || 'Error al crear el prestador',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleGuardarEdicion = async (prestadorEditado) => {
+    try {
+      await dispatch(editarPrestador(prestadorEditado)).unwrap();
+      setDialogoEditar(false);
+      setPrestadorSeleccionado(null);
+      setSnackbar({
+        open: true,
+        message: 'Prestador actualizado exitosamente',
+        severity: 'success'
+      });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: error || 'Error al actualizar el prestador',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 } }}> {/* Contenedor principal responsive */}
+    <Box sx={{ p: { xs: 2, sm: 3 } }}>
       {/* Header de la página */}
       <Typography 
         variant="h4" 
@@ -113,7 +151,7 @@ function Prestadores() { // Componente principal
           fontSize: { xs: '1.5rem', sm: '2.125rem' }
         }}
       >
-        Prestadores {/* Título principal */}
+        Prestadores
       </Typography>
       <Typography 
         variant="subtitle1" 
@@ -124,20 +162,20 @@ function Prestadores() { // Componente principal
           fontSize: { xs: '0.875rem', sm: '1rem' }
         }}
       >
-        Gestión de prestadores médicos y centros de salud {/* Subtítulo */}
+        Gestión de prestadores médicos y centros de salud
       </Typography>
 
-      {/* Campo de búsqueda */}
+      {/* Buscador unificado */}
       <TextField
-        fullWidth // Ocupa todo el ancho
-        variant="outlined" // Variante con borde
-        placeholder="Buscar por nombre, CUIT/CUIL, especialidad o tipo..." // Texto de ayuda
-        value={searchTerm} // Valor controlado
-        onChange={(e) => setSearchTerm(e.target.value)} // Actualiza el estado
+        fullWidth
+        variant="outlined"
+        placeholder="Buscar por nombre, CUIT/CUIL, especialidad, código postal, tipo o día de atención (ej: Lunes)..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
-              <SearchIcon color="action" /> {/* Ícono de lupa */}
+              <SearchIcon color="action" />
             </InputAdornment>
           ),
         }}
@@ -152,232 +190,38 @@ function Prestadores() { // Componente principal
 
       {/* Lista de prestadores */}
       <Box sx={{ mb: 4 }}>
-        {prestadores.map((prestador, index) => (
-          <Box key={prestador.id}>
-            <Card 
-              elevation={1} // Sombra sutil
-              sx={{
-                mb: { xs: 1.5, sm: 2 },
-                borderRadius: 2,
-                border: '1px solid #e0e0e0',
-                backgroundColor: prestador.estado === 'Inactivo' ? '#f5f5f5' : 'white', // Fondo gris si está inactivo
-                opacity: prestador.estado === 'Inactivo' ? 0.8 : 1, // Opacidad reducida si está inactivo
-                transition: 'all 0.3s ease' // Transición suave
-              }}
-            >
-              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                <Grid container spacing={{ xs: 2, sm: 3 }} alignItems="stretch">
-                  {/* Columna de información */}
-                  <Grid item xs={12} lg={8} md={7}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                      {/* Header con nombre e ícono */}
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        mb: { xs: 1.5, sm: 2 },
-                        flexWrap: 'wrap',
-                        gap: 1
-                      }}>
-                        <PersonIcon sx={{ 
-                          color: 'text.secondary', 
-                          fontSize: { xs: 18, sm: 20 },
-                          minWidth: { xs: 18, sm: 20 }
-                        }} />
-                        <Typography 
-                          variant="h5" 
-                          component="h3" 
-                          sx={{ 
-                            fontWeight: 'bold', 
-                            fontSize: { xs: '1.1rem', sm: '1.25rem' },
-                            wordBreak: 'break-word'
-                          }}
-                        >
-                          {prestador.nombre}
-                        </Typography>
-                      </Box>
-                      
-                      {/* Chips de tipo y estado */}
-                      <Box sx={{ 
-                        display: 'flex', 
-                        gap: { xs: 1, sm: 1.5 }, 
-                        mb: { xs: 1.5, sm: 2 },
-                        flexWrap: 'wrap'
-                      }}>
-                        <Chip
-                          label={prestador.tipo}
-                          size="small"
-                          sx={{
-                            backgroundColor: getTipoColor(prestador.tipo),
-                            color: 'white',
-                            fontWeight: 'bold',
-                            fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                            height: { xs: 24, sm: 28 }
-                          }}
-                        />
-                        <Chip
-                          label={prestador.estado}
-                          size="small"
-                          sx={{
-                            backgroundColor: getEstadoColor(prestador.estado),
-                            color: 'white',
-                            fontWeight: 'bold',
-                            fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                            height: { xs: 24, sm: 28 }
-                          }}
-                        />
-                      </Box>
-                      
-                      {/* Detalles del prestador */}
-                      <Box sx={{ 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        gap: { xs: 0.5, sm: 0.8 }, 
-                        mb: { xs: 1.5, sm: 2 },
-                        flex: 1
-                      }}>
-                        <Typography variant="body2" color="text.secondary" sx={{ 
-                          fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                          wordBreak: 'break-word'
-                        }}>
-                          <strong>CUIT/CUIL:</strong> {prestador.cuit}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ 
-                          fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                          wordBreak: 'break-word'
-                        }}>
-                          <strong>Direcciones:</strong> {prestador.direcciones}
-                        </Typography>
-                      </Box>
-                      
-                      {/* Especialidades */}
-                      <Box sx={{ 
-                        display: 'flex', 
-                        gap: { xs: 0.5, sm: 1 }, 
-                        flexWrap: 'wrap',
-                        mt: 'auto'
-                      }}>
-                        {prestador.especialidades.map((especialidad, idx) => (
-                          <Chip
-                            key={idx}
-                            label={especialidad}
-                            size="small"
-                            sx={{
-                              backgroundColor: getEspecialidadColor(especialidad),
-                              color: 'text.primary',
-                              fontWeight: 'bold',
-                              fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                              height: { xs: 24, sm: 28 }
-                            }}
-                          />
-                        ))}
-                      </Box>
-                    </Box>
-                  </Grid>
-
-                  {/* Columna de botones de acción */}
-                  <Grid item xs={12} lg={4} md={5}>
-                    <Box sx={{ 
-                      display: 'flex', 
-                      flexDirection: { xs: 'row', sm: 'column' },
-                      gap: { xs: 1, sm: 1.5 }, 
-                      justifyContent: { xs: 'center', sm: 'center' }, 
-                      alignItems: { xs: 'center', sm: 'flex-end' }, 
-                      height: '100%',
-                      flexWrap: 'wrap'
-                    }}>
-                      {/* Botón VER */}
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<VisibilityIcon />}
-                        sx={{
-                          borderColor: '#2196f3',
-                          color: '#2196f3',
-                          backgroundColor: '#e3f2fd',
-                          '&:hover': {
-                            borderColor: '#1976d2',
-                            backgroundColor: '#bbdefb'
-                          },
-                          fontWeight: 'bold',
-                          fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                          height: { xs: 28, sm: 32 },
-                          textTransform: 'none',
-                          minWidth: { xs: 60, sm: 80 },
-                          px: { xs: 0.5, sm: 1 },
-                          flexShrink: 0
-                        }}
-                      >
-                        VER
-                      </Button>
-                      
-                      {/* Botón EDITAR */}
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<EditIcon />}
-                        sx={{
-                          borderColor: '#2196f3',
-                          color: '#2196f3',
-                          backgroundColor: '#e3f2fd',
-                          '&:hover': {
-                            borderColor: '#1976d2',
-                            backgroundColor: '#bbdefb'
-                          },
-                          fontWeight: 'bold',
-                          fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                          height: { xs: 28, sm: 32 },
-                          textTransform: 'none',
-                          minWidth: { xs: 60, sm: 80 },
-                          px: { xs: 0.5, sm: 1 },
-                          flexShrink: 0
-                        }}
-                      >
-                        EDITAR
-                      </Button>
-                      
-                      {/* Botón DAR DE BAJA/REHABILITAR */}
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        startIcon={<PowerSettingsNewIcon />}
-                        onClick={() => handleCambiarEstado(prestador.id)}
-                        sx={{
-                          borderColor: prestador.estado === 'Activo' ? '#f44336' : '#4caf50',
-                          color: prestador.estado === 'Activo' ? '#f44336' : '#4caf50',
-                          backgroundColor: prestador.estado === 'Activo' ? '#ffebee' : '#e8f5e8',
-                          '&:hover': {
-                            borderColor: prestador.estado === 'Activo' ? '#d32f2f' : '#45a049',
-                            backgroundColor: prestador.estado === 'Activo' ? '#ffcdd2' : '#c8e6c9'
-                          },
-                          fontWeight: 'bold',
-                          fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                          height: { xs: 28, sm: 32 },
-                          textTransform: 'none',
-                          minWidth: { xs: 60, sm: 80 },
-                          px: { xs: 0.5, sm: 1 },
-                          flexShrink: 0
-                        }}
-                      >
-                        {prestador.estado === 'Activo' ? 'DAR DE BAJA' : 'REHABILITAR'}
-                      </Button>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-            
-            {/* Separador entre prestadores */}
-            {index < prestadores.length - 1 && (
-              <Divider sx={{ my: { xs: 2, sm: 3 }, opacity: 0.6 }} />
-            )}
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
           </Box>
-        ))}
+        ) : error ? (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        ) : prestadoresFiltrados.length > 0 ? (
+          prestadoresFiltrados.map((prestador) => (
+            <TarjetaPrestadorSimple
+              key={prestador.id}
+              prestador={prestador}
+              onVer={handleVer}
+              onEditar={handleEditar}
+              onToggleActivo={handleToggleActivo}
+            />
+          ))
+        ) : (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="body1" color="text.secondary">
+              No se encontraron prestadores
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       {/* Botón flotante para agregar */}
       <Fab
         color="primary"
         aria-label="add"
+        onClick={handleAgregar}
         sx={{
           position: 'fixed',
           bottom: { xs: 16, sm: 24 },
@@ -390,6 +234,51 @@ function Prestadores() { // Componente principal
       >
         <AddIcon />
       </Fab>
+
+      {/* Diálogo Agregar Prestador */}
+      <DialogPrestador
+        abierto={dialogoAgregar}
+        valorInicial={null}
+        onCerrar={() => setDialogoAgregar(false)}
+        onGuardar={handleGuardarNuevo}
+      />
+
+      {/* Diálogo Editar Prestador */}
+      <DialogPrestador
+        abierto={dialogoEditar}
+        valorInicial={prestadorSeleccionado}
+        onCerrar={() => {
+          setDialogoEditar(false);
+          setPrestadorSeleccionado(null);
+        }}
+        onGuardar={handleGuardarEdicion}
+      />
+
+      {/* Diálogo Ver Detalles */}
+      <DialogVerPrestador
+        abierto={dialogoVer}
+        prestador={prestadorSeleccionado}
+        onCerrar={() => {
+          setDialogoVer(false);
+          setPrestadorSeleccionado(null);
+        }}
+      />
+
+      {/* Snackbar para notificaciones */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -1,463 +1,567 @@
-import React, { useState } from 'react'; // Importa React y useState
+import { useState, useEffect } from "react";
+import { useSelector, useDispatch } from "react-redux";
+import { Box, Typography, Fab, Snackbar, Alert } from "@mui/material";
+import { Add as AddIcon, Person as PersonIcon } from "@mui/icons-material";
 import {
-  Box, // Contenedor principal
-  Typography, // Componente de texto
-  TextField, // Campo de entrada
-  InputAdornment, // Adorno del campo
-  Card, // Tarjeta
-  CardContent, // Contenido de tarjeta
-  Grid, // Sistema de grilla
-  Button, // Botón
-  Chip, // Etiqueta
-  Divider, // Separador
-  Fab // Botón flotante
-} from '@mui/material';
+  setBajaAfiliado,
+  cancelBajaAfiliado,
+  programarAltaAfiliado,
+  cancelarAltaProgramada,
+  reactivarAfiliado,
+} from "../store/afiliadosSlice";
 import {
-  Search as SearchIcon, // Ícono de búsqueda
-  Visibility as VisibilityIcon, // Ícono de ver
-  Edit as EditIcon, // Ícono de editar
-  PowerSettingsNew as PowerSettingsNewIcon, // Ícono de estado
-  Person as PersonIcon, // Ícono de persona para afiliados
-  Add as AddIcon // Ícono de agregar
-} from '@mui/icons-material';
+  addPersona,
+  updatePersona,
+  deletePersona,
+} from "../store/personasSlice";
+import AdvancedSearchBar from "../components/Afiliados/AdvancedSearchBar";
+import AfiliadoCard from "../components/Afiliados/AfiliadosCard";
+import AfiliadoFormDialog from "../components/Afiliados/AfiliadoFormDialog";
+import PersonaFormDialog from "../components/Afiliados/PersonaFormDialog";
+import BajaDialog from "../components/Afiliados/BajaDialog";
+import AltaDialog from "../components/Afiliados/AltaDialog";
+import { AfiliadosService } from "../services/afiliadosService";
+import { selectSituaciones } from "../store/situacionesTerapeuticasSlice";
+import { selectPlanes } from "../store/planesSlice";
 
-function Afiliados() { // Componente principal
-  const [searchTerm, setSearchTerm] = useState(''); // Estado de búsqueda
+const startOfDay = (d) => {
+  const dt = new Date(d);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+};
+const hoyISO = () => new Date().toISOString().split("T")[0];
 
-  // Array de afiliados con estado controlado
-  const [afiliados, setAfiliados] = useState([
-    {
-      id: 1, // ID único
-      nombre: 'Gómez, Pedro', // Nombre del afiliado
-      credencial: '0000001-01', // Credencial del afiliado
-      dni: '12345678', // DNI del afiliado
-      plan: 'Plan 310', // Plan de cobertura
-      estado: 'Activo', // Estado actual
-      grupoFamiliar: 'Titular', // Rol en el grupo familiar
-      alta: '14/1/2024', // Fecha de alta
-      infoAdicional: [] // Sin información adicional
-    },
-    {
-      id: 2,
-      nombre: 'Gómez, María',
-      credencial: '0000001-02',
-      dni: '87654321',
-      plan: 'Plan 310',
-      estado: 'Activo',
-      grupoFamiliar: 'Cónyuge',
-      alta: '14/1/2024',
-      infoAdicional: ['Embarazo'] // Información adicional
-    },
-    {
-      id: 3,
-      nombre: 'López, Ana',
-      credencial: '0000002-01',
-      dni: '11223344',
-      plan: 'Plan 510',
-      estado: 'Activo',
-      grupoFamiliar: 'Titular',
-      alta: '31/1/2024',
-      infoAdicional: ['Diabetes'] // Información adicional
-    },
-    {
-      id: 4,
-      nombre: 'Rodríguez, Carlos',
-      credencial: '0000001-03',
-      dni: '55667788',
-      plan: 'Plan 310',
-      estado: 'Activo',
-      grupoFamiliar: 'Hijo',
-      alta: '10/6/2021',
-      infoAdicional: [] // Sin información adicional
+const estaActivo = (alta, baja) => {
+  const hoy = startOfDay(new Date());
+  if (baja) {
+    const fechaBaja = startOfDay(new Date(baja));
+    if (fechaBaja <= hoy) return false;
+  }
+  if (alta) {
+    const fechaAlta = startOfDay(new Date(alta));
+    if (fechaAlta > hoy) return false;
+  }
+  return true;
+};
+
+const tieneBajaProgramada = (baja) => {
+  if (!baja) return false;
+  return startOfDay(new Date(baja)) > startOfDay(new Date());
+};
+
+const tieneAltaProgramada = (alta) => {
+  if (!alta) return false;
+  return startOfDay(new Date(alta)) > startOfDay(new Date());
+};
+
+// MEJORADA: Agregar validación para afiliado null
+const getTitularDelAfiliado = (afiliado, personas) => {
+  if (!afiliado || !afiliado.titularId) return null;
+  return personas.find((p) => p.id === afiliado.titularId);
+};
+
+// MEJORADA: Agregar validación para afiliado null
+const getFamiliaresDelAfiliado = (afiliado, personas) => {
+  if (!afiliado) return [];
+  return personas.filter(
+    (p) => p.afiliadoId === afiliado.id && p.id !== afiliado.titularId
+  );
+};
+
+const getPlanMedicoNombre = (planMedicoId, planesMedicos) => {
+  const plan = planesMedicos.find((p) => String(p.id) === String(planMedicoId));
+  return plan ? plan.nombre : "Desconocido";
+};
+
+export default function Afiliados() {
+  const dispatch = useDispatch();
+  const afiliados = useSelector((state) => state.afiliados.afiliados);
+  const planesMedicos = useSelector(selectPlanes) || [];
+  const personas = useSelector((state) => state.personas.personas);
+  const parentescos = useSelector((state) => state.personas.parentescos);
+  const situacionesCatalogo = useSelector(selectSituaciones);
+
+  const [filteredAfiliados, setFilteredAfiliados] = useState([]);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [selectedAfiliado, setSelectedAfiliado] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [openFamiliarDialog, setOpenFamiliarDialog] = useState(false);
+  const [selectedFamiliar, setSelectedFamiliar] = useState(null);
+  const [isEditingFamiliar, setIsEditingFamiliar] = useState(false);
+  const [openBajaDialog, setOpenBajaDialog] = useState(false);
+  const [openAltaDialog, setOpenAltaDialog] = useState(false);
+  const [afiliadoParaBaja, setAfiliadoParaBaja] = useState(null);
+  const [afiliadoParaAlta, setAfiliadoParaAlta] = useState(null);
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  // Form states
+  const [formAfiliado, setFormAfiliado] = useState({
+    nombre: "",
+    apellido: "",
+    tipoDocumento: "DNI",
+    numeroDocumento: "",
+    fechaNacimiento: "",
+    planMedicoId: "1", // Cambiado a string para consistencia
+    alta: hoyISO(),
+  });
+
+  const [formFamiliar, setFormFamiliar] = useState({
+    nombre: "",
+    apellido: "",
+    tipoDocumento: "DNI",
+    numeroDocumento: "",
+    fechaNacimiento: "",
+    parentesco: 2,
+    alta: hoyISO(),
+  });
+
+  const [editTelefonos, setEditTelefonos] = useState([]);
+  const [editEmails, setEditEmails] = useState([]);
+  const [editDirecciones, setEditDirecciones] = useState([]);
+  const [editSituaciones, setEditSituaciones] = useState([]);
+
+  useEffect(() => setFilteredAfiliados(afiliados), [afiliados]);
+
+  const showSnackbar = (message, severity = "success") =>
+    setSnackbar({ open: true, message, severity });
+
+  // Afiliado handlers
+  const handleAddAfiliado = () => {
+    setSelectedAfiliado(null);
+    setIsEditing(false);
+    setFormAfiliado({
+      nombre: "",
+      apellido: "",
+      tipoDocumento: "DNI",
+      numeroDocumento: "",
+      fechaNacimiento: "",
+      planMedicoId: "1", // Cambiado a string
+      alta: hoyISO(),
+    });
+    setEditTelefonos([]);
+    setEditEmails([]);
+    setEditDirecciones([]);
+    setEditSituaciones([]);
+    setOpenDialog(true);
+  };
+
+  // MEJORADA: Agregar validación para afiliado null
+  const handleEditAfiliado = (afiliado) => {
+    if (!afiliado) {
+      console.error("No se proporcionó un afiliado para editar");
+      return;
     }
-  ]);
 
-  // Función para cambiar el estado del afiliado
-  const handleCambiarEstado = (id) => {
-    setAfiliados(prevAfiliados =>
-      prevAfiliados.map(afiliado =>
-        afiliado.id === id
-          ? {
-              ...afiliado,
-              estado: afiliado.estado === 'Activo' ? 'Inactivo' : 'Activo'
-            }
-          : afiliado
-      )
+    const titular = getTitularDelAfiliado(afiliado, personas);
+    if (!titular) {
+      console.error("No se encontró el titular del afiliado");
+      return;
+    }
+
+    setSelectedAfiliado(afiliado);
+    setIsEditing(true);
+    setFormAfiliado({
+      nombre: titular.nombre,
+      apellido: titular.apellido,
+      tipoDocumento: titular.tipoDocumento,
+      numeroDocumento: titular.numeroDocumento,
+      fechaNacimiento: titular.fechaNacimiento,
+      planMedicoId: afiliado.planMedicoId,
+      alta: afiliado.alta,
+    });
+    setEditTelefonos([...titular.telefonos]);
+    setEditEmails([...titular.emails]);
+    setEditDirecciones([...titular.direcciones]);
+    setEditSituaciones([...(titular.situacionesTerapeuticas || [])]);
+    setOpenDialog(true);
+  };
+
+  const handleViewAfiliado = (afiliado) => {
+    setSelectedAfiliado(afiliado);
+    setIsEditing(false);
+    const titular = getTitularDelAfiliado(afiliado, personas);
+    setEditSituaciones([...(titular?.situacionesTerapeuticas || [])]);
+    setOpenDialog(true);
+  };
+
+  const handleSaveAfiliado = () => {
+    if (
+      !formAfiliado.nombre ||
+      !formAfiliado.apellido ||
+      !formAfiliado.tipoDocumento ||
+      !formAfiliado.numeroDocumento ||
+      !formAfiliado.fechaNacimiento
+    ) {
+      showSnackbar("Complete todos los campos requeridos", "error");
+      return;
+    }
+
+    if (selectedAfiliado && isEditing) {
+      // delegar a service
+      AfiliadosService.updateAfiliadoExisting(
+        dispatch,
+        selectedAfiliado,
+        formAfiliado,
+        editTelefonos,
+        editEmails,
+        editDirecciones,
+        editSituaciones,
+        personas
+      );
+      showSnackbar("Afiliado actualizado");
+    } else {
+      AfiliadosService.createAfiliado(
+        dispatch,
+        formAfiliado,
+        editTelefonos,
+        editEmails,
+        editDirecciones,
+        editSituaciones,
+        afiliados
+      );
+      showSnackbar("Afiliado creado");
+    }
+
+    setOpenDialog(false);
+    setSelectedAfiliado(null);
+  };
+
+  // Altas programadas / reactivación
+  const handleProgramarAltaAfiliado = (afiliado, fechaAlta) => {
+    dispatch(programarAltaAfiliado({ afiliadoId: afiliado.id, fechaAlta }));
+    const titular = getTitularDelAfiliado(afiliado, personas);
+    if (titular) dispatch(updatePersona({ ...titular, alta: fechaAlta }));
+    showSnackbar("Alta programada correctamente");
+  };
+
+  const handleCancelarAltaProgramada = (afiliado) => {
+    const hoy = hoyISO();
+    dispatch(
+      cancelarAltaProgramada({
+        afiliadoId: afiliado.id,
+        fechaAltaInmediata: hoy,
+      })
     );
+    const titular = getTitularDelAfiliado(afiliado, personas);
+    if (titular) dispatch(updatePersona({ ...titular, alta: hoy }));
+    showSnackbar("Alta programada cancelada");
   };
 
-  // Función que retorna el color según el plan
-  const getPlanColor = (plan) => {
-    const planColors = {
-      'Plan 310': '#2196f3', // Azul para plan 310
-      'Plan 510': '#9c27b0' // Morado para plan 510
-    };
-    return planColors[plan] || '#2196f3';
+  const handleReactivarInmediatamente = (afiliado) => {
+    dispatch(reactivarAfiliado({ afiliadoId: afiliado.id }));
+    const titular = getTitularDelAfiliado(afiliado, personas);
+    if (titular) dispatch(updatePersona({ ...titular, alta: hoyISO() }));
+    showSnackbar("Afiliado reactivado inmediatamente");
   };
 
-  // Función que retorna el color según el estado
-  const getEstadoColor = (estado) => {
-    const estadoColors = {
-      'Activo': '#4caf50', // Verde para activo
-      'Inactivo': '#f44336', // Rojo para inactivo
-      'Pendiente': '#ff9800' // Naranja para pendiente
-    };
-    return estadoColors[estado] || '#4caf50';
+  const handleOpenAltaDialog = (afiliado) => {
+    setAfiliadoParaAlta(afiliado);
+    setOpenAltaDialog(true);
   };
 
-  // Función que retorna el color según el grupo familiar
-  const getGrupoFamiliarColor = (grupo) => {
-    const grupoColors = {
-      'Titular': '#2196f3', // Azul para titular
-      'Cónyuge': '#4caf50', // Verde para cónyuge
-      'Hijo': '#2196f3', // Azul para hijo
-      'Hija': '#2196f3' // Azul para hija
-    };
-    return grupoColors[grupo] || '#2196f3';
+  // Familiares
+  const handleAddFamiliar = (afiliado) => {
+    setSelectedAfiliado(afiliado);
+    setSelectedFamiliar(null);
+    setIsEditingFamiliar(false);
+    setFormFamiliar({
+      nombre: "",
+      apellido: "",
+      tipoDocumento: "DNI",
+      numeroDocumento: "",
+      fechaNacimiento: "",
+      parentesco: 2,
+      alta: hoyISO(),
+    });
+    setEditTelefonos([]);
+    setEditEmails([]);
+    setEditDirecciones([]);
+    setEditSituaciones([]);
+    setOpenFamiliarDialog(true);
   };
 
-  // Función que retorna el color según la información adicional
-  const getInfoAdicionalColor = (info) => {
-    const infoColors = {
-      'Embarazo': '#ff9800', // Naranja para embarazo
-      'Diabetes': '#ff9800' // Naranja para diabetes
-    };
-    return infoColors[info] || '#ff9800';
+  const handleEditFamiliar = (familiar, afiliado) => {
+    setSelectedAfiliado(afiliado);
+    setSelectedFamiliar(familiar);
+    setIsEditingFamiliar(true);
+    setFormFamiliar({
+      nombre: familiar.nombre,
+      apellido: familiar.apellido,
+      fechaNacimiento: familiar.fechaNacimiento,
+      tipoDocumento: familiar.tipoDocumento,
+      numeroDocumento: familiar.numeroDocumento,
+      parentesco: familiar.parentesco,
+      alta: familiar.alta,
+    });
+    setEditTelefonos([...familiar.telefonos]);
+    setEditEmails([...familiar.emails]);
+    setEditDirecciones([...familiar.direcciones]);
+    setEditSituaciones([...(familiar.situacionesTerapeuticas || [])]);
+    setOpenFamiliarDialog(true);
   };
+
+  const handleViewFamiliar = (familiar, afiliado) => {
+    setSelectedAfiliado(afiliado);
+    setSelectedFamiliar(familiar);
+    setIsEditingFamiliar(false);
+    setEditSituaciones([...(familiar.situacionesTerapeuticas || [])]);
+    setOpenFamiliarDialog(true);
+  };
+
+  const handleSaveFamiliar = () => {
+    if (
+      !selectedAfiliado ||
+      !formFamiliar.nombre ||
+      !formFamiliar.apellido ||
+      !formFamiliar.tipoDocumento ||
+      !formFamiliar.numeroDocumento ||
+      !formFamiliar.fechaNacimiento
+    ) {
+      showSnackbar("Complete todos los campos requeridos", "error");
+      return;
+    }
+
+    if (selectedFamiliar && isEditingFamiliar) {
+      dispatch(
+        updatePersona({
+          ...selectedFamiliar,
+          nombre: formFamiliar.nombre,
+          apellido: formFamiliar.apellido,
+          fechaNacimiento: formFamiliar.fechaNacimiento,
+          tipoDocumento: formFamiliar.tipoDocumento,
+          numeroDocumento: formFamiliar.numeroDocumento,
+          parentesco: formFamiliar.parentesco,
+          telefonos: editTelefonos,
+          emails: editEmails,
+          direcciones: editDirecciones,
+          situacionesTerapeuticas: editSituaciones,
+        })
+      );
+      showSnackbar("Familiar actualizado");
+    } else {
+      const familiaresDelGrupo = getFamiliaresDelAfiliado(
+        selectedAfiliado,
+        personas
+      );
+      const maxIntegrante = Math.max(
+        ...familiaresDelGrupo.map((f) => Number(f.numeroIntegrante) || 1),
+        1
+      );
+      dispatch(
+        addPersona({
+          id: `f${Date.now()}`,
+          numeroIntegrante: maxIntegrante + 1,
+          nombre: formFamiliar.nombre,
+          apellido: formFamiliar.apellido,
+          tipoDocumento: formFamiliar.tipoDocumento,
+          numeroDocumento: formFamiliar.numeroDocumento,
+          fechaNacimiento: formFamiliar.fechaNacimiento,
+          parentesco: formFamiliar.parentesco,
+          afiliadoId: selectedAfiliado.id,
+          alta: formFamiliar.alta,
+          baja: null,
+          telefonos: editTelefonos,
+          emails: editEmails,
+          direcciones: editDirecciones,
+          situacionesTerapeuticas: editSituaciones,
+        })
+      );
+      showSnackbar("Familiar agregado");
+    }
+
+    setOpenFamiliarDialog(false);
+    setSelectedFamiliar(null);
+  };
+
+  const handleDeleteFamiliar = (familiar) => {
+    if (
+      window.confirm(`¿Eliminar a ${familiar.nombre} ${familiar.apellido}?`)
+    ) {
+      dispatch(deletePersona(familiar.id));
+      showSnackbar("Familiar eliminado");
+    }
+  };
+
+  // Bajas
+  const handleOpenBajaDialog = (afiliado) => {
+    setAfiliadoParaBaja(afiliado);
+    setOpenBajaDialog(true);
+  };
+
+  const handleSetBajaAfiliado = (afiliado, fechaBaja) => {
+    dispatch(setBajaAfiliado({ afiliadoId: afiliado.id, fechaBaja }));
+    const titular = getTitularDelAfiliado(afiliado, personas);
+    if (titular) dispatch(updatePersona({ ...titular, baja: fechaBaja }));
+    showSnackbar("Baja programada");
+  };
+
+  const handleCancelBajaAfiliado = (afiliado) => {
+    dispatch(cancelBajaAfiliado(afiliado.id));
+    const titular = getTitularDelAfiliado(afiliado, personas);
+    if (titular) dispatch(updatePersona({ ...titular, baja: null }));
+    showSnackbar("Baja cancelada");
+  };
+
+  // Style helpers
+  const getParentescoColor = (parentescoId) =>
+    ({ 1: "#1976d2", 2: "#2e7d32", 3: "#f57c00", 4: "#757575" }[parentescoId] ||
+    "#757575");
+  const getPlanColor = (planMedicoId) =>
+    ({ 1: "#cd7f32", 2: "#c0c0c0", 3: "#ffd700", 4: "#e5e4e2" }[planMedicoId] ||
+    "#757575");
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 } }}> {/* Contenedor principal responsive */}
-      {/* Header de la página */}
-      <Typography 
-        variant="h4" 
-        component="h1" 
-        gutterBottom 
-        sx={{ 
-          color: 'text.primary', 
-          mb: { xs: 0.5, sm: 1 }, 
-          fontWeight: 'bold',
-          fontSize: { xs: '1.5rem', sm: '2.125rem' }
-        }}
+    <Box>
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{ fontWeight: "bold", color: "#1976d2" }}
       >
-        Afiliados {/* Título principal */}
-      </Typography>
-      <Typography 
-        variant="subtitle1" 
-        color="text.secondary" 
-        gutterBottom 
-        sx={{ 
-          mb: { xs: 3, sm: 4 }, 
-          fontSize: { xs: '0.875rem', sm: '1rem' }
-        }}
-      >
-        Gestión de afiliados y grupos familiares {/* Subtítulo */}
+        Afiliados
       </Typography>
 
-      {/* Campo de búsqueda */}
-      <TextField
-        fullWidth // Ocupa todo el ancho
-        variant="outlined" // Variante con borde
-        placeholder="Buscar por nombre, DNI, credencial, plan o grupo familiar..." // Texto de ayuda
-        value={searchTerm} // Valor controlado
-        onChange={(e) => setSearchTerm(e.target.value)} // Actualiza el estado
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <SearchIcon color="action" /> {/* Ícono de lupa */}
-            </InputAdornment>
-          ),
-        }}
-        sx={{
-          mb: { xs: 3, sm: 4 },
-          '& .MuiOutlinedInput-root': {
-            borderRadius: 2,
-            fontSize: { xs: '0.875rem', sm: '1rem' }
-          }
-        }}
+      <AdvancedSearchBar
+        afiliados={afiliados}
+        personas={personas}
+        planesMedicos={planesMedicos}
+        onFilteredAfiliadosChange={setFilteredAfiliados}
+        estaActivo={estaActivo}
+        tieneBajaProgramada={tieneBajaProgramada}
+        tieneAltaProgramada={tieneAltaProgramada}
       />
 
-      {/* Lista de afiliados */}
-      <Box sx={{ mb: 4 }}>
-        {afiliados.map((afiliado, index) => (
-          <Box key={afiliado.id}>
-                         <Card 
-               elevation={1} // Sombra sutil
-               sx={{
-                 mb: { xs: 1.5, sm: 2 },
-                 borderRadius: 2,
-                 border: '1px solid #e0e0e0',
-                 backgroundColor: afiliado.estado === 'Inactivo' ? '#f5f5f5' : 'white', // Fondo gris si está inactivo
-                 opacity: afiliado.estado === 'Inactivo' ? 0.8 : 1, // Opacidad reducida si está inactivo
-                 transition: 'all 0.3s ease' // Transición suave
-               }}
-             >
-               <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-                                 <Grid container spacing={{ xs: 2, sm: 3 }} alignItems="stretch">
-                   {/* Columna de información */}
-                   <Grid item xs={12} lg={8} md={7}>
-                     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                       {/* Header con nombre e ícono */}
-                       <Box sx={{ 
-                         display: 'flex', 
-                         alignItems: 'center', 
-                         mb: { xs: 1.5, sm: 2 },
-                         flexWrap: 'wrap',
-                         gap: 1
-                       }}>
-                         <PersonIcon sx={{ 
-                           color: 'text.secondary', 
-                           fontSize: { xs: 18, sm: 20 },
-                           minWidth: { xs: 18, sm: 20 }
-                         }} />
-                         <Typography 
-                           variant="h5" 
-                           component="h3" 
-                           sx={{ 
-                             fontWeight: 'bold', 
-                             fontSize: { xs: '1.1rem', sm: '1.25rem' },
-                             wordBreak: 'break-word'
-                           }}
-                         >
-                           {afiliado.nombre}
-                         </Typography>
-                       </Box>
-                       
-                       {/* Chips de plan y estado */}
-                       <Box sx={{ 
-                         display: 'flex', 
-                         gap: { xs: 1, sm: 1.5 }, 
-                         mb: { xs: 1.5, sm: 2 },
-                         flexWrap: 'wrap'
-                       }}>
-                         <Chip
-                           label={afiliado.plan}
-                           size="small"
-                           sx={{
-                             backgroundColor: getPlanColor(afiliado.plan),
-                             color: 'white',
-                             fontWeight: 'bold',
-                             fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                             height: { xs: 24, sm: 28 }
-                           }}
-                         />
-                         <Chip
-                           label={afiliado.estado}
-                           size="small"
-                           sx={{
-                             backgroundColor: getEstadoColor(afiliado.estado),
-                             color: 'white',
-                             fontWeight: 'bold',
-                             fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                             height: { xs: 24, sm: 28 }
-                           }}
-                         />
-                       </Box>
-                       
-                       {/* Detalles del afiliado */}
-                       <Box sx={{ 
-                         display: 'flex', 
-                         flexDirection: 'column', 
-                         gap: { xs: 0.5, sm: 0.8 }, 
-                         mb: { xs: 1.5, sm: 2 },
-                         flex: 1
-                       }}>
-                         <Typography variant="body2" color="text.secondary" sx={{ 
-                           fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                           wordBreak: 'break-word'
-                         }}>
-                           <strong>Credencial:</strong> {afiliado.credencial}
-                         </Typography>
-                         <Typography variant="body2" color="text.secondary" sx={{ 
-                           fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                           wordBreak: 'break-word'
-                         }}>
-                           <strong>DNI:</strong> {afiliado.dni}
-                         </Typography>
-                         <Typography variant="body2" color="text.secondary" sx={{ 
-                           fontSize: { xs: '0.8rem', sm: '0.9rem' },
-                           wordBreak: 'break-word'
-                         }}>
-                           <strong>Alta:</strong> {afiliado.alta}
-                         </Typography>
-                       </Box>
-                       
-                       {/* Botones del grupo familiar e información adicional */}
-                       <Box sx={{ 
-                         display: 'flex', 
-                         gap: { xs: 0.5, sm: 1 }, 
-                         flexWrap: 'wrap',
-                         mt: 'auto'
-                       }}>
-                         {/* Botón del grupo familiar */}
-                         <Button
-                           variant="outlined"
-                           size="small"
-                           sx={{
-                             backgroundColor: 'transparent',
-                             borderColor: getGrupoFamiliarColor(afiliado.grupoFamiliar),
-                             color: getGrupoFamiliarColor(afiliado.grupoFamiliar),
-                             fontWeight: 'bold',
-                             fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                             height: { xs: 24, sm: 28 },
-                             textTransform: 'none',
-                             minWidth: 'fit-content',
-                             px: { xs: 0.5, sm: 1 },
-                             '&:hover': {
-                               backgroundColor: getGrupoFamiliarColor(afiliado.grupoFamiliar),
-                               color: 'white'
-                             }
-                           }}
-                         >
-                           {afiliado.grupoFamiliar}
-                         </Button>
-                         
-                         {/* Botones de información adicional */}
-                         {afiliado.infoAdicional.map((info, index) => (
-                           <Button
-                             key={index}
-                             variant="outlined"
-                             size="small"
-                             sx={{
-                               backgroundColor: 'transparent',
-                               borderColor: getInfoAdicionalColor(info),
-                               color: getInfoAdicionalColor(info),
-                               fontWeight: 'bold',
-                               fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                               height: { xs: 24, sm: 28 },
-                               textTransform: 'none',
-                               minWidth: 'fit-content',
-                               px: { xs: 0.5, sm: 1 },
-                               '&:hover': {
-                                 backgroundColor: getInfoAdicionalColor(info),
-                                 color: 'white'
-                               }
-                             }}
-                           >
-                             {info}
-                           </Button>
-                         ))}
-                       </Box>
-                     </Box>
-                   </Grid>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {filteredAfiliados.map((afiliado) => {
+          const titular = getTitularDelAfiliado(afiliado, personas);
+          const familiares = getFamiliaresDelAfiliado(afiliado, personas);
+          if (!titular) return null;
+          return (
+            <AfiliadoCard
+              key={afiliado.id}
+              afiliado={afiliado}
+              titular={titular}
+              familiares={familiares}
+              planMedico={getPlanMedicoNombre(
+                afiliado.planMedicoId,
+                planesMedicos
+              )}
+              estaActivo={estaActivo(afiliado.alta, afiliado.baja)}
+              tieneBajaProgramada={tieneBajaProgramada(afiliado.baja)}
+              tieneAltaProgramada={tieneAltaProgramada(afiliado.alta)}
+              onView={handleViewAfiliado}
+              onEdit={handleEditAfiliado}
+              onSetBaja={handleOpenBajaDialog}
+              onSetAlta={handleOpenAltaDialog}
+              onAddFamiliar={handleAddFamiliar}
+              onViewFamiliar={handleViewFamiliar}
+              onEditFamiliar={handleEditFamiliar}
+              onDeleteFamiliar={handleDeleteFamiliar}
+              getParentescoColor={getParentescoColor}
+              getPlanColor={getPlanColor}
+              parentescos={parentescos}
+            />
+          );
+        })}
+      </Box>
 
-                   {/* Columna de botones de acción */}
-                   <Grid item xs={12} lg={4} md={5}>
-                     <Box sx={{ 
-                       display: 'flex', 
-                       flexDirection: { xs: 'row', sm: 'column' },
-                       gap: { xs: 1, sm: 1.5 }, 
-                       justifyContent: { xs: 'center', sm: 'center' }, 
-                       alignItems: { xs: 'center', sm: 'flex-end' }, 
-                       height: '100%',
-                       flexWrap: 'wrap'
-                     }}>
-                       {/* Botón VER */}
-                       <Button
-                         variant="outlined"
-                         size="small"
-                         startIcon={<VisibilityIcon />}
-                         sx={{
-                           borderColor: '#2196f3',
-                           color: '#2196f3',
-                           backgroundColor: '#e3f2fd',
-                           '&:hover': {
-                             borderColor: '#1976d2',
-                             backgroundColor: '#bbdefb'
-                           },
-                           fontWeight: 'bold',
-                           fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                           height: { xs: 28, sm: 32 },
-                           textTransform: 'none',
-                           minWidth: { xs: 60, sm: 80 },
-                           px: { xs: 0.5, sm: 1 },
-                           flexShrink: 0
-                         }}
-                       >
-                         VER
-                       </Button>
-                       
-                       {/* Botón EDITAR */}
-                       <Button
-                         variant="outlined"
-                         size="small"
-                         startIcon={<EditIcon />}
-                         sx={{
-                           borderColor: '#2196f3',
-                           color: '#2196f3',
-                           backgroundColor: '#e3f2fd',
-                           '&:hover': {
-                             borderColor: '#1976d2',
-                             backgroundColor: '#bbdefb'
-                           },
-                           fontWeight: 'bold',
-                           fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                           height: { xs: 28, sm: 32 },
-                           textTransform: 'none',
-                           minWidth: { xs: 60, sm: 80 },
-                           px: { xs: 0.5, sm: 1 },
-                           flexShrink: 0
-                         }}
-                       >
-                         EDITAR
-                       </Button>
-                       
-                       {/* Botón DAR DE BAJA/REHABILITAR */}
-                       <Button
-                         variant="outlined"
-                         size="small"
-                         startIcon={<PowerSettingsNewIcon />}
-                         onClick={() => handleCambiarEstado(afiliado.id)}
-                         sx={{
-                           borderColor: afiliado.estado === 'Activo' ? '#f44336' : '#4caf50',
-                           color: afiliado.estado === 'Activo' ? '#f44336' : '#4caf50',
-                           backgroundColor: afiliado.estado === 'Activo' ? '#ffebee' : '#e8f5e8',
-                           '&:hover': {
-                             borderColor: afiliado.estado === 'Activo' ? '#d32f2f' : '#45a049',
-                             backgroundColor: afiliado.estado === 'Activo' ? '#ffcdd2' : '#c8e6c9'
-                           },
-                           fontWeight: 'bold',
-                           fontSize: { xs: '0.7rem', sm: '0.75rem' },
-                           height: { xs: 28, sm: 32 },
-                           textTransform: 'none',
-                           minWidth: { xs: 60, sm: 80 },
-                           px: { xs: 0.5, sm: 1 },
-                           flexShrink: 0
-                         }}
-                       >
-                         {afiliado.estado === 'Activo' ? 'DAR DE BAJA' : 'REHABILITAR'}
-                       </Button>
-                     </Box>
-                   </Grid>
-                 </Grid>
-              </CardContent>
-            </Card>
-            
-                         {/* Separador entre afiliados */}
-             {index < afiliados.length - 1 && (
-               <Divider sx={{ my: { xs: 2, sm: 3 }, opacity: 0.6 }} />
-             )}
-           </Box>
-         ))}
-       </Box>
+      {filteredAfiliados.length === 0 && (
+        <Box sx={{ textAlign: "center", py: 8 }}>
+          <PersonIcon sx={{ fontSize: 64, color: "#ccc", mb: 2 }} />
+          <Typography variant="h6" color="textSecondary">
+            No se encontraron afiliados
+          </Typography>
+        </Box>
+      )}
 
-       {/* Botón flotante para agregar */}
-       <Fab
-         color="primary"
-         aria-label="add"
-         sx={{
-           position: 'fixed',
-           bottom: { xs: 16, sm: 24 },
-           right: { xs: 16, sm: 24 },
-           backgroundColor: '#2196f3',
-           '&:hover': { backgroundColor: '#1976d2' },
-           width: { xs: 48, sm: 56 },
-           height: { xs: 48, sm: 56 }
-         }}
-       >
-         <AddIcon />
-       </Fab>
+      <Fab
+        color="primary"
+        sx={{ position: "fixed", bottom: 16, right: 16 }}
+        onClick={handleAddAfiliado}
+      >
+        <AddIcon />
+      </Fab>
+
+      {/* CORREGIDO: onEdit ahora usa arrow function */}
+      <AfiliadoFormDialog
+        open={openDialog}
+        selectedAfiliado={selectedAfiliado}
+        isEditing={isEditing}
+        formData={formAfiliado}
+        planesMedicos={planesMedicos}
+        personas={personas}
+        situacionesCatalogo={situacionesCatalogo}
+        editTelefonos={editTelefonos}
+        editEmails={editEmails}
+        editDirecciones={editDirecciones}
+        editSituaciones={editSituaciones}
+        onEditTelefonosChange={setEditTelefonos}
+        onEditEmailsChange={setEditEmails}
+        onEditDireccionesChange={setEditDirecciones}
+        onEditSituacionesChange={setEditSituaciones}
+        onClose={() => setOpenDialog(false)}
+        onSave={handleSaveAfiliado}
+        onEdit={() => handleEditAfiliado(selectedAfiliado)}
+        onFormChange={(field, value) =>
+          setFormAfiliado((prev) => ({ ...prev, [field]: value }))
+        }
+      />
+
+      <PersonaFormDialog
+        open={openFamiliarDialog}
+        selectedAfiliado={selectedAfiliado}
+        selectedFamiliar={selectedFamiliar}
+        isEditing={isEditingFamiliar}
+        formData={formFamiliar}
+        parentescos={parentescos}
+        situacionesCatalogo={situacionesCatalogo}
+        editTelefonos={editTelefonos}
+        editEmails={editEmails}
+        editDirecciones={editDirecciones}
+        editSituaciones={editSituaciones}
+        onEditTelefonosChange={setEditTelefonos}
+        onEditEmailsChange={setEditEmails}
+        onEditDireccionesChange={setEditDirecciones}
+        onEditSituacionesChange={setEditSituaciones}
+        onClose={() => setOpenFamiliarDialog(false)}
+        onSave={handleSaveFamiliar}
+        onFormChange={(field, value) =>
+          setFormFamiliar((prev) => ({ ...prev, [field]: value }))
+        }
+      />
+
+      <BajaDialog
+        open={openBajaDialog}
+        afiliado={afiliadoParaBaja}
+        onClose={() => setOpenBajaDialog(false)}
+        onConfirm={handleSetBajaAfiliado}
+        onCancelBaja={handleCancelBajaAfiliado}
+      />
+
+      <AltaDialog
+        open={openAltaDialog}
+        afiliado={afiliadoParaAlta}
+        onClose={() => setOpenAltaDialog(false)}
+        onConfirm={handleProgramarAltaAfiliado}
+        onCancelAlta={handleCancelarAltaProgramada}
+        onReactivar={handleReactivarInmediatamente}
+      />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert
+          severity={snackbar.severity}
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
-
-export default Afiliados;
