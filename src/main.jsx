@@ -19,6 +19,37 @@ const theme = createTheme({
       secondary: "#727273",
     },
   },
+  components: {
+    MuiOutlinedInput: {
+      styleOverrides: {
+        root: {
+          "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            borderColor: "#2563eb",
+          },
+        },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          "&.Mui-focused": {
+            color: "black",
+          },
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        outlinedPrimary: {
+          borderColor: "#2563eb",
+          color: "#2563eb",
+          "&:hover": {
+            backgroundColor: "rgba(37, 99, 235, 0.08)",
+          },
+        },
+      },
+    },
+  },
 });
 
 createRoot(document.getElementById("root")).render(
