@@ -1,4 +1,5 @@
-import React, { useState } from 'react'; // Importa React y useState
+import React, { useEffect, useState } from 'react'; // Importa React y useState
+import { useSearchParams } from 'react-router-dom';
 import {
   Box, // Contenedor principal
   Typography, // Componente de texto
@@ -22,6 +23,7 @@ import {
 } from '@mui/icons-material';
 
 function Afiliados() { // Componente principal
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(''); // Estado de búsqueda
 
   // Array de afiliados con estado controlado
@@ -124,6 +126,15 @@ function Afiliados() { // Componente principal
     };
     return infoColors[info] || '#ff9800';
   };
+
+  // Abrir modal agregar afiliado si viene ?nuevo=1 (placeholder: alerta hasta que se integre modal real)
+  useEffect(() => {
+    if (searchParams.get('nuevo') === '1') {
+      alert('Abrir modal: Nuevo Afiliado (pendiente de integrar)');
+      searchParams.delete('nuevo');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3 } }}> {/* Contenedor principal responsive */}

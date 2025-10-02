@@ -1,9 +1,9 @@
-// Servicio mock para Situaciones Terapéuticas con persistencia en localStorage
+// Servicio mock para Situaciones Terapéuticas con persistencia en sessionStorage
 
 const STORAGE_KEY = 'mock_situaciones_terapeuticas_v1';
 
 function readAll() {
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = sessionStorage.getItem(STORAGE_KEY);
   if (!raw) return [];
   try {
     return JSON.parse(raw);
@@ -13,7 +13,7 @@ function readAll() {
 }
 
 function writeAll(items) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
 function delay(ms = 350) {
