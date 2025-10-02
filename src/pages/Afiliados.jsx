@@ -366,7 +366,6 @@ export default function Afiliados() {
     setEditDirecciones([]);
     setOpenFamiliarDialog(true);
   };
-
   const handleEditFamiliar = (familiar, afiliado) => {
     setSelectedAfiliado(afiliado);
     setSelectedFamiliar(familiar);

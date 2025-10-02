@@ -1,31 +1,46 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Box, Typography, Container, Alert, CircularProgress, Snackbar } from '@mui/material';
-import EspecialidadCard from '../components/EspecialidadCard';
+import TarjetaSituacionTerapeutica from '../components/TarjetaSituacionTerapeutica.jsx';
 import BotonFlotante from '../components/BotonFlotante';
-import { toggleSituacionStatus, addSituacion, selectSituaciones, selectSituacionesLoading, selectSituacionesError } from '../store/situacionesTerapeuticasSlice';
+import DialogSituacion from '../components/DialogSituacion.jsx';
+import { cargarSituaciones, crearSituacion, editarSituacion, alternarSituacionThunk, selectSituaciones, selectSituacionesLoading, selectSituacionesError } from '../store/situacionesTerapeuticasSlice';
 
 function SituacionesTerapeuticas() {
   const dispatch = useDispatch();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editSituacion, setEditSituacion] = useState(null);
   
 
   const situaciones = useSelector(selectSituaciones);
   const loading = useSelector(selectSituacionesLoading);
   const error = useSelector(selectSituacionesError);
 
+  useEffect(() => {
+    dispatch(cargarSituaciones());
+  }, [dispatch]);
+
   
 
-  const handleEdit = useCallback((situacion) => {
-    window.alert(`Editar situación: ${situacion.nombre}`);
+  const handleOpenAdd = useCallback(() => {
+    setEditSituacion(null);
+    setDialogOpen(true);
   }, []);
 
+  const handleOpenEdit = useCallback((situacion) => {
+    setEditSituacion(situacion);
+    setDialogOpen(true);
+  }, []);
+
+  const handleCloseDialog = useCallback(() => setDialogOpen(false), []);
+
   const handleToggleStatus = useCallback((situacion) => {
-    dispatch(toggleSituacionStatus({ id: situacion.id, activa: situacion.activa }))
+    dispatch(alternarSituacionThunk(situacion.id))
       .unwrap()
-      .then((result) => {
-        setSnackbarMessage(result.activa ? 'Situación activada correctamente' : 'Situación desactivada correctamente');
+      .then((updated) => {
+        setSnackbarMessage(updated.activa ? 'Situación activada correctamente' : 'Situación desactivada correctamente');
         setSnackbarOpen(true);
       })
       .catch(() => {
@@ -34,10 +49,32 @@ function SituacionesTerapeuticas() {
       });
   }, [dispatch]);
 
-  const handleAdd = useCallback(() => {
-    const nueva = { nombre: 'Nueva Situación Terapéutica', descripcion: 'Descripción de la nueva situación' };
-    dispatch(addSituacion(nueva));
-  }, [dispatch]);
+  const handleSubmit = useCallback((data) => {
+    if (editSituacion) {
+      dispatch(editarSituacion({ ...data, id: editSituacion.id }))
+        .unwrap()
+        .then(() => {
+          setSnackbarMessage('Situación actualizada correctamente');
+          setSnackbarOpen(true);
+        })
+        .catch((e) => {
+          setSnackbarMessage(e?.message || 'Error al actualizar');
+          setSnackbarOpen(true);
+        });
+    } else {
+      dispatch(crearSituacion(data))
+        .unwrap()
+        .then(() => {
+          setSnackbarMessage('Situación agregada correctamente');
+          setSnackbarOpen(true);
+        })
+        .catch((e) => {
+          setSnackbarMessage(e?.message || 'Error al agregar');
+          setSnackbarOpen(true);
+        });
+    }
+    setDialogOpen(false);
+  }, [dispatch, editSituacion]);
 
   return (
     <Container maxWidth="lg">
@@ -65,18 +102,19 @@ function SituacionesTerapeuticas() {
           </Alert>
         ) : (
           situaciones.map((situacion) => (
-            <EspecialidadCard
+            <TarjetaSituacionTerapeutica
               key={situacion.id}
-              especialidad={situacion}
-              onEdit={handleEdit}
-              onToggleStatus={handleToggleStatus}
-              statusLabels={{ active: 'Activo', inactive: 'Inactivo' }}
+              situacion={situacion}
+              onEditar={handleOpenEdit}
+              onAlternarActiva={handleToggleStatus}
             />
           ))
         )}
       </Box>
 
-      <BotonFlotante onClick={handleAdd} />
+      <DialogSituacion abierto={dialogOpen} valorInicial={editSituacion} onCerrar={handleCloseDialog} onGuardar={handleSubmit} />
+
+      <BotonFlotante onClick={handleOpenAdd} title="Agregar situación" />
 
       <Snackbar
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}

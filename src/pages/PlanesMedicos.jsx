@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Container, Box, Typography, Snackbar, CircularProgress, Alert } from '@mui/material';
+import { Container, Box, Typography, Snackbar, CircularProgress, Alert, TextField, InputAdornment} from '@mui/material';
 import TarjetaPlan from '../components/TarjetaPlan.jsx';
 import DialogoPlan from '../components/DialogoPlan.jsx';
 import BotonFlotante from '../components/BotonFlotante.jsx';
 import { useDispatch, useSelector } from 'react-redux';
 import { selectPlanesFiltrados, cargarPlanes, crearPlan, editarPlan, eliminarPlanThunk, alternarPlanThunk } from '../store/planesSlice.js';
 import { useEffect } from 'react';
+import SearchIcon from '@mui/icons-material/Search';
 
 function PlanesMedicos() {
   const dispatch = useDispatch();
@@ -20,6 +21,7 @@ function PlanesMedicos() {
   const [editPlan, setEditPlan] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [search, setSearch] = useState('');
 
   const handleOpenAdd = () => {
     setEditPlan(null);
@@ -43,6 +45,12 @@ function PlanesMedicos() {
     setSnackbarOpen(true);
   };
 
+  const planesFiltrados = planes.filter((plan) => {
+    const texto = search.toLowerCase()
+    return (
+      plan.nombre.toLowerCase().includes(texto) || plan.descripcion.toLowerCase().includes(texto))
+  });
+
   return (
     <Container maxWidth="lg">
       <Box sx={{ mb: 4 }}>
@@ -54,6 +62,24 @@ function PlanesMedicos() {
         </Typography>
       </Box>
 
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-start' }}>
+        <TextField
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar plan por nombre o descripción"
+          variant="outlined"
+          size="small"
+          sx={{ width: 350 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon color="action" />
+              </InputAdornment>
+            )
+          }}
+        />
+      </Box>
+
       <Box sx={{ mb: 8 }}>
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}><CircularProgress /></Box>
@@ -61,7 +87,7 @@ function PlanesMedicos() {
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
         )}
-        {planes.map((plan) => (
+        {planesFiltrados.map((plan) => (
           <TarjetaPlan
             key={plan.id}
             plan={plan}

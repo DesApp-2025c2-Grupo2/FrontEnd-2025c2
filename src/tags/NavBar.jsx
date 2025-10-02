@@ -52,7 +52,7 @@ const menuItems = [
 ];
 
 export default function NavBar({ mobileOpen, handleDrawerToggle }) {
-  const drawerContent = (
+  const renderDrawerContent = (closeOnClick = false) => (
     <Box sx={{ bgcolor: "primary.main", height: "100%" }}>
       <List>
         {/* Logo */}
@@ -96,7 +96,7 @@ export default function NavBar({ mobileOpen, handleDrawerToggle }) {
             key={item.text}
             component={Link}
             to={item.path}
-            onClick={handleDrawerToggle}
+            onClick={closeOnClick ? handleDrawerToggle : undefined}
             sx={{
               color: "text.secondary",
               "&:hover": {
@@ -130,7 +130,7 @@ export default function NavBar({ mobileOpen, handleDrawerToggle }) {
           "& .MuiDrawer-paper": { width: drawerWidth },
         }}
       >
-        {drawerContent}
+        {renderDrawerContent(true)}
       </Drawer>
 
       {/* Drawer permanente para desktop */}
@@ -145,7 +145,7 @@ export default function NavBar({ mobileOpen, handleDrawerToggle }) {
         }}
         open
       >
-        {drawerContent}
+        {renderDrawerContent(false)}
       </Drawer>
     </>
   );
