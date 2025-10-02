@@ -4,7 +4,6 @@ import situacionesReducer from "../store/situacionesTerapeuticasSlice";
 import planesReducer from "../store/planesSlice";
 import afiliadosReducer from "../store/afiliadosSlice";
 import personasReducer from "../store/personasSlice";
-import { configureStore } from '@reduxjs/toolkit';
 import agendasReducer from '../store/agendasSlice';
 import prestadoresReducer from '../store/prestadoresSlice';
 import { loadState, saveState } from './localStorage';
