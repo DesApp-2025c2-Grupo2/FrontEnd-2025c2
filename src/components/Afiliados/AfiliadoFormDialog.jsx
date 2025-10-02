@@ -64,8 +64,10 @@ export default function AfiliadoFormDialog({
     }
   }, [open]);
 
-  const getTitularDelAfiliado = (afiliado) =>
-    personas.find((p) => p.id === afiliado.titularId);
+  const getTitularDelAfiliado = (afiliado) => {
+    if (!afiliado || !afiliado.titularId) return null;
+    return personas.find((p) => p.id === afiliado.titularId);
+  };
 
   const handleAddTelefono = () => {
     if (newTelefono.trim()) {
@@ -94,7 +96,7 @@ export default function AfiliadoFormDialog({
 
   const handleFormChange = (field, value) => onFormChange(field, value);
   const handlePlanMedicoChange = (e) =>
-    handleFormChange("planMedicoId", Number(e.target.value));
+    handleFormChange("planMedicoId", e.target.value);
   const handleTipoDocumentoChange = (e) =>
     handleFormChange("tipoDocumento", e.target.value);
 
@@ -135,7 +137,8 @@ export default function AfiliadoFormDialog({
                 <Typography variant="body2" gutterBottom>
                   <strong>Plan Médico:</strong>{" "}
                   {planesMedicos.find(
-                    (p) => p.id === selectedAfiliado.planMedicoId
+                    (p) =>
+                      String(p.id) === String(selectedAfiliado.planMedicoId)
                   )?.nombre || "Desconocido"}
                 </Typography>
 
@@ -392,8 +395,8 @@ export default function AfiliadoFormDialog({
                     label="Plan Médico"
                     onChange={handlePlanMedicoChange}
                   >
-                    {planesMedicos.map((plan) => (
-                      <MenuItem key={plan.id} value={plan.id}>
+                    {(planesMedicos || []).map((plan) => (
+                      <MenuItem key={plan.id} value={String(plan.id)}>
                         {plan.nombre}
                       </MenuItem>
                     ))}

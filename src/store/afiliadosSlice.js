@@ -6,7 +6,7 @@ const initialState = {
       id: "1",
       numeroAfiliado: 1,
       titularId: "1",
-      planMedicoId: 1,
+      planMedicoId: "1", // Cambiado a string
       alta: "2024-01-15",
       baja: null,
       situacionesTerapeuticas: [],
@@ -15,7 +15,7 @@ const initialState = {
       id: "2",
       numeroAfiliado: 2,
       titularId: "4",
-      planMedicoId: 4,
+      planMedicoId: "4", // Cambiado a string
       alta: "2024-02-01",
       baja: null,
       situacionesTerapeuticas: [],
@@ -24,18 +24,13 @@ const initialState = {
       id: "3",
       numeroAfiliado: 3,
       titularId: "6",
-      planMedicoId: 3,
+      planMedicoId: "3", // Cambiado a string
       alta: "2024-01-25",
       baja: "2024-12-31",
       situacionesTerapeuticas: [],
     },
   ],
-  planesMedicos: [
-    { id: 1, nombre: "Plan Bronce" },
-    { id: 2, nombre: "Plan Plata" },
-    { id: 3, nombre: "Plan Oro" },
-    { id: 4, nombre: "Plan Platino" },
-  ],
+  // Se eliminó planesMedicos de aquí
 };
 
 const afiliadosSlice = createSlice({
@@ -91,8 +86,6 @@ const afiliadosSlice = createSlice({
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
       if (afiliado) afiliado.alta = fechaAlta;
     },
-
-    // ---- NUEVAS ACCIONES para situaciones sobre afiliado ----
     addSituacionAfiliado: (state, action) => {
       const { afiliadoId, situacionNombre } = action.payload;
       const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
@@ -141,6 +134,5 @@ export const {
 } = afiliadosSlice.actions;
 
 export const selectAfiliados = (state) => state.afiliados.afiliados;
-export const selectPlanesMedicos = (state) => state.afiliados.planesMedicos;
 
 export default afiliadosSlice.reducer;
