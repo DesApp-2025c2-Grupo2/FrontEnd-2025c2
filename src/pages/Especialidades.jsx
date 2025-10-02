@@ -1,12 +1,15 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Box, Typography, Container, Alert, CircularProgress, Snackbar } from '@mui/material';
 import EspecialidadCard from '../components/EspecialidadCard';
 import BotonFlotante from '../components/BotonFlotante';
-import { toggleEspecialidadStatus, addEspecialidad, selectEspecialidadesFiltradas, selectLoading, selectError } from '../store/especialidadesSlice';
+import { toggleEspecialidadStatus, addEspecialidad, updateEspecialidad, selectEspecialidadesFiltradas, selectLoading, selectError, cargarEspecialidades } from '../store/especialidadesSlice';
+import DialogEspecialidad from '../components/DialogEspecialidad';
 
 function Especialidades() {
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
@@ -14,27 +17,62 @@ function Especialidades() {
   const loading = useSelector(selectLoading);
   const error = useSelector(selectError);
 
+  useEffect(() => {
+    dispatch(cargarEspecialidades());
+  }, [dispatch]);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  // Abrir modal si viene ?nuevo=1
+  useEffect(() => {
+    if (searchParams.get('nuevo') === '1') {
+      setEditing(null);
+      setDialogOpen(true);
+      searchParams.delete('nuevo');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const handleEdit = useCallback((especialidad) => {
-    window.alert(`Editar especialidad: ${especialidad.nombre}`);
+    setEditing(especialidad);
+    setDialogOpen(true);
   }, []);
 
-  const handleToggleStatus = useCallback((especialidad) => {
-    dispatch(toggleEspecialidadStatus({ id: especialidad.id, activa: especialidad.activa }))
-      .unwrap()
-      .then((result) => {
-        setSnackbarMessage(result.activa ? 'Especialidad activada correctamente' : 'Especialidad desactivada correctamente');
-        setSnackbarOpen(true);
-      })
-      .catch(() => {
-        setSnackbarMessage('Ocurrió un error. Inténtalo nuevamente.');
-        setSnackbarOpen(true);
-      });
+  const handleToggleStatus = useCallback(async (especialidad) => {
+    try {
+      const result = await dispatch(toggleEspecialidadStatus({ id: especialidad.id, activa: especialidad.activa })).unwrap();
+      setSnackbarMessage(result.activa ? 'Especialidad activada correctamente' : 'Especialidad desactivada correctamente');
+      setSnackbarOpen(true);
+    } catch {
+      setSnackbarMessage('Ocurrió un error. Inténtalo nuevamente.');
+      setSnackbarOpen(true);
+    }
   }, [dispatch]);
 
   const handleAddEspecialidad = useCallback(() => {
-    const nuevaEspecialidad = { nombre: 'Nueva Especialidad', descripcion: 'Descripción de la nueva especialidad' };
-    dispatch(addEspecialidad(nuevaEspecialidad));
-  }, [dispatch]);
+    setEditing(null);
+    setDialogOpen(true);
+  }, []);
+
+  const handleSave = async (esp) => {
+    try {
+      if (esp.id) {
+        await dispatch(updateEspecialidad(esp)).unwrap();
+      } else {
+        await dispatch(addEspecialidad({ nombre: esp.nombre, descripcion: esp.descripcion })).unwrap();
+      }
+      setDialogOpen(false);
+      setEditing(null);
+      setSnackbarMessage('Especialidad guardada correctamente');
+      setSnackbarOpen(true);
+    } catch (e) {
+      setSnackbarMessage(e?.message || 'Error al guardar la especialidad');
+      setSnackbarOpen(true);
+    }
+  };
+
+  
 
   return (
     <Container maxWidth="lg">
@@ -71,6 +109,13 @@ function Especialidades() {
       </Box>
 
       <BotonFlotante onClick={handleAddEspecialidad} />
+
+      <DialogEspecialidad
+        abierto={dialogOpen}
+        valorInicial={editing}
+        onCerrar={() => { setDialogOpen(false); setEditing(null); }}
+        onGuardar={handleSave}
+      />
 
       <Snackbar
         anchorOrigin={{ vertical: 'top', horizontal: 'right' }}

@@ -1,4 +1,5 @@
-import React, { useState } from 'react'; // Importa React y useState
+import React, { useEffect, useState } from 'react'; // Importa React y useState
+import { useSearchParams } from 'react-router-dom';
 import {
   Box, // Contenedor principal
   Typography, // Componente de texto
@@ -25,6 +26,7 @@ import ModalEditarAfiliado from '../components/ModalEditarAfiliado';
 import ModalNuevoAfiliado from '../components/ModalNuevoAfiliado';
 
 function Afiliados() { // Componente principal
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState(''); // Estado de búsqueda
   const [modalDetalleOpen, setModalDetalleOpen] = useState(false);
   const [modalEditarOpen, setModalEditarOpen] = useState(false);
