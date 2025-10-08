@@ -17,7 +17,7 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import PollIcon from "@mui/icons-material/Poll";
 import HealingIcon from "@mui/icons-material/Healing";
 import CreditCardIcon from "@mui/icons-material/CreditCard";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import CloseIcon from "@mui/icons-material/Close";
 
@@ -48,6 +48,7 @@ const menuItems = [
 ];
 
 export default function NavBar({ mobileOpen, handleDrawerToggle }) {
+  const location = useLocation();
   const renderDrawerContent = (closeOnClick = false) => (
     <Box sx={{ bgcolor: "primary.main", height: "100%" }}>
       <List>
@@ -87,28 +88,35 @@ export default function NavBar({ mobileOpen, handleDrawerToggle }) {
         <Divider />
 
         {/* Menú */}
-        {menuItems.map((item) => (
-          <ListItemButton
-            key={item.text}
-            component={Link}
-            to={item.path}
-            onClick={closeOnClick ? handleDrawerToggle : undefined}
-            sx={{
-              color: "text.secondary",
-              "&:hover": {
-                color: "text.primary",
-                "& .MuiListItemIcon-root": {
+        {menuItems.map((item) => {
+          const isActive = item.path === "/" ? location.pathname === "/" : location.pathname.startsWith(item.path);
+          return (
+            <ListItemButton
+              key={item.text}
+              component={Link}
+              to={item.path}
+              onClick={closeOnClick ? handleDrawerToggle : undefined}
+              selected={isActive}
+              sx={{
+                color: isActive ? "text.primary" : "text.secondary",
+                "&.Mui-selected": {
+                  bgcolor: "action.selected",
                   color: "text.primary",
+                  "& .MuiListItemIcon-root": { color: "text.primary" },
                 },
-              },
-            }}
-          >
-            <ListItemIcon sx={{ color: "inherit", paddingLeft: 1 }}>
-              {item.icon}
-            </ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItemButton>
-        ))}
+                "&:hover": {
+                  color: "text.primary",
+                  "& .MuiListItemIcon-root": { color: "text.primary" },
+                },
+              }}
+            >
+              <ListItemIcon sx={{ color: "inherit", paddingLeft: 1 }}>
+                {item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.text} />
+            </ListItemButton>
+          );
+        })}
       </List>
     </Box>
   );

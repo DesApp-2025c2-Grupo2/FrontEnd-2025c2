@@ -132,7 +132,7 @@ const detectarConflictosEntreLugares = (lugaresAtencion) => {
   return conflictos;
 };
 
-export default function DialogPrestador({ abierto, valorInicial, onCerrar, onGuardar }) {
+export default function DialogPrestador({ abierto, valorInicial, onCerrar, onGuardar, soloDirecciones = false }) {
   const [form, setForm] = useState({
     cuilCuit: '',
     nombreCompleto: '',
@@ -313,7 +313,8 @@ export default function DialogPrestador({ abierto, valorInicial, onCerrar, onGua
                 {
                   dias: [],
                   horaInicio: '',
-                  horaFin: ''
+                  horaFin: '',
+                  duracionMinutos: 30
                 }
               ]
             }
@@ -415,12 +416,19 @@ export default function DialogPrestador({ abierto, valorInicial, onCerrar, onGua
 
     const lugaresAtencionLimpios = (form.lugaresAtencion || [])
       .map((l) => {
-        const horariosLimpios = (l.horarios || []).filter(
-          (h) =>
-            Array.isArray(h.dias) && h.dias.length > 0 &&
-            String(h.horaInicio || '').trim() !== '' &&
-            String(h.horaFin || '').trim() !== ''
-        );
+        const horariosLimpios = (l.horarios || [])
+          .filter(
+            (h) =>
+              Array.isArray(h.dias) && h.dias.length > 0 &&
+              String(h.horaInicio || '').trim() !== '' &&
+              String(h.horaFin || '').trim() !== ''
+          )
+          .map((h) => ({
+            dias: h.dias,
+            horaInicio: h.horaInicio,
+            horaFin: h.horaFin,
+            duracionMinutos: Number(h.duracionMinutos || 30)
+          }));
         return {
           id: l.id,
           direccion: (l.direccion || '').trim(),
@@ -840,200 +848,17 @@ export default function DialogPrestador({ abierto, valorInicial, onCerrar, onGua
                         placeholder="Avenida Vergara 1908, CABA"
                       />
                     </Grid>
-                    
                   </Grid>
 
-                  <Divider sx={{ my: 2 }} />
-
-                  {/* Horarios del lugar */}
-                  <Box>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 700, fontSize: '1rem' }}>
-                        Horarios de Atención
+                  {!soloDirecciones && (
+                    <>
+                      <Divider sx={{ my: 2 }} />
+                      {/* Horarios del lugar - se oculta si soloDirecciones es true */}
+                      <Typography variant="body2" color="text.secondary">
+                        Los horarios ahora se gestionan desde el modal dedicado.
                       </Typography>
-                      <Button
-                        variant="contained"
-                        size="medium"
-                        startIcon={<AddIcon />}
-                        onClick={() => agregarHorario(lugarIndex)}
-                        sx={{ 
-                          textTransform: 'none',
-                          fontWeight: 600,
-                          backgroundColor: '#78909c',
-                          color: 'white',
-                          '&:hover': { backgroundColor: '#607d8b' }
-                        }}
-                      >
-                        Agregar Horario
-                      </Button>
-                    </Box>
-
-                    {/* Alerta de conflictos */}
-                    {conflictosHorarios[lugarIndex] && conflictosHorarios[lugarIndex].length > 0 && (
-                      <Alert severity="error" sx={{ mb: 2 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700, mb: 1 }}>
-                          ⚠️ Conflictos detectados en los horarios:
-                        </Typography>
-                        {conflictosHorarios[lugarIndex].map((conflicto, idx) => (
-                          <Typography key={idx} variant="body2" sx={{ ml: 2 }}>
-                            • Los horarios #{conflicto.indice1 + 1} ({conflicto.horario1}) y #{conflicto.indice2 + 1} ({conflicto.horario2}) se solapan el/los día(s): {conflicto.dias.join(', ')}
-                          </Typography>
-                        ))}
-                      </Alert>
-                    )}
-
-                    {lugar.horarios.map((horario, horarioIndex) => {
-                      // Verificar si este horario específico está en conflicto dentro del mismo lugar
-                      const tieneConflicto = conflictosHorarios[lugarIndex]?.some(
-                        c => c.indice1 === horarioIndex || c.indice2 === horarioIndex
-                      );
-                      
-                      // Verificar si este horario está en conflicto con otro lugar
-                      const conflictoConOtroLugar = conflictosEntreLugares.find(
-                        c => (c.lugar1Index === lugarIndex && c.horario1Index === horarioIndex) ||
-                             (c.lugar2Index === lugarIndex && c.horario2Index === horarioIndex)
-                      );
-                      
-                      const tieneConflictoTotal = tieneConflicto || conflictoConOtroLugar;
-                      
-                      return (
-                      <Card
-                        key={horarioIndex}
-                        variant="outlined"
-                        sx={{ 
-                          mb: 2, 
-                          backgroundColor: tieneConflictoTotal ? '#fee2e2' : 'white',
-                          borderColor: tieneConflictoTotal ? '#dc2626' : '#e0e0e0',
-                          borderWidth: tieneConflictoTotal ? 2 : 1,
-                          boxShadow: tieneConflictoTotal ? 2 : 0
-                        }}
-                      >
-                        <CardContent sx={{ p: 2.5 }}>
-                          {/* Header del horario */}
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700, color: tieneConflictoTotal ? '#dc2626' : '#546e7a' }}>
-                              Horario #{horarioIndex + 1}
-                            </Typography>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => eliminarHorario(lugarIndex, horarioIndex)}
-                              sx={{ 
-                                '&:hover': { 
-                                  backgroundColor: '#ffebee',
-                                  transform: 'scale(1.1)'
-                                },
-                                transition: 'all 0.2s'
-                              }}
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-
-                          {tieneConflicto && (
-                            <Alert severity="warning" sx={{ mb: 2 }}>
-                              <Typography variant="caption">
-                                ⚠️ Este horario tiene conflictos con otros horarios del mismo lugar
-                              </Typography>
-                            </Alert>
-                          )}
-
-                          {conflictoConOtroLugar && (
-                            <Alert severity="error" sx={{ mb: 2 }}>
-                              <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                                ⚠️ Este horario se solapa con <strong>{conflictoConOtroLugar.lugar1Index === lugarIndex ? conflictoConOtroLugar.lugar2Dir : conflictoConOtroLugar.lugar1Dir}</strong>
-                              </Typography>
-                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5 }}>
-                                Días: {conflictoConOtroLugar.dias.join(', ')} • Horario en conflicto: {conflictoConOtroLugar.lugar1Index === lugarIndex ? conflictoConOtroLugar.horario2 : conflictoConOtroLugar.horario1}
-                              </Typography>
-                            </Alert>
-                          )}
-
-                          {/* Días de la semana */}
-                          <Box sx={{ mb: 2 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 600, color: '#666', mb: 0.5, display: 'block' }}>
-                              Días de atención
-                            </Typography>
-                            <Autocomplete
-                              multiple
-                              options={diasSemana}
-                              value={horario.dias}
-                              onChange={(e, newValue) =>
-                                actualizarHorario(lugarIndex, horarioIndex, 'dias', newValue)
-                              }
-                              renderInput={(params) => (
-                                <TextField
-                                  {...params}
-                                  placeholder="Seleccione los días"
-                                  variant="outlined"
-                                />
-                              )}
-                              sx={{
-                                '& .MuiOutlinedInput-root': {
-                                  backgroundColor: '#fafafa'
-                                }
-                              }}
-                            />
-                          </Box>
-
-                          {/* Horarios */}
-                          <Box>
-                            <Typography variant="caption" sx={{ fontWeight: 600, color: '#666', mb: 1, display: 'block' }}>
-                              Horario de atención
-                            </Typography>
-                            <Stack direction="row" spacing={2} alignItems="center">
-                              <Box sx={{ flex: 1 }}>
-                                <TextField
-                                  label="Hora inicio"
-                                  type="time"
-                                  value={horario.horaInicio}
-                                  onChange={(e) =>
-                                    actualizarHorario(lugarIndex, horarioIndex, 'horaInicio', e.target.value)
-                                  }
-                                  fullWidth
-                                  InputLabelProps={{ shrink: true }}
-                                  sx={{
-                                    '& .MuiOutlinedInput-root': {
-                                      backgroundColor: '#fafafa',
-                                      fontSize: '1rem',
-                                      '& input': {
-                                        padding: '12px 14px',
-                                        fontSize: '1rem'
-                                      }
-                                    }
-                                  }}
-                                />
-                              </Box>
-                              <Typography sx={{ color: '#999', fontWeight: 600 }}>—</Typography>
-                              <Box sx={{ flex: 1 }}>
-                                <TextField
-                                  label="Hora fin"
-                                  type="time"
-                                  value={horario.horaFin}
-                                  onChange={(e) =>
-                                    actualizarHorario(lugarIndex, horarioIndex, 'horaFin', e.target.value)
-                                  }
-                                  fullWidth
-                                  InputLabelProps={{ shrink: true }}
-                                  sx={{
-                                    '& .MuiOutlinedInput-root': {
-                                      backgroundColor: '#fafafa',
-                                      fontSize: '1rem',
-                                      '& input': {
-                                        padding: '12px 14px',
-                                        fontSize: '1rem'
-                                      }
-                                    }
-                                  }}
-                                />
-                              </Box>
-                            </Stack>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                      );
-                    })}
-                  </Box>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             ))}
