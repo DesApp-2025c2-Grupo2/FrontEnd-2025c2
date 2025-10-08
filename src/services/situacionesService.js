@@ -1,98 +1,25 @@
-// Servicio mock para Situaciones Terapéuticas con persistencia en sessionStorage
+// Servicio para Situaciones Terapéuticas consumiendo backend
+import WebAPI from './config/WebAPI';
 
-const STORAGE_KEY = 'mock_situaciones_terapeuticas_v1';
+const ENDPOINT = '/sterapeuticas';
 
-function readAll() {
-  const raw = sessionStorage.getItem(STORAGE_KEY);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
+export async function getAll() {
+  const res = await WebAPI.Instance().get(`${ENDPOINT}/all`);
+  return res.data;
 }
 
-function writeAll(items) {
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+export async function create(situacion) {
+  const res = await WebAPI.Instance().post(`${ENDPOINT}/save`, situacion);
+  return res.data;
 }
 
-function delay(ms = 350) {
-  return new Promise((res) => setTimeout(res, ms));
+export async function update(partial) {
+  // El backend expone POST /sterapeuticas/save para crear/actualizar
+  const res = await WebAPI.Instance().post(`${ENDPOINT}/save`, partial);
+  return res.data;
 }
 
-export async function getSituaciones() {
-  await delay();
-  return readAll();
+export async function toggle(id) {
+  const res = await WebAPI.Instance().patch(`${ENDPOINT}/toggleStatus/${id}`);
+  return res.data;
 }
-
-export async function ensureSeed(defaultItems = []) {
-  const existing = readAll();
-  if (!existing || existing.length === 0) {
-    writeAll(defaultItems);
-    await delay(50);
-    return defaultItems;
-  }
-  return existing;
-}
-
-export async function createSituacion(situacion) {
-  await delay();
-  const items = readAll();
-  // Validación de unicidad por nombre (case-insensitive)
-  const nombre = String(situacion.nombre).trim().toLowerCase();
-  const dup = items.find((s) => String(s.nombre).trim().toLowerCase() === nombre);
-  if (dup) {
-    throw new Error('Ya existe una situación con el mismo nombre');
-  }
-  items.unshift(situacion);
-  writeAll(items);
-  return situacion;
-}
-
-export async function updateSituacion(partial) {
-  await delay();
-  const items = readAll();
-  const idx = items.findIndex((s) => s.id === partial.id);
-  if (idx !== -1) {
-    // Validar unicidad si cambia el nombre
-    const nombre = partial.nombre !== undefined
-      ? String(partial.nombre).trim().toLowerCase()
-      : String(items[idx].nombre).trim().toLowerCase();
-    const dup = items.find((s) => s.id !== partial.id && String(s.nombre).trim().toLowerCase() === nombre);
-    if (dup) {
-      throw new Error('Ya existe otra situación con el mismo nombre');
-    }
-    items[idx] = { ...items[idx], ...partial };
-    writeAll(items);
-    return items[idx];
-  }
-  throw new Error('Situación no encontrada');
-}
-
-export async function deleteSituacion(id) {
-  await delay();
-  const items = readAll();
-  const filtered = items.filter((s) => s.id !== id);
-  writeAll(filtered);
-  return { id };
-}
-
-export async function toggleSituacion(id) {
-  await delay();
-  const items = readAll();
-  const idx = items.findIndex((s) => s.id === id);
-  if (idx !== -1) {
-    items[idx].activa = !items[idx].activa;
-    writeAll(items);
-    return { ...items[idx] };
-  }
-  throw new Error('Situación no encontrada');
-}
-
-export async function overwriteAll(items) {
-  writeAll(items);
-  await delay(10);
-  return readAll();
-}
-
-

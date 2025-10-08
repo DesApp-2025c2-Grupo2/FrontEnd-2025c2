@@ -1,55 +1,45 @@
-import { createSlice, nanoid, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import * as situacionesService from '../services/situacionesService';
 
-const seedSituaciones = [
-  { id: '101', nombre: 'Diabetes Tipo 2', descripcion: 'Tratamiento y seguimiento de diabetes mellitus tipo 2', activa: false },
-  { id: '102', nombre: 'Hipertensión Arterial', descripcion: 'Control y monitoreo de presión arterial elevada', activa: true },
-  { id: '103', nombre: 'Rehabilitación Cardíaca', descripcion: 'Programa de rehabilitación post-infarto o cirugía cardiaca', activa: true },
-  { id: '104', nombre: 'Terapia Oncológica', descripcion: 'Tratamiento y seguimiento de pacientes oncológicos', activa: false },
-];
+const initialState = { items: [], loading: false, error: null };
 
-const initialState = {
-  items: seedSituaciones,
-  loading: false,
-  error: null,
-};
-
-export const cargarSituaciones = createAsyncThunk('situaciones/cargar', async () => {
-  const data = await situacionesService.ensureSeed(initialState.items);
-  const fixed = data.map((s) => ({
-    id: s.id || nanoid(),
-    nombre: s.nombre,
-    descripcion: s.descripcion || '',
-    activa: s.activa ?? true,
-  }));
-  const changed = JSON.stringify(data) !== JSON.stringify(fixed);
-  if (changed) {
-    await situacionesService.overwriteAll(fixed);
+export const cargarSituaciones = createAsyncThunk('situaciones/cargar', async (_, { rejectWithValue }) => {
+  try {
+    const data = await situacionesService.getAll();
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    return rejectWithValue(e.message || 'Error al cargar situaciones');
   }
-  return fixed;
 });
 
-export const crearSituacion = createAsyncThunk('situaciones/crear', async (situacion) => {
-  const payload = {
-    id: situacion.id || nanoid(),
-    nombre: situacion.nombre,
-    descripcion: situacion.descripcion || '',
-    activa: situacion.activa ?? true,
-  };
-  const created = await situacionesService.createSituacion(payload);
-  return created;
+export const crearSituacion = createAsyncThunk('situaciones/crear', async (situacion, { rejectWithValue }) => {
+  try {
+    const created = await situacionesService.create(situacion);
+    return created;
+  } catch (e) {
+    return rejectWithValue(e.message || 'No se pudo crear la situación');
+  }
 });
 
-export const editarSituacion = createAsyncThunk('situaciones/editar', async (situacion) => {
-  const updated = await situacionesService.updateSituacion(situacion);
-  return updated;
+export const editarSituacion = createAsyncThunk('situaciones/editar', async (situacion, { rejectWithValue }) => {
+  try {
+    const updated = await situacionesService.update(situacion);
+    return updated && updated.id ? updated : situacion;
+  } catch (e) {
+    return rejectWithValue(e.message || 'No se pudo actualizar la situación');
+  }
 });
 
 // Eliminar situación: aún no utilizado en UI; se podrá reactivar cuando haya flujo de borrado
 
-export const alternarSituacionThunk = createAsyncThunk('situaciones/alternar', async (id) => {
-  const updated = await situacionesService.toggleSituacion(id);
-  return updated;
+export const alternarSituacionThunk = createAsyncThunk('situaciones/alternar', async ({ id, activa }, { rejectWithValue }) => {
+  try {
+    const res = await situacionesService.toggle(id);
+    const nuevaActiva = (res && (res.activa ?? res.activo)) !== undefined ? (res.activa ?? res.activo) : !activa;
+    return { id, activa: !!nuevaActiva };
+  } catch (e) {
+    return rejectWithValue(e.message || 'No se pudo cambiar el estado de la situación');
+  }
 });
 
 const slice = createSlice({
@@ -63,25 +53,47 @@ const slice = createSlice({
       // cargar
       .addCase(cargarSituaciones.pending, (state) => { state.loading = true; state.error = null; })
       .addCase(cargarSituaciones.fulfilled, (state, action) => { state.loading = false; state.items = Array.isArray(action.payload) ? action.payload : []; })
-      .addCase(cargarSituaciones.rejected, (state, action) => { state.loading = false; state.error = action.error?.message || 'Error al cargar situaciones'; })
+      .addCase(cargarSituaciones.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
       // crear
       .addCase(crearSituacion.pending, (state) => { state.error = null; })
-      .addCase(crearSituacion.fulfilled, (state, action) => { state.items.unshift(action.payload); })
-      .addCase(crearSituacion.rejected, (state, action) => { state.error = action.error?.message || 'No se pudo crear la situación'; })
+      .addCase(crearSituacion.fulfilled, (state, action) => {
+        const exists = state.items.some(s => s.id === action.payload.id);
+        state.items = exists ? state.items : [action.payload, ...state.items];
+      })
+      .addCase(crearSituacion.rejected, (state, action) => { state.error = action.payload; })
       // editar
-      .addCase(editarSituacion.pending, (state) => { state.error = null; })
+      .addCase(editarSituacion.pending, (state, action) => {
+        state.error = null;
+        const partial = action.meta?.arg;
+        if (partial && partial.id) {
+          state.items = state.items.map(s => s.id === partial.id ? { ...s, ...partial } : s);
+        }
+      })
       .addCase(editarSituacion.fulfilled, (state, action) => {
-        const idx = state.items.findIndex((s) => s.id === action.payload.id);
-        if (idx !== -1) state.items[idx] = action.payload;
+        const updated = action.payload;
+        state.items = state.items.map(s => s.id === updated.id ? { ...s, ...updated } : s);
       })
-      .addCase(editarSituacion.rejected, (state, action) => { state.error = action.error?.message || 'No se pudo actualizar la situación'; })
+      .addCase(editarSituacion.rejected, (state, action) => { state.error = action.payload; })
       // alternar activa
-      .addCase(alternarSituacionThunk.pending, (state) => { state.error = null; })
-      .addCase(alternarSituacionThunk.fulfilled, (state, action) => {
-        const idx = state.items.findIndex((s) => s.id === action.payload.id);
-        if (idx !== -1) state.items[idx] = action.payload;
+      .addCase(alternarSituacionThunk.pending, (state, action) => {
+        state.error = null;
+        const { id, activa } = action.meta?.arg || {};
+        if (id !== undefined) {
+          state.items = state.items.map(s => s.id === id ? { ...s, activa: !activa } : s);
+        }
       })
-      .addCase(alternarSituacionThunk.rejected, (state, action) => { state.error = action.error?.message || 'No se pudo cambiar el estado de la situación'; });
+      .addCase(alternarSituacionThunk.fulfilled, (state, action) => {
+        const { id, activa } = action.payload;
+        state.items = state.items.map(s => s.id === id ? { ...s, activa } : s);
+      })
+      .addCase(alternarSituacionThunk.rejected, (state, action) => {
+        state.error = action.payload;
+        const { id, activa } = action.meta?.arg || {};
+        if (id !== undefined) {
+          // rollback
+          state.items = state.items.map(s => s.id === id ? { ...s, activa } : s);
+        }
+      });
   }
 });
 
