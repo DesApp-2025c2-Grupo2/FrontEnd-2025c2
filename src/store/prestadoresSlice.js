@@ -192,6 +192,10 @@ export const selectPrestadoresFiltrados = (searchTerm) => (state) => {
       prestador.nombreCompleto.toLowerCase().includes(searchLower) ||
       prestador.cuilCuit.toLowerCase().includes(searchLower) ||
       prestador.tipo.toLowerCase().includes(searchLower) ||
+      // Especialidad seleccionada por dirección
+      (Array.isArray(prestador.lugaresAtencion) && prestador.lugaresAtencion.some(l =>
+        typeof l.especialidadSeleccionada === 'string' && l.especialidadSeleccionada.toLowerCase().includes(searchLower)
+      )) ||
       // Resolver nombre de centro por ID para búsqueda
       (() => {
         if (!prestador.integraCentroMedicoId) return false;

@@ -90,7 +90,7 @@ const detectarConflictosHorarios = (horarios) => {
   return conflictos;
 };
 
-export default function DialogAgenda({ abierto, valorInicial, onCerrar, onGuardar }) {
+export default function DialogAgenda({ abierto, valorInicial, onCerrar, onGuardar, presetPrestadorId = null, presetLugarDireccion = '' }) {
   const [form, setForm] = useState({
     prestadorId: null,
     prestador: '',
@@ -103,10 +103,8 @@ export default function DialogAgenda({ abierto, valorInicial, onCerrar, onGuarda
   const [conflictosHorarios, setConflictosHorarios] = useState({});
   const [intentoGuardar, setIntentoGuardar] = useState(false);
 
-  // Cargar prestadores desde Redux (todos, no solo activos)
-  const todosPrestadores = useSelector(selectPrestadores);
-  // Filtrar solo prestadores activos
-  const prestadores = todosPrestadores.filter(p => p.activo);
+  // Cargar prestadores desde Redux (usar TODOS, incluso inactivos, para permitir agendas históricas)
+  const prestadores = useSelector(selectPrestadores);
 
   // Inicializar formulario (no depender de cambios en prestadores para no resetear la selección)
   useEffect(() => {
@@ -143,6 +141,37 @@ export default function DialogAgenda({ abierto, valorInicial, onCerrar, onGuarda
       setPrestadorSeleccionado(prestador);
     }
   }, [abierto, prestadores, form.prestadorId]);
+
+  // Prefill desde preset (prestador y lugar) en modo creación
+  useEffect(() => {
+    if (!abierto || valorInicial) return;
+    if (presetPrestadorId) {
+      const prestador = prestadores.find(p => p.id === presetPrestadorId) || null;
+      setPrestadorSeleccionado(prestador);
+      setForm(prev => ({
+        ...prev,
+        prestadorId: presetPrestadorId,
+        prestador: prestador?.nombreCompleto || ''
+      }));
+    }
+  }, [abierto, valorInicial, presetPrestadorId, prestadores]);
+
+  useEffect(() => {
+    if (!abierto || valorInicial) return;
+    if (presetLugarDireccion && prestadorSeleccionado) {
+      // Agregar dirección preset si no existe aún
+      setForm(prev => {
+        const yaExiste = prev.direcciones.some(d => d.lugar === presetLugarDireccion);
+        if (yaExiste) return prev;
+        const nueva = {
+          lugar: presetLugarDireccion,
+          duracion: 30,
+          horarios: []
+        };
+        return { ...prev, direcciones: [...prev.direcciones, nueva] };
+      });
+    }
+  }, [abierto, valorInicial, presetLugarDireccion, prestadorSeleccionado]);
 
   // Validar coherencia cuando cambie prestador o datos de la agenda
   useEffect(() => {
@@ -202,7 +231,9 @@ export default function DialogAgenda({ abierto, valorInicial, onCerrar, onGuarda
   };
 
   // Obtener especialidades del prestador seleccionado
-  const especialidadesDisponibles = prestadorSeleccionado?.especialidades || [];
+  const especialidadesDisponibles = Array.isArray(prestadorSeleccionado?.especialidades)
+    ? prestadorSeleccionado.especialidades
+    : [];
 
   // Obtener lugares de atención del prestador seleccionado
   const lugaresAtencionDisponibles = prestadorSeleccionado 
@@ -543,12 +574,12 @@ export default function DialogAgenda({ abierto, valorInicial, onCerrar, onGuarda
             <InputLabel sx={{ fontWeight: 700, color: '#111827' }}>Especialidad</InputLabel>
             <Select
               value={form.especialidad}
-              onChange={cambiar('especialidad')}
+              onChange={(e) => setForm(prev => ({ ...prev, especialidad: e.target.value }))}
               label="Especialidad"
               sx={{ color: '#111827', fontWeight: 600 }}
             >
               {especialidadesDisponibles.map((esp) => (
-                <MenuItem key={esp.id} value={esp.nombre}>
+                <MenuItem key={esp.id ?? esp.nombre} value={esp.nombre}>
                   {esp.nombre}
                 </MenuItem>
               ))}
@@ -646,6 +677,7 @@ export default function DialogAgenda({ abierto, valorInicial, onCerrar, onGuarda
                       onChange={(e, newValue) => {
                         const nuevaDir = newValue?.direccion || '';
                         actualizarDireccion(dirIndex, 'lugar', nuevaDir);
+                        prefillHorariosDesdePrestador(dirIndex, nuevaDir);
                       }}
                       disabled={!prestadorSeleccionado}
                       renderInput={(params) => (
@@ -700,8 +732,89 @@ export default function DialogAgenda({ abierto, valorInicial, onCerrar, onGuarda
                     </FormControl>
 
                     <Divider />
+                    {/* Horarios de turnos (validados contra la disponibilidad del prestador en ese lugar) */}
+                    <Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                          Horarios de Turnos
+                        </Typography>
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          startIcon={<AddIcon />}
+                          onClick={() => agregarHorario(dirIndex)}
+                          disabled={!direccion.lugar}
+                          sx={{ textTransform: 'none' }}
+                        >
+                          Agregar Horario
+                        </Button>
+                      </Box>
 
-                    {/* Horarios removidos temporalmente */}
+                      {(direccion.horarios || []).length === 0 && (
+                        <Typography variant="caption" color="text.secondary">
+                          No hay horarios. Puede precargar desde la disponibilidad al elegir el lugar, o agregar manualmente.
+                        </Typography>
+                      )}
+
+                      {(direccion.horarios || []).map((h, hIdx) => (
+                        <Grid container spacing={1.5} key={hIdx} sx={{ mb: 1 }}>
+                          <Grid item xs={12} sm={4} md={3}>
+                            <FormControl fullWidth size="small">
+                              <InputLabel>Día</InputLabel>
+                              <Select
+                                label="Día"
+                                value={h.dia || ''}
+                                onChange={(e) => actualizarHorario(dirIndex, hIdx, 'dia', e.target.value)}
+                              >
+                                {diasSemana.map((d) => (
+                                  <MenuItem key={d} value={d}>{d}</MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          </Grid>
+                          <Grid item xs={6} sm={4} md={3}>
+                            <FormControl fullWidth size="small" disabled={!h.dia || !direccion.duracion || !direccion.lugar}>
+                              <InputLabel>Inicio</InputLabel>
+                              <Select
+                                label="Inicio"
+                                value={h.horaInicio || ''}
+                                onChange={(e) => actualizarHorario(dirIndex, hIdx, 'horaInicio', e.target.value)}
+                              >
+                                {getStartSlots(direccion.lugar, h.dia, Number(direccion.duracion) || 30).map((hhmm) => (
+                                  <MenuItem key={hhmm} value={hhmm}>{hhmm}</MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          </Grid>
+                          <Grid item xs={6} sm={4} md={3}>
+                            <FormControl fullWidth size="small" disabled={!h.dia || !direccion.duracion || !h.horaInicio || !direccion.lugar}>
+                              <InputLabel>Fin</InputLabel>
+                              <Select
+                                label="Fin"
+                                value={h.horaFin || ''}
+                                onChange={(e) => actualizarHorario(dirIndex, hIdx, 'horaFin', e.target.value)}
+                              >
+                                {getEndSlots(direccion.lugar, h.dia, Number(direccion.duracion) || 30, h.horaInicio || '').map((hhmm) => (
+                                  <MenuItem key={hhmm} value={hhmm}>{hhmm}</MenuItem>
+                                ))}
+                              </Select>
+                            </FormControl>
+                          </Grid>
+                          <Grid item xs={12} sm={12} md={3} sx={{ display: 'flex', alignItems: 'center' }}>
+                            <IconButton size="small" color="error" onClick={() => eliminarHorario(dirIndex, hIdx)} aria-label="Eliminar horario">
+                              <DeleteIcon />
+                            </IconButton>
+                          </Grid>
+                          {!estaDentroDeRangos(direccion.lugar, h.dia, h.horaInicio, h.horaFin) && (
+                            <Grid item xs={12}>
+                              <Alert severity="error">
+                                El rango seleccionado no está dentro de la disponibilidad del prestador para este lugar.
+                              </Alert>
+                            </Grid>
+                          )}
+                        </Grid>
+                      ))}
+                    </Box>
                   </Box>
                 </CardContent>
               </Card>
