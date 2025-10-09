@@ -1,6 +1,9 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Box, Typography, Container, Alert, CircularProgress, Snackbar } from '@mui/material';
+import { Box, Typography, Container, Alert, CircularProgress } from '@mui/material';
+import SearchField from '../components/Ui/SearchField.jsx';
+import EstadoFilter from '../components/Ui/EstadoFilter.jsx';
+import SnackbarMini from '../components/Ui/SnackbarMini.jsx';
 import TarjetaSituacionTerapeutica from '../components/TarjetaSituacionTerapeutica.jsx';
 import BotonFlotante from '../components/BotonFlotante';
 import DialogSituacion from '../components/DialogSituacion.jsx';
@@ -10,8 +13,11 @@ function SituacionesTerapeuticas() {
   const dispatch = useDispatch();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editSituacion, setEditSituacion] = useState(null);
+  const [estado, setEstado] = useState('activos');
+  const [search, setSearch] = useState('');
   
 
   const situaciones = useSelector(selectSituaciones);
@@ -37,14 +43,16 @@ function SituacionesTerapeuticas() {
   const handleCloseDialog = useCallback(() => setDialogOpen(false), []);
 
   const handleToggleStatus = useCallback((situacion) => {
-    dispatch(alternarSituacionThunk(situacion.id))
+    dispatch(alternarSituacionThunk({ id: situacion.id, activa: situacion.activa }))
       .unwrap()
       .then((updated) => {
         setSnackbarMessage(updated.activa ? 'Situación activada correctamente' : 'Situación desactivada correctamente');
+        setSnackbarSeverity(updated.activa ? 'success' : 'warning');
         setSnackbarOpen(true);
       })
       .catch(() => {
         setSnackbarMessage('Ocurrió un error. Inténtalo nuevamente.');
+        setSnackbarSeverity('error');
         setSnackbarOpen(true);
       });
   }, [dispatch]);
@@ -55,10 +63,12 @@ function SituacionesTerapeuticas() {
         .unwrap()
         .then(() => {
           setSnackbarMessage('Situación actualizada correctamente');
+          setSnackbarSeverity('success');
           setSnackbarOpen(true);
         })
         .catch((e) => {
           setSnackbarMessage(e?.message || 'Error al actualizar');
+          setSnackbarSeverity('error');
           setSnackbarOpen(true);
         });
     } else {
@@ -66,10 +76,12 @@ function SituacionesTerapeuticas() {
         .unwrap()
         .then(() => {
           setSnackbarMessage('Situación agregada correctamente');
+          setSnackbarSeverity('success');
           setSnackbarOpen(true);
         })
         .catch((e) => {
           setSnackbarMessage(e?.message || 'Error al agregar');
+          setSnackbarSeverity('error');
           setSnackbarOpen(true);
         });
     }
@@ -89,6 +101,11 @@ function SituacionesTerapeuticas() {
 
       
 
+      <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+        <SearchField value={search} onChange={setSearch} placeholder="Buscar por nombre o descripción" />
+        <EstadoFilter value={estado} onChange={setEstado} />
+      </Box>
+
       <Box sx={{ mb: 8 }}>
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
@@ -101,7 +118,17 @@ function SituacionesTerapeuticas() {
             {'No hay situaciones terapéuticas registradas.'}
           </Alert>
         ) : (
-          situaciones.map((situacion) => (
+          situaciones
+            .filter((s) => estado === 'todos' ? true : estado === 'activos' ? !!s.activa : !s.activa)
+            .filter((s) => {
+              const t = search.toLowerCase();
+              if (!t) return true;
+              return (
+                String(s.nombre || '').toLowerCase().includes(t) ||
+                String(s.descripcion || '').toLowerCase().includes(t)
+              );
+            })
+            .map((situacion) => (
             <TarjetaSituacionTerapeutica
               key={situacion.id}
               situacion={situacion}
@@ -116,13 +143,7 @@ function SituacionesTerapeuticas() {
 
       <BotonFlotante onClick={handleOpenAdd} title="Agregar situación" />
 
-      <Snackbar
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        open={snackbarOpen}
-        message={snackbarMessage}
-        autoHideDuration={2500}
-        onClose={() => setSnackbarOpen(false)}
-      />
+      <SnackbarMini open={snackbarOpen} message={snackbarMessage} severity={snackbarSeverity} onClose={() => setSnackbarOpen(false)} />
     </Container>
   );
 }

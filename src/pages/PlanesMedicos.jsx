@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { Container, Box, Typography, Snackbar, CircularProgress, Alert, TextField, InputAdornment} from '@mui/material';
+import { Container, Box, Typography, Snackbar, CircularProgress, Alert } from '@mui/material';
+import SearchField from '../components/Ui/SearchField.jsx';
+import EstadoFilter from '../components/Ui/EstadoFilter.jsx';
+import SnackbarMini from '../components/Ui/SnackbarMini.jsx';
 import TarjetaPlan from '../components/TarjetaPlan.jsx';
 import DialogoPlan from '../components/DialogoPlan.jsx';
 import BotonFlotante from '../components/BotonFlotante.jsx';
 import { useDispatch, useSelector } from 'react-redux';
-import { selectPlanesFiltrados, cargarPlanes, crearPlan, editarPlan, eliminarPlanThunk, alternarPlanThunk } from '../store/planesSlice.js';
+import { selectPlanesFiltrados, cargarPlanes, crearPlan, editarPlan, alternarPlanThunk } from '../store/planesSlice.js';
 import { useEffect } from 'react';
 import SearchIcon from '@mui/icons-material/Search';
 
@@ -21,7 +24,9 @@ function PlanesMedicos() {
   const [editPlan, setEditPlan] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
   const [search, setSearch] = useState('');
+  const [estado, setEstado] = useState('activos');
 
   const handleOpenAdd = () => {
     setEditPlan(null);
@@ -37,18 +42,25 @@ function PlanesMedicos() {
     if (editPlan) {
       dispatch(editarPlan({ ...data, id: editPlan.id }));
       setSnackbarMessage('Plan actualizado correctamente');
+      setSnackbarSeverity('success');
     } else {
       dispatch(crearPlan(data));
       setSnackbarMessage('Plan agregado correctamente');
+      setSnackbarSeverity('success');
     }
     setDialogOpen(false);
     setSnackbarOpen(true);
   };
 
-  const planesFiltrados = planes.filter((plan) => {
-    const texto = search.toLowerCase()
+  const planesFiltrados = planes
+    .filter((p) => estado === 'todos' ? true : estado === 'activos' ? !!p.activo : !p.activo)
+    .filter((plan) => {
+    const texto = search.toLowerCase();
     return (
-      plan.nombre.toLowerCase().includes(texto) || plan.descripcion.toLowerCase().includes(texto))
+      (plan.nombre || '').toLowerCase().includes(texto) ||
+      (plan.descripcion || '').toLowerCase().includes(texto) ||
+      String(plan.moneda || '').toLowerCase().includes(texto)
+    );
   });
 
   return (
@@ -62,22 +74,9 @@ function PlanesMedicos() {
         </Typography>
       </Box>
 
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-start' }}>
-        <TextField
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar plan por nombre o descripción"
-          variant="outlined"
-          size="small"
-          sx={{ width: 350 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon color="action" />
-              </InputAdornment>
-            )
-          }}
-        />
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-start', gap: 2 }}>
+        <SearchField value={search} onChange={setSearch} placeholder="Buscar plan por nombre o descripción" />
+        <EstadoFilter value={estado} onChange={setEstado} />
       </Box>
 
       <Box sx={{ mb: 8 }}>
@@ -93,10 +92,10 @@ function PlanesMedicos() {
             plan={plan}
             onEditar={handleOpenEdit}
             onAlternarActivo={(p) => {
-              // El nuevo estado será el opuesto al actual
               const seraActivo = !p.activo;
-              dispatch(alternarPlanThunk(p.id));
+              dispatch(alternarPlanThunk({ id: p.id, activo: p.activo }));
               setSnackbarMessage(seraActivo ? 'Plan activado correctamente' : 'Plan desactivado correctamente');
+              setSnackbarSeverity(seraActivo ? 'success' : 'warning');
               setSnackbarOpen(true);
             }}
           />
@@ -107,13 +106,7 @@ function PlanesMedicos() {
 
       <BotonFlotante onClick={handleOpenAdd} title="Agregar plan" />
 
-      <Snackbar
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        open={snackbarOpen}
-        message={snackbarMessage}
-        autoHideDuration={2500}
-        onClose={() => setSnackbarOpen(false)}
-      />
+      <SnackbarMini open={snackbarOpen} message={snackbarMessage} severity={snackbarSeverity} onClose={() => setSnackbarOpen(false)} />
     </Container>
   );
 }
