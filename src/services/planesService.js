@@ -1,98 +1,56 @@
-// Servicio mock para Planes Médicos con persistencia en sessionStorage
+// Servicio para Planes Médicos consumiendo backend
+import WebAPI from './config/WebAPI';
 
-const STORAGE_KEY = 'mock_planes_medicos_v1';
+const ENDPOINT = '/PlanMedico';
 
-function readAll() {
-  const raw = sessionStorage.getItem(STORAGE_KEY);
-  if (!raw) return [];
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
+export async function getAll() {
+  const res = await WebAPI.Instance().get(`${ENDPOINT}/all`);
+  const data = res.data;
+  if (!Array.isArray(data)) return [];
+  return data.map((p) => ({
+    id: p.id,
+    nombre: p.nombre,
+    descripcion: p.descripcion ?? '',
+    activo: (p.activo ?? p.activa) ?? true,
+    costoMensual: p.costoMensual ?? p.precio ?? 0,
+    moneda: p.moneda ?? 'ARS',
+  }));
 }
 
-function writeAll(items) {
-  sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+export async function create(plan) {
+  const res = await WebAPI.Instance().post(`${ENDPOINT}/save`, plan);
+  const p = res.data || plan;
+  return {
+    id: p.id,
+    nombre: p.nombre,
+    descripcion: p.descripcion ?? plan.descripcion ?? '',
+    activo: (p.activo ?? p.activa) ?? plan.activo ?? true,
+    costoMensual: p.costoMensual ?? p.precio ?? plan.costoMensual ?? 0,
+    moneda: p.moneda ?? plan.moneda ?? 'ARS',
+  };
 }
 
-function delay(ms = 350) {
-  return new Promise((res) => setTimeout(res, ms));
-}
-
-export async function getPlanes() {
-  await delay();
-  return readAll();
-}
-
-export async function ensureSeed(defaultItems = []) {
-  const existing = readAll();
-  if (!existing || existing.length === 0) {
-    writeAll(defaultItems);
-    await delay(50);
-    return defaultItems;
-  }
-  return existing;
-}
-
-export async function createPlan(plan) {
-  await delay();
-  const items = readAll();
-  // Validaciones de unicidad: código y nombre (case-insensitive)
-  const codigo = String(plan.codigo).toLowerCase();
-  const nombre = String(plan.nombre).trim().toLowerCase();
-  const dup = items.find(p => String(p.codigo).toLowerCase() === codigo || String(p.nombre).trim().toLowerCase() === nombre);
-  if (dup) {
-    throw new Error('Ya existe un plan con el mismo código o nombre');
-  }
-  items.unshift(plan);
-  writeAll(items);
-  return plan;
-}
-
-export async function updatePlan(partial) {
-  await delay();
-  const items = readAll();
-  const idx = items.findIndex((p) => p.id === partial.id);
-  if (idx !== -1) {
-    // Validar unicidad si cambian código/nombre
-    const codigo = partial.codigo !== undefined ? String(partial.codigo).toLowerCase() : String(items[idx].codigo).toLowerCase();
-    const nombre = partial.nombre !== undefined ? String(partial.nombre).trim().toLowerCase() : String(items[idx].nombre).trim().toLowerCase();
-    const dup = items.find(p => p.id !== partial.id && (String(p.codigo).toLowerCase() === codigo || String(p.nombre).trim().toLowerCase() === nombre));
-    if (dup) {
-      throw new Error('Ya existe otro plan con el mismo código o nombre');
-    }
-    items[idx] = { ...items[idx], ...partial };
-    writeAll(items);
-    return items[idx];
-  }
-  throw new Error('Plan no encontrado');
+export async function update(partial) {
+  // El backend expone POST /PlanMedico/save para crear/actualizar
+  const res = await WebAPI.Instance().post(`${ENDPOINT}/save`, partial);
+  const p = res.data || partial;
+  return {
+    id: p.id,
+    nombre: p.nombre ?? partial.nombre,
+    descripcion: p.descripcion ?? partial.descripcion ?? '',
+    activo: (p.activo ?? p.activa) ?? partial.activo ?? true,
+    costoMensual: p.costoMensual ?? p.precio ?? partial.costoMensual ?? 0,
+    moneda: p.moneda ?? partial.moneda ?? 'ARS',
+  };
 }
 
 export async function deletePlan(id) {
-  await delay();
-  const items = readAll();
-  const filtered = items.filter((p) => p.id !== id);
-  writeAll(filtered);
-  return { id };
+  // Puede que el backend no tenga borrado; dejamos tentativa por si existe
+  const res = await WebAPI.Instance().delete(`${ENDPOINT}/${id}`);
+  return res.data;
 }
 
-export async function togglePlan(id) {
-  await delay();
-  const items = readAll();
-  const idx = items.findIndex((p) => p.id === id);
-  if (idx !== -1) {
-    items[idx].activo = !items[idx].activo;
-    writeAll(items);
-    return { ...items[idx] };
-  }
-  throw new Error('Plan no encontrado');
+export async function toggle(id) {
+  const res = await WebAPI.Instance().patch(`${ENDPOINT}/toggleStatus/${id}`);
+  return res.data;
 }
-
-export async function overwriteAll(items) {
-  writeAll(items);
-  await delay(10);
-  return readAll();
-}
-
-

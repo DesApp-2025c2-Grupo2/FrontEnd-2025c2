@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Box, Typography, Container, Alert, CircularProgress, Snackbar } from '@mui/material';
+import { Box, Typography, Container, Alert, CircularProgress } from '@mui/material';
+import SearchField from '../components/Ui/SearchField.jsx';
+import EstadoFilter from '../components/Ui/EstadoFilter.jsx';
+import SnackbarMini from '../components/Ui/SnackbarMini.jsx';
 import EspecialidadCard from '../components/EspecialidadCard';
 import BotonFlotante from '../components/BotonFlotante';
 import { toggleEspecialidadStatus, addEspecialidad, updateEspecialidad, selectEspecialidadesFiltradas, selectLoading, selectError, cargarEspecialidades } from '../store/especialidadesSlice';
@@ -12,6 +15,7 @@ function Especialidades() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
 
   const especialidadesFiltradas = useSelector(selectEspecialidadesFiltradas);
   const loading = useSelector(selectLoading);
@@ -23,6 +27,8 @@ function Especialidades() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [estado, setEstado] = useState('activos');
+  const [search, setSearch] = useState('');
 
   // Abrir modal si viene ?nuevo=1
   useEffect(() => {
@@ -43,9 +49,11 @@ function Especialidades() {
     try {
       const result = await dispatch(toggleEspecialidadStatus({ id: especialidad.id, activa: especialidad.activa })).unwrap();
       setSnackbarMessage(result.activa ? 'Especialidad activada correctamente' : 'Especialidad desactivada correctamente');
+      setSnackbarSeverity(result.activa ? 'success' : 'warning');
       setSnackbarOpen(true);
     } catch {
       setSnackbarMessage('Ocurrió un error. Inténtalo nuevamente.');
+      setSnackbarSeverity('error');
       setSnackbarOpen(true);
     }
   }, [dispatch]);
@@ -60,14 +68,16 @@ function Especialidades() {
       if (esp.id) {
         await dispatch(updateEspecialidad(esp)).unwrap();
       } else {
-        await dispatch(addEspecialidad({ nombre: esp.nombre, descripcion: esp.descripcion })).unwrap();
+        await dispatch(addEspecialidad({ nombre: esp.nombre, descripcion: esp.descripcion, activa: esp.activa })).unwrap();
       }
       setDialogOpen(false);
       setEditing(null);
       setSnackbarMessage('Especialidad guardada correctamente');
+      setSnackbarSeverity('success');
       setSnackbarOpen(true);
     } catch (e) {
       setSnackbarMessage(e?.message || 'Error al guardar la especialidad');
+      setSnackbarSeverity('error');
       setSnackbarOpen(true);
     }
   };
@@ -85,6 +95,11 @@ function Especialidades() {
         </Typography>
       </Box>
 
+      <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+        <SearchField value={search} onChange={setSearch} placeholder="Buscar por nombre o descripción" />
+        <EstadoFilter value={estado} onChange={setEstado} />
+      </Box>
+
       <Box sx={{ mb: 8 }}>
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
@@ -97,7 +112,17 @@ function Especialidades() {
             {'No hay especialidades registradas.'}
           </Alert>
         ) : (
-          especialidadesFiltradas.map((especialidad) => (
+          especialidadesFiltradas
+            .filter((e) => estado === 'todos' ? true : estado === 'activos' ? !!e.activa : !e.activa)
+            .filter((e) => {
+              const t = search.toLowerCase();
+              if (!t) return true;
+              return (
+                String(e.nombre || '').toLowerCase().includes(t) ||
+                String(e.descripcion || '').toLowerCase().includes(t)
+              );
+            })
+            .map((especialidad) => (
             <EspecialidadCard
               key={especialidad.id}
               especialidad={especialidad}
@@ -117,13 +142,7 @@ function Especialidades() {
         onGuardar={handleSave}
       />
 
-      <Snackbar
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        open={snackbarOpen}
-        message={snackbarMessage}
-        autoHideDuration={2500}
-        onClose={() => setSnackbarOpen(false)}
-      />
+      <SnackbarMini open={snackbarOpen} message={snackbarMessage} severity={snackbarSeverity} onClose={() => setSnackbarOpen(false)} />
     </Container>
   );
 }

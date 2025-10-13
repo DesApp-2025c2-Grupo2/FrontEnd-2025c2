@@ -1,141 +1,248 @@
 import React from 'react';
-import { Button, Chip, Card, CardContent, Stack, Typography, Box } from '@mui/material';
-import VisibilityIcon from '@mui/icons-material/Visibility';
+import { Button, Chip, Card, Typography, Box, Accordion, AccordionSummary, AccordionDetails, IconButton, Tooltip } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
-import BotonAlternarEstado from './BotonAlternarEstado.jsx';
+import ScheduleIcon from '@mui/icons-material/Schedule';
+import PersonIcon from '@mui/icons-material/Person';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector } from 'react-redux';
 import { selectPrestadores } from '../store/prestadoresSlice';
 
-export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo }) {
+export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo, onGestionarHorarios, onEliminarDireccion }) {
   const todosPrestadores = useSelector(selectPrestadores);
   const centroNombre = prestador.integraCentroMedicoId
     ? (todosPrestadores || []).find(p => p.id === prestador.integraCentroMedicoId)?.nombreCompleto
     : null;
 
+  const getTipoColor = (tipo) => ({
+    'Centro Médico': '#546e7a',
+    'Profesional Independiente': '#1976d2'
+  }[tipo] || '#757575');
+
+  const formatHorario = (h) => {
+    const desde = h.desde || h.horaInicio || '';
+    const hasta = h.hasta || h.horaFin || '';
+    const dias = Array.isArray(h.dias) ? h.dias.join('/') : '';
+    if (!dias && !desde && !hasta) return '';
+    return dias ? `${dias}: ${desde} - ${hasta}` : `${desde} - ${hasta}`;
+  };
+
+  const diasSemanaOrden = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+
   return (
-    <Card sx={{ 
+    <Card
+      sx={{
+        p: 2,
       mb: 2, 
-      boxShadow: 2, 
-      borderRadius: 2, 
-      border: `1px solid ${prestador.activo ? '#e9ecef' : '#d1d5db'}`, 
-      backgroundColor: prestador.activo ? '#fff' : '#f3f4f6',
-      opacity: prestador.activo ? 1 : 0.7
-    }}>
-      <CardContent sx={{ p: 2.5 }}>
-        <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent="space-between">
-          <Stack spacing={1} flex={1}>
-            {/* Nombre y CUIL */}
-            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-              <Typography variant="h6" sx={{ fontWeight: 700, color: prestador.activo ? '#1f2937' : '#6b7280' }}>
+        border: prestador.activo ? '1px solid #e0e0e0' : '1px solid #d1d5db',
+        backgroundColor: prestador.activo ? 'white' : '#f3f4f6',
+        opacity: prestador.activo ? 1 : 0.7,
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+          <PersonIcon sx={{ fontSize: 40, color: '#1976d2' }} />
+        </Box>
+
+        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1, flexWrap: 'wrap' }}>
+            <Typography variant="h6" sx={{ fontWeight: 'bold', color: prestador.activo ? 'inherit' : '#6b7280' }}>
                 {prestador.nombreCompleto}
               </Typography>
               <Chip 
-                label={`CUIL/CUIT: ${prestador.cuilCuit}`} 
+              label={prestador.tipo}
                 size="small" 
-                variant="outlined" 
-                sx={{ borderRadius: 999 }} 
-              />
-            </Stack>
+              sx={{ backgroundColor: getTipoColor(prestador.tipo), color: 'white', fontWeight: 'bold' }}
+            />
+          </Box>
 
-            {/* Tipo de prestador */}
-            <Typography variant="body2" sx={{ color: '#6b7280' }}>
-              {prestador.tipo}
+          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Typography variant="body2" color="textSecondary">
+              <strong>CUIL/CUIT:</strong> {prestador.cuilCuit}
             </Typography>
-            {prestador.tipo === 'Profesional Independiente' && centroNombre && (
-              <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                Integra centro: <strong>{centroNombre}</strong>
+            {prestador.matricula && (
+              <Typography variant="body2" color="textSecondary">
+                <strong>Matrícula:</strong> {prestador.matricula}
               </Typography>
             )}
+            {prestador.tipo === 'Profesional Independiente' && centroNombre && (
+              <Typography variant="body2" color="textSecondary">
+                <strong>Integra centro:</strong> {centroNombre}
+              </Typography>
+            )}
+          </Box>
 
-            {/* Especialidades */}
+          {prestador.especialidades && prestador.especialidades.length > 0 && (
             <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
               {prestador.especialidades.map((esp, idx) => (
                 <Chip
                   key={idx}
                   label={esp.nombre}
                   size="small"
-                  sx={{
-                    backgroundColor: '#e3f2fd',
-                    color: '#1976d2',
-                    fontWeight: 600,
-                    borderRadius: 999
-                  }}
+                  sx={{ backgroundColor: '#e3f2fd', color: '#1976d2', fontWeight: 600 }}
                 />
               ))}
             </Box>
-          </Stack>
+          )}
 
-          <Stack spacing={0.5} alignItems="flex-end" sx={{ minWidth: 170 }}>
+          {/* Lugares de atención movidos fuera de la fila principal para ocupar ancho completo */}
+        </Box>
+
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, ml: 3, minWidth: 140 }}>
             <Button
-              type="button"
-              variant="text"
-              startIcon={<VisibilityIcon />}
+            size="small"
               onClick={(e) => { 
                 e.preventDefault(); 
                 e.stopPropagation(); 
                 onVer?.(prestador); 
               }}
-              sx={{
-                color: '#2563eb',
-                textTransform: 'uppercase',
-                fontWeight: 600,
-                fontSize: '0.75rem',
-                width: 160,
-                height: 40,
-                justifyContent: 'center',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                border: '1px solid #2563eb',
-                borderRadius: 1,
-                '&:hover': {
-                  backgroundColor: '#2563eb',
-                  color: 'white'
-                }
-              }}
-            >
-              Ver Detalles
+            variant="outlined"
+            fullWidth
+          >
+            Ver
             </Button>
-
-            {/* Botón Editar */}
             <Button
-              type="button"
-              variant="text"
+            size="small"
               startIcon={<EditIcon />}
               onClick={(e) => { 
                 e.preventDefault(); 
                 e.stopPropagation(); 
                 onEditar?.(prestador); 
               }}
-              sx={{
-                color: '#2563eb',
-                textTransform: 'uppercase',
-                fontWeight: 600,
-                fontSize: '0.75rem',
-                width: 160,
-                height: 40,
-                justifyContent: 'center',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                border: '1px solid #2563eb',
-                borderRadius: 1,
-                '&:hover': {
-                  backgroundColor: '#2563eb',
-                  color: 'white'
-                }
-              }}
+            variant="outlined"
+            fullWidth
             >
               Editar
             </Button>
-
-            <BotonAlternarEstado 
-              activo={!!prestador.activo} 
-              onClick={() => onToggleActivo?.(prestador)} 
-            />
-          </Stack>
-        </Stack>
-      </CardContent>
+          <Button
+            size="small"
+            startIcon={<ScheduleIcon />}
+            color={prestador.activo ? 'error' : 'success'}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onToggleActivo?.(prestador);
+            }}
+            variant="outlined"
+            fullWidth
+          >
+            {prestador.activo ? 'Dar de baja' : 'Rehabilitar'}
+          </Button>
+        </Box>
+      </Box>
+      {prestador.lugaresAtencion && prestador.lugaresAtencion.length > 0 && (
+        <Accordion sx={{ mt: 2 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle2">
+              Lugares de Atención ({prestador.lugaresAtencion.length})
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {prestador.lugaresAtencion.map((lugar, idx) => (
+                <Card key={idx} variant="outlined" sx={{ p: 1.5, borderColor: '#e0e0e0' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, gap: 1, flexWrap: 'wrap' }}>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        {lugar.direccion}
+                      </Typography>
+                      {lugar.localidad && (
+                        <Typography variant="body2" color="textSecondary">
+                          • {lugar.localidad}
+                        </Typography>
+                      )}
+                      {lugar.codigoPostal && (
+                        <Typography variant="body2" color="textSecondary">
+                          • CP {lugar.codigoPostal}
+                        </Typography>
+                      )}
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                      {typeof lugar.especialidadSeleccionada === 'string' && lugar.especialidadSeleccionada.trim() !== '' && (
+                        <Chip
+                          label={lugar.especialidadSeleccionada}
+                          size="small"
+                          sx={{ backgroundColor: '#e3f2fd', color: '#1976d2', fontWeight: 600 }}
+                        />
+                      )}
+                      <Tooltip title="Editar horarios">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onGestionarHorarios?.(prestador, idx);
+                          }}
+                          aria-label="Editar horarios"
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onEliminarDireccion?.(prestador, idx);
+                        }}
+                        aria-label="Eliminar dirección"
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                  {Array.isArray(lugar.horarios) && lugar.horarios.length > 0 && (
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
+                      {(() => {
+                        const dayToRanges = {};
+                        (lugar.horarios || []).forEach((h) => {
+                          const dias = Array.isArray(h.dias) && h.dias.length > 0 ? h.dias : [];
+                          const inicio = h.horaInicio || h.desde || '';
+                          const fin = h.horaFin || h.hasta || '';
+                          dias.forEach((dia) => {
+                            if (!dayToRanges[dia]) dayToRanges[dia] = [];
+                            dayToRanges[dia].push({ rango: `${inicio} - ${fin}`, dur: h.duracionMinutos });
+                          });
+                        });
+                        return diasSemanaOrden
+                          .filter((dia) => (dayToRanges[dia] || []).length > 0)
+                          .map((dia, idxCard) => {
+                            const rangos = dayToRanges[dia];
+                            return (
+                              <Card key={idxCard} variant="outlined" sx={{ p: 1.25, borderColor: '#e0e0e0', backgroundColor: '#f8f9fa', minWidth: 180 }}>
+                                <Chip
+                                  label={dia}
+                                  size="small"
+                                  sx={{ backgroundColor: '#2196f3', color: 'white', fontWeight: 'bold', mb: 0.75 }}
+                                />
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                                  {rangos.map((item, i) => (
+                                    <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                      <ScheduleIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2' }}>
+                                        {item.rango}
+                                      </Typography>
+                                      {typeof item.dur === 'number' && item.dur > 0 && (
+                                        <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                                          • {item.dur} min
+                                        </Typography>
+                                      )}
+                                    </Box>
+                                  ))}
+                                </Box>
+                              </Card>
+                            );
+                          });
+                      })()}
+                    </Box>
+                  )}
+                </Card>
+              ))}
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+      )}
     </Card>
   );
 }

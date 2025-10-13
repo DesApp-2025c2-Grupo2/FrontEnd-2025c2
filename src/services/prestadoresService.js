@@ -43,9 +43,10 @@ const seedPrestadores = [
       {
         id: 1,
         direccion: 'Avenida Vergara 1908, CABA',
+        especialidadesPermitidas: [],
         horarios: [
-          { dias: ['Lunes', 'Miércoles'], horaInicio: '08:00', horaFin: '14:00' },
-          { dias: ['Viernes'], horaInicio: '09:00', horaFin: '13:00' }
+          { dias: ['Lunes', 'Miércoles'], horaInicio: '08:00', horaFin: '14:00', duracionMinutos: 30 },
+          { dias: ['Viernes'], horaInicio: '09:00', horaFin: '13:00', duracionMinutos: 30 }
         ]
       }
     ],
@@ -70,9 +71,10 @@ const seedPrestadores = [
       {
         id: 1,
         direccion: 'Rivadavia 2345, CABA',
+        especialidadesPermitidas: [],
         horarios: [
-          { dias: ['Martes', 'Jueves'], horaInicio: '14:00', horaFin: '20:00' },
-          { dias: ['Jueves'], horaInicio: '08:00', horaFin: '12:00' }
+          { dias: ['Martes', 'Jueves'], horaInicio: '14:00', horaFin: '20:00', duracionMinutos: 30 },
+          { dias: ['Jueves'], horaInicio: '08:00', horaFin: '12:00', duracionMinutos: 30 }
         ]
       }
     ],
@@ -97,25 +99,28 @@ const seedPrestadores = [
       {
         id: 1,
         direccion: 'Corrientes 1234, CABA',
+        especialidadesPermitidas: [],
         horarios: [
-          { dias: ['Lunes', 'Miércoles', 'Viernes'], horaInicio: '08:00', horaFin: '12:00' },
-          { dias: ['Miércoles'], horaInicio: '14:00', horaFin: '18:00' }
+          { dias: ['Lunes', 'Miércoles', 'Viernes'], horaInicio: '08:00', horaFin: '12:00', duracionMinutos: 30 },
+          { dias: ['Miércoles'], horaInicio: '14:00', horaFin: '18:00', duracionMinutos: 30 }
         ]
       },
       {
         id: 2,
         direccion: 'Santa Fe 5678, CABA',
+        especialidadesPermitidas: [],
         horarios: [
-          { dias: ['Lunes', 'Martes', 'Jueves'], horaInicio: '14:00', horaFin: '18:00' },
-          { dias: ['Martes'], horaInicio: '08:00', horaFin: '12:00' }
+          { dias: ['Lunes', 'Martes', 'Jueves'], horaInicio: '14:00', horaFin: '18:00', duracionMinutos: 30 },
+          { dias: ['Martes'], horaInicio: '08:00', horaFin: '12:00', duracionMinutos: 30 }
         ]
       },
       {
         id: 3,
         direccion: 'Callao 9012, CABA',
+        especialidadesPermitidas: [],
         horarios: [
-          { dias: ['Martes', 'Miércoles', 'Viernes'], horaInicio: '08:00', horaFin: '12:00' },
-          { dias: ['Martes'], horaInicio: '14:00', horaFin: '18:00' }
+          { dias: ['Martes', 'Miércoles', 'Viernes'], horaInicio: '08:00', horaFin: '12:00', duracionMinutos: 30 },
+          { dias: ['Martes'], horaInicio: '14:00', horaFin: '18:00', duracionMinutos: 30 }
         ]
       }
     ],
@@ -148,8 +153,21 @@ export async function ensureSeed() {
     }
     return p;
   });
-  writeAll(migrados);
-  return migrados;
+  // Migración adicional: asegurar duracionMinutos por defecto en horarios
+  const migrados2 = migrados.map(p => {
+    const lugares = Array.isArray(p.lugaresAtencion) ? p.lugaresAtencion.map(l => ({
+      ...l,
+      especialidadesPermitidas: Array.isArray(l.especialidadesPermitidas) ? l.especialidadesPermitidas : [],
+      especialidadSeleccionada: typeof l.especialidadSeleccionada === 'string' ? l.especialidadSeleccionada : null,
+      horarios: Array.isArray(l.horarios) ? l.horarios.map(h => ({
+        ...h,
+        duracionMinutos: typeof h.duracionMinutos === 'number' && h.duracionMinutos > 0 ? h.duracionMinutos : 30
+      })) : []
+    })) : [];
+    return { ...p, lugaresAtencion: lugares };
+  });
+  writeAll(migrados2);
+  return migrados2;
 }
 
 export async function create(prestador) {

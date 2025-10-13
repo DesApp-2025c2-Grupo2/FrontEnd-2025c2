@@ -66,14 +66,6 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
                         fontWeight: 'bold'
                       }}
                     />
-                    <Chip
-                      label={prestador.activo ? 'Activo' : 'Inactivo'}
-                      sx={{
-                        backgroundColor: prestador.activo ? '#4caf50' : '#f44336',
-                        color: 'white',
-                        fontWeight: 'bold'
-                      }}
-                    />
                   </Stack>
                 </Grid>
 
@@ -254,6 +246,7 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
                               </Typography>
                               <Typography variant="body2" sx={{ color: '#1976d2' }}>
                                 ⏰ {horario.horaInicio} - {horario.horaFin}
+                                {typeof horario.duracionMinutos === 'number' && horario.duracionMinutos > 0 ? ` • ${horario.duracionMinutos} min` : ''}
                               </Typography>
                             </Box>
                           ))}

@@ -9,8 +9,8 @@ import prestadoresReducer from '../store/prestadoresSlice';
 import reportesReducer from '../store/reportesSlice';
 import { loadState, saveState } from './localStorage';
 
-// Cargar estado inicial desde localStorage
-const persistedState = loadState();
+// Cargar estado inicial desde localStorage (solo partes no-catálogo)
+const persistedState = loadState() || undefined;
 
 export const store = configureStore({
   reducer: {
@@ -28,5 +28,6 @@ export const store = configureStore({
 
 // Suscribirse a cambios y guardar en localStorage
 store.subscribe(() => {
-  saveState(store.getState());
+  const { planes, especialidades, situaciones, ...rest } = store.getState();
+  saveState(rest);
 });
