@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Box, Container } from "@mui/material";
+import { Box, Container, Typography } from "@mui/material";
 import SeccionAccionesRapidas from "../components/SeccionAccionesRapidas";
 import SeccionEstadisticasRecientes from "../components/SeccionEstadisticasRecientes";
 import { useEstadisticasRecientes } from "../hooks/useEstadisticasRecientes.jsx";
@@ -11,6 +11,13 @@ import { useDispatch, useSelector } from "react-redux";
 import { crearPrestador } from "../store/prestadoresSlice";
 import { addEspecialidad } from "../store/especialidadesSlice";
 import { selectPlanes } from "../store/planesSlice"; // ejemplo
+import TablaCrecimiento from "../components/TablaCrecimiento.jsx";
+
+import PeopleIcon from "@mui/icons-material/People";
+import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
+import EventIcon from "@mui/icons-material/Event";
+import DescriptionIcon from "@mui/icons-material/Description";
+import TarjetaEstadistica from "../components/TarjetaEstadistica.jsx";
 
 function Dashboard() {
   const { stats: recentStats } = useEstadisticasRecientes("dashboard");
@@ -61,11 +68,27 @@ function Dashboard() {
     setOpenAfiliado(false);
   };
 
+  const metrics = [
+    { title: "Total Afiliados", value: "13,698", changeValue: "+12.5%", positive: true, icon: <PeopleIcon color="secondary" /> },
+    { title: "Prestadores Activos", value: "327", changeValue: "+5.2%", positive: true, icon: <MedicalServicesIcon color="secondary" /> },
+    { title: "Turnos del Mes", value: "8,234", changeValue: "-2.4%", positive: false, icon: <EventIcon color="secondary" /> },
+    { title: "Planes Activos", value: "12", changeValue: "+8.1%", positive: true, icon: <DescriptionIcon color="secondary" /> },
+  ];
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Typography variant="h3" fontWeight="bold">Dashboard</Typography>
+      <Typography variant="body2" color="text.secondary" mb={3}>
+        Resumen general de la plataforma de servicios médicos
+      </Typography>
+      
       <Box>
         <SeccionAccionesRapidas actions={actions} />
-        {/*<SeccionEstadisticasRecientes stats={recentStats} />*/}
+        <Box display="flex" gap={2} flexWrap="wrap" mb={4}>
+          {metrics.map((m, i) => <TarjetaEstadistica key={i} {...m} />)}
+        </Box>
+        <Box display="flex" gap={2} flexWrap="wrap">
+          <TablaCrecimiento/>
+        </Box>
       </Box>
 
       {/* Modal Nuevo Prestador */}
