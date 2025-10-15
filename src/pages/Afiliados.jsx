@@ -1,4 +1,3 @@
-// components/pages/Afiliados.jsx
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Box, Typography, Fab, Snackbar, Alert } from "@mui/material";
@@ -17,6 +16,7 @@ import {
   addPersona,
   updatePersona,
   deletePersona,
+  setPersonasFromAfiliados,
 } from "../store/personasSlice";
 import AdvancedSearchBar from "../components/Afiliados/AdvancedSearchBar";
 import AfiliadoCard from "../components/Afiliados/AfiliadosCard";
@@ -57,7 +57,6 @@ const tieneAltaProgramada = (alta) => {
   return startOfDay(new Date(alta)) > startOfDay(new Date());
 };
 
-// MEJORADA: admite titularId o titularID y defensa si no hay afiliado
 const getTitularDelAfiliado = (afiliado, personas) => {
   if (!afiliado) return null;
   const titularId =
@@ -66,11 +65,9 @@ const getTitularDelAfiliado = (afiliado, personas) => {
   return personas.find((p) => p.id === titularId);
 };
 
-// MEJORADA: admite ambas variantes del campo titular y defensa
 const getFamiliaresDelAfiliado = (afiliado, personas) => {
   if (!afiliado) return [];
-  const titularId =
-    afiliado.titularId ?? afiliado.titularID ?? afiliado.titular;
+  const titularId = afiliado.titularId ?? afiliado.titularID ?? afiliado.titular;
   return personas.filter(
     (p) => p.afiliadoId === afiliado.id && p.id !== titularId
   );
@@ -134,11 +131,38 @@ export default function Afiliados() {
   const [editDirecciones, setEditDirecciones] = useState([]);
   const [editSituaciones, setEditSituaciones] = useState([]);
 
-  useEffect(() => setFilteredAfiliados(afiliados), [afiliados]);
-
   useEffect(() => {
     dispatch(fetchAfiliados());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (afiliados && afiliados.length > 0) {
+      // Extraer todas las personas de los afiliados
+      const todasPersonas = [];
+      
+      afiliados.forEach(afiliado => {
+        // Si el backend devuelve el titular en la propiedad 'titular'
+        if (afiliado.titular) {
+          todasPersonas.push(afiliado.titular);
+        }
+        
+        // Si el backend devuelve los integrantes en un array
+        if (afiliado.integrantes && Array.isArray(afiliado.integrantes)) {
+          afiliado.integrantes.forEach(integrante => {
+            // Evitar duplicados
+            if (!todasPersonas.find(p => p.id === integrante.id)) {
+              todasPersonas.push(integrante);
+            }
+          });
+        }
+      });
+
+      console.log('Personas extraídas:', todasPersonas); // Debug
+      dispatch(setPersonasFromAfiliados(todasPersonas));
+    }
+  }, [afiliados, dispatch]);
+
+  useEffect(() => setFilteredAfiliados(afiliados), [afiliados]);
 
   const showSnackbar = (message, severity = "success") =>
     setSnackbar({ open: true, message, severity });
@@ -172,6 +196,9 @@ export default function Afiliados() {
     const titular = getTitularDelAfiliado(afiliado, personas);
     if (!titular) {
       console.error("No se encontró el titular del afiliado");
+      console.log("Afiliado:", afiliado); // Debug
+      console.log("Personas disponibles:", personas); // Debug
+      showSnackbar("No se encontró el titular del afiliado", "error");
       return;
     }
 
@@ -215,7 +242,6 @@ export default function Afiliados() {
 
     try {
       if (selectedAfiliado && isEditing) {
-        // usar thunk para actualizar afiliado completo
         await dispatch(
           updateAfiliadoCompleto({
             selectedAfiliado,
@@ -228,7 +254,6 @@ export default function Afiliados() {
         ).unwrap();
         showSnackbar("Afiliado actualizado");
       } else {
-        // usar thunk para crear afiliado completo
         await dispatch(
           createAfiliadoCompleto({
             formAfiliado,
@@ -271,7 +296,7 @@ export default function Afiliados() {
   };
 
   const handleReactivarInmediatamente = (afiliado) => {
-    dispatch(reactivarAfiliado({ afiliadoId: afiliado.id }));
+    dispatch(reactivarAfiliado(afiliado.id));
     const titular = getTitularDelAfiliado(afiliado, personas);
     if (titular) dispatch(updatePersona({ ...titular, alta: hoyISO() }));
     showSnackbar("Afiliado reactivado inmediatamente");
@@ -457,7 +482,13 @@ export default function Afiliados() {
         {filteredAfiliados.map((afiliado) => {
           const titular = getTitularDelAfiliado(afiliado, personas);
           const familiares = getFamiliaresDelAfiliado(afiliado, personas);
-          if (!titular) return null;
+          
+          // Debug: ver qué está pasando
+          if (!titular) {
+            console.warn(`No se encontró titular para afiliado ${afiliado.id}`, afiliado);
+            return null;
+          }
+          
           return (
             <AfiliadoCard
               key={afiliado.id}

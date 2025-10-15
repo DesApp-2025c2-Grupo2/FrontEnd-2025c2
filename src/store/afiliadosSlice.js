@@ -200,11 +200,13 @@ const afiliadosSlice = createSlice({
       })
       .addCase(fetchAfiliados.fulfilled, (state, action) => {
         state.loading = false;
+        console.log("=== Afiliados recibidos del backend ===", action.payload);
         state.afiliados = action.payload;
       })
       .addCase(fetchAfiliados.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        console.error("=== Error cargando afiliados ===", action.payload);
       })
       // Create Afiliado Completo
       .addCase(createAfiliadoCompleto.pending, (state) => {

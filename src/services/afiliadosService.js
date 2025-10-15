@@ -1,26 +1,32 @@
-// services/afiliadosService.js
 import WebAPI from "./config/WebAPI";
 
-// Endpoints
-const AFILIADOS_ENDPOINT = "/afiliados";
-const PERSONAS_ENDPOINT = "/personas";
+const AFILIADOS_ENDPOINT = "/Afiliados";
+const PERSONAS_ENDPOINT = "/Personas";
 
-// Servicios básicos de Afiliados
+const normalizeAfiliado = (afiliado) => {
+  return {
+    ...afiliado,
+    id: afiliado.id,
+    titularId: afiliado.titularId || afiliado.titularID, // Normalizar mayúscula
+  };
+};
+
 export async function getAllAfiliados() {
   const res = await WebAPI.Instance().get(AFILIADOS_ENDPOINT);
-  return res.data;
+  const afiliados = Array.isArray(res.data) ? res.data : [];
+  return afiliados.map(normalizeAfiliado);
 }
 
 export async function getAfiliadoByNumero(numeroAfiliado) {
   const res = await WebAPI.Instance().get(
     `${AFILIADOS_ENDPOINT}/${numeroAfiliado}`
   );
-  return res.data;
+  return normalizeAfiliado(res.data);
 }
 
 export async function createAfiliado(afiliado) {
   const res = await WebAPI.Instance().post(AFILIADOS_ENDPOINT, afiliado);
-  return res.data;
+  return normalizeAfiliado(res.data);
 }
 
 export async function updateAfiliado(id, partial) {
@@ -28,24 +34,23 @@ export async function updateAfiliado(id, partial) {
     `${AFILIADOS_ENDPOINT}/${id}`,
     partial
   );
-  return res.data;
+  return normalizeAfiliado(res.data);
 }
 
 export async function darBajaAfiliado(id, fechaBaja) {
   const res = await WebAPI.Instance().put(`${AFILIADOS_ENDPOINT}/${id}`, {
     baja: fechaBaja || new Date().toISOString().split("T")[0],
   });
-  return res.data;
+  return normalizeAfiliado(res.data);
 }
 
 export async function reactivarAfiliado(id) {
   const res = await WebAPI.Instance().put(`${AFILIADOS_ENDPOINT}/${id}`, {
     baja: null,
   });
-  return res.data;
+  return normalizeAfiliado(res.data);
 }
 
-// Servicios básicos de Personas
 export async function createPersona(persona) {
   const res = await WebAPI.Instance().post(PERSONAS_ENDPOINT, persona);
   return res.data;
@@ -78,14 +83,7 @@ export async function reactivarPersona(id) {
   return res.data;
 }
 
-/**
- * Servicio de utilidades para operaciones compuestas
- * Mantiene la lógica de negocio coordinada
- */
 export const AfiliadosService = {
-  /**
-   * Crea un nuevo afiliado con su persona titular (operación compuesta)
-   */
   createAfiliadoCompleto: async (
     formAfiliado,
     editTelefonos = [],
@@ -96,61 +94,46 @@ export const AfiliadosService = {
     try {
       // 1. Primero crear la persona titular
       const personaPayload = {
-        numeroIntegrante: 1, // titular siempre 1
+        numeroIntegrante: 1,
         nombre: formAfiliado.nombre,
         apellido: formAfiliado.apellido,
         tipoDocumento: formAfiliado.tipoDocumento,
         numeroDocumento: formAfiliado.numeroDocumento,
         fechaNacimiento: formAfiliado.fechaNacimiento,
-        parentesco: 1, // Titular
-        afiliadoId: 0, // Se actualizará después
+        parentesco: 1,
+        afiliadoId: 0, // Temporal, se actualiza después
         alta: formAfiliado.alta,
         baja: null,
-        telefonos: (editTelefonos || []).map((telefono, index) => ({
-          id: index + 1,
-          numero: telefono,
-        })),
-        emails: (editEmails || []).map((email, index) => ({
-          id: index + 1,
-          correo: email,
-        })),
-        direcciones: (editDirecciones || []).map((direccion, index) => ({
-          id: index + 1,
-          calle: (direccion || "").split(",")[0]?.trim() || direccion || "",
-          altura: "",
-          piso: "",
-          departamento: "",
-          provinciaCiudad: "Buenos Aires",
-        })),
+        telefonos: editTelefonos || [],
+        emails: editEmails || [],
+        direcciones: editDirecciones || [],
         situacionesTerapeuticas: editSituaciones || [],
       };
 
       const personaResult = await createPersona(personaPayload);
 
-      // 2. Luego crear el afiliado referenciando a la persona
+      // 2. Luego crear el afiliado
       const afiliadoPayload = {
-        numeroAfiliado: 0, // El backend asignará el número
         titularId: personaResult.id,
         planMedicoId: parseInt(formAfiliado.planMedicoId),
         alta: formAfiliado.alta,
         baja: null,
-        integrantes: [personaResult.id],
       };
 
       const afiliadoResult = await createAfiliado(afiliadoPayload);
 
-      // 3. Actualizar la persona con el afiliadoId correcto
+      // 3. Actualizar la persona con el afiliadoId correcto (ahora tenemos el id real)
       await updatePersona(personaResult.id, {
         afiliadoId: afiliadoResult.id,
       });
 
-      // Retornar el afiliado completo con el titular incluido
+      // Retornar con estructura normalizada
       return {
-        afiliado: {
-          ...afiliadoResult,
-          titular: { ...personaResult, afiliadoId: afiliadoResult.id },
+        afiliado: normalizeAfiliado(afiliadoResult),
+        persona: {
+          ...personaResult,
+          afiliadoId: afiliadoResult.id,
         },
-        persona: { ...personaResult, afiliadoId: afiliadoResult.id },
       };
     } catch (error) {
       console.error("Error creating afiliado completo:", error);
@@ -159,7 +142,7 @@ export const AfiliadosService = {
   },
 
   /**
-   * Actualiza un afiliado existente y su persona titular (operación compuesta)
+   * Actualiza un afiliado existente y su persona titular
    */
   updateAfiliadoCompleto: async (
     selectedAfiliado,
@@ -172,23 +155,22 @@ export const AfiliadosService = {
     if (!selectedAfiliado) throw new Error("Afiliado no seleccionado");
 
     try {
-      // 1. Actualizar afiliado
+      const afiliadoId = selectedAfiliado.id;
+
       const afiliadoUpdate = {
         planMedicoId: parseInt(formAfiliado.planMedicoId),
         alta: formAfiliado.alta,
         baja: selectedAfiliado.baja,
       };
 
-      const afiliadoResult = await updateAfiliado(
-        selectedAfiliado.id,
-        afiliadoUpdate
-      );
-
-      // 2. Actualizar persona titular
+      const afiliadoResult = await updateAfiliado(afiliadoId, afiliadoUpdate);
       const titularId =
         selectedAfiliado.titularId || selectedAfiliado.titularID;
       if (!titularId) {
-        return { afiliado: afiliadoResult, persona: null };
+        return {
+          afiliado: normalizeAfiliado(afiliadoResult),
+          persona: null,
+        };
       }
 
       const personaUpdate = {
@@ -197,29 +179,16 @@ export const AfiliadosService = {
         tipoDocumento: formAfiliado.tipoDocumento,
         numeroDocumento: formAfiliado.numeroDocumento,
         fechaNacimiento: formAfiliado.fechaNacimiento,
-        telefonos: (editTelefonos || []).map((telefono, index) => ({
-          id: index + 1,
-          numero: telefono,
-        })),
-        emails: (editEmails || []).map((email, index) => ({
-          id: index + 1,
-          correo: email,
-        })),
-        direcciones: (editDirecciones || []).map((direccion, index) => ({
-          id: index + 1,
-          calle: (direccion || "").split(",")[0]?.trim() || direccion || "",
-          altura: "",
-          piso: "",
-          departamento: "",
-          provinciaCiudad: "Buenos Aires",
-        })),
+        telefonos: editTelefonos || [],
+        emails: editEmails || [],
+        direcciones: editDirecciones || [],
         situacionesTerapeuticas: editSituaciones || [],
       };
 
       const personaResult = await updatePersona(titularId, personaUpdate);
 
       return {
-        afiliado: afiliadoResult,
+        afiliado: normalizeAfiliado(afiliadoResult),
         persona: personaResult,
       };
     } catch (error) {
@@ -228,15 +197,11 @@ export const AfiliadosService = {
     }
   },
 
-  /**
-   * Utilidades de formato
-   */
   formatNumeroAfiliado: (numero) => {
     return String(numero).padStart(7, "0");
   },
 };
 
-// Exportar todo junto para mantener compatibilidad
 export default {
   getAllAfiliados,
   getAfiliadoByNumero,
