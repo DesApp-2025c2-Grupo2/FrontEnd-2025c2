@@ -74,12 +74,7 @@ const afiliadosSlice = createSlice({
       })
       .addCase(fetchAfiliados.fulfilled, (state, action) => {
         state.loading = false;
-<<<<<<< HEAD
         state.lista = action.payload;
-=======
-        console.log("=== Afiliados recibidos del backend ===", action.payload);
-        state.afiliados = action.payload;
->>>>>>> 87bc780cb0493b4c159170398b95ddf7b1927c74
       })
       .addCase(fetchAfiliados.rejected, (state, action) => {
         state.loading = false;
