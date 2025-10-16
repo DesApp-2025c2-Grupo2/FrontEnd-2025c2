@@ -5,6 +5,7 @@ export default function ContactInfoEditor({
   icon,
   title,
   items = [],
+  keyProp = null, // nueva prop opcional
   newValue = "",
   placeholder,
   inputType = "text",
@@ -13,7 +14,6 @@ export default function ContactInfoEditor({
   onRemove = () => {},
   disabled = false,
 }) {
-  // defensive: ensure items is array
   const list = Array.isArray(items) ? items : [];
 
   const handleKeyDown = (e) => {
@@ -73,7 +73,11 @@ export default function ContactInfoEditor({
             variant="outlined"
           >
             <Typography variant="body1" sx={{ wordBreak: "break-word" }}>
-              {typeof item === "string" ? item : JSON.stringify(item)}
+              {keyProp && item[keyProp]
+                ? item[keyProp]
+                : typeof item === "string"
+                ? item
+                : JSON.stringify(item)}
             </Typography>
             <IconButton
               size="small"

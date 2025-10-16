@@ -25,6 +25,7 @@ import ContactInfoEditor from "./ContactInfoEditor";
 import SituacionesSelector from "./SituacionesSelector";
 import { useSelector } from "react-redux";
 import { selectSituaciones } from "../../store/situacionesTerapeuticasSlice";
+import { tiposDocumento } from "../../utilidades/tipoDocumento";
 
 const hoyISO = () => new Date().toISOString().split("T")[0];
 const padNumeroAfiliado = (n) => String(Number(n) || 0).padStart(7, "0");
@@ -55,6 +56,17 @@ export default function AfiliadoFormDialog({
   const [newDireccion, setNewDireccion] = useState("");
 
   const situacionesCatalogo = useSelector(selectSituaciones) || [];
+
+  const getPlanMedicoNombre = (planMedicoId, planesMedicos) => {
+    const plan = (planesMedicos || []).find(
+      (p) => String(p.id) === String(planMedicoId)
+    );
+    return plan ? plan.nombre : "Desconocido";
+  };
+
+  const planMedico = selectedAfiliado
+    ? getPlanMedicoNombre(selectedAfiliado.planMedicoId, planesMedicos)
+    : null;
 
   useEffect(() => {
     if (open) {
@@ -130,16 +142,15 @@ export default function AfiliadoFormDialog({
                 </Typography>
 
                 <Typography variant="body2" gutterBottom>
-                  <strong>Documento:</strong> {titular.tipoDocumento}{" "}
-                  {titular.numeroDocumento}
+                  <strong>Documento:</strong>{" "}
+                  {tiposDocumento[titular.documentacion.tipoDocumento] ||
+                    "Tipo desconocido"}{" "}
+                  {titular.documentacion.numero}
                 </Typography>
 
                 <Typography variant="body2" gutterBottom>
                   <strong>Plan Médico:</strong>{" "}
-                  {planesMedicos.find(
-                    (p) =>
-                      String(p.id) === String(selectedAfiliado.planMedicoId)
-                  )?.nombre ?? "Desconocido"}
+                  {planMedico || "Plan Desconocido"} {console.log(planMedico)}
                 </Typography>
 
                 <Typography variant="body2" gutterBottom>
@@ -193,9 +204,7 @@ export default function AfiliadoFormDialog({
                           sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
                           <PhoneIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                          <Typography variant="body2">
-                            {typeof t === "string" ? t : JSON.stringify(t)}
-                          </Typography>
+                          <Typography variant="body2">{t.numero}</Typography>
                         </Box>
                       ))
                     ) : (
@@ -228,9 +237,7 @@ export default function AfiliadoFormDialog({
                           sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
                           <EmailIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                          <Typography variant="body2">
-                            {typeof e === "string" ? e : JSON.stringify(e)}
-                          </Typography>
+                          <Typography variant="body2">{e.correo}</Typography>
                         </Box>
                       ))
                     ) : (
@@ -264,7 +271,8 @@ export default function AfiliadoFormDialog({
                         >
                           <HomeIcon sx={{ fontSize: 16, color: "#1976d2" }} />
                           <Typography variant="body2">
-                            {typeof d === "string" ? d : JSON.stringify(d)}
+                            {d.calle}, {d.altura}, Piso {d.piso}, Departamento{" "}
+                            {d.departamento}, {d.provinciaCiudad}
                           </Typography>
                         </Box>
                       ))
@@ -339,8 +347,12 @@ export default function AfiliadoFormDialog({
                     label="Tipo de Documento"
                     onChange={handleTipoDocumentoChange}
                   >
-                    <MenuItem value="DNI">DNI</MenuItem>
-                    <MenuItem value="Pasaporte">Pasaporte</MenuItem>
+                    <MenuItem value="">Seleccione</MenuItem>
+                    {Object.entries(tiposDocumento).map(([key, value]) => (
+                      <MenuItem key={key} value={key}>
+                        {value}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>
@@ -365,7 +377,11 @@ export default function AfiliadoFormDialog({
                   label="Fecha de Nacimiento"
                   type="date"
                   InputLabelProps={{ shrink: true }}
-                  value={formData.fechaNacimiento || ""}
+                  value={
+                    formData.fechaNacimiento
+                      ? new Date(formData.fechaNacimiento).toISOString().split("T")[0]
+                      : hoyISO()
+                  }
                   onChange={(e) =>
                     handleFormChange("fechaNacimiento", e.target.value)
                   }

@@ -6,6 +6,7 @@ import afiliadosReducer from "../store/afiliadosSlice";
 import agendasReducer from '../store/agendasSlice';
 import prestadoresReducer from '../store/prestadoresSlice';
 import reportesReducer from '../store/reportesSlice';
+import personasReducer from '../store/personasSlice';
 import { loadState, saveState } from './localStorage';
 
 // Cargar estado inicial desde localStorage (solo partes no-catálogo)
@@ -20,6 +21,7 @@ export const store = configureStore({
     agendas: agendasReducer,
     prestadores: prestadoresReducer,
     reportes: reportesReducer,
+    personas: personasReducer
   },
   preloadedState: persistedState,
 });

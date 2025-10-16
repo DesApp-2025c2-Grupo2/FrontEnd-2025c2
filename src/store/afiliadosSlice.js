@@ -1,9 +1,9 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { AfiliadosService } from '../services/AfiliadosService';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { AfiliadosService } from "../services/AfiliadosService";
 
 // --- Async Thunks ---
 export const fetchAfiliados = createAsyncThunk(
-  'afiliados/fetchAll',
+  "afiliados/fetchAll",
   async (_, { rejectWithValue }) => {
     try {
       return await AfiliadosService.getAll();
@@ -14,7 +14,7 @@ export const fetchAfiliados = createAsyncThunk(
 );
 
 export const createAfiliado = createAsyncThunk(
-  'afiliados/create',
+  "afiliados/create",
   async (payload, { rejectWithValue }) => {
     try {
       return await AfiliadosService.create(payload);
@@ -25,7 +25,7 @@ export const createAfiliado = createAsyncThunk(
 );
 
 export const updateAfiliado = createAsyncThunk(
-  'afiliados/update',
+  "afiliados/update",
   async ({ id, payload }, { rejectWithValue }) => {
     try {
       return await AfiliadosService.update(id, payload);
@@ -36,10 +36,12 @@ export const updateAfiliado = createAsyncThunk(
 );
 
 export const deleteAfiliado = createAsyncThunk(
-  'afiliados/delete',
+  "afiliados/delete",
   async (id, { rejectWithValue }) => {
     try {
-      return await AfiliadosService.delete(id);
+      await AfiliadosService.delete(id);
+      // devolvemos el id para simplificar el extraReducer
+      return id;
     } catch (err) {
       return rejectWithValue(err.response?.data || err.message);
     }
@@ -48,7 +50,7 @@ export const deleteAfiliado = createAsyncThunk(
 
 // --- Slice ---
 const afiliadosSlice = createSlice({
-  name: 'afiliados',
+  name: "afiliados",
   initialState: {
     lista: [],
     selected: null,
@@ -65,7 +67,7 @@ const afiliadosSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // --- fetchAfiliados ---
+      // fetchAfiliados
       .addCase(fetchAfiliados.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -78,20 +80,23 @@ const afiliadosSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // --- createAfiliado ---
+
+      // createAfiliado
       .addCase(createAfiliado.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(createAfiliado.fulfilled, (state, action) => {
         state.loading = false;
+        // push created afiliado to lista
         state.lista.push(action.payload);
       })
       .addCase(createAfiliado.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      // --- updateAfiliado ---
+
+      // updateAfiliado
       .addCase(updateAfiliado.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -106,15 +111,17 @@ const afiliadosSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // --- deleteAfiliado ---
+
+      // deleteAfiliado
       .addCase(deleteAfiliado.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(deleteAfiliado.fulfilled, (state, action) => {
         state.loading = false;
-        state.lista = state.lista.filter((a) => a.id !== action.meta.arg);
-        if (state.selected?.id === action.meta.arg) state.selected = null;
+        // action.payload === id
+        state.lista = state.lista.filter((a) => a.id !== action.payload);
+        if (state.selected?.id === action.payload) state.selected = null;
       })
       .addCase(deleteAfiliado.rejected, (state, action) => {
         state.loading = false;

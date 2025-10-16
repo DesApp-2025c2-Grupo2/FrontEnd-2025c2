@@ -1,3 +1,4 @@
+// src/components/Afiliados/PersonaFormDialog.jsx
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -24,7 +25,10 @@ import ContactInfoEditor from "./ContactInfoEditor";
 import SituacionesSelector from "./SituacionesSelector";
 import { selectSituaciones } from "../../store/situacionesTerapeuticasSlice";
 import { useSelector } from "react-redux";
+import { tiposDocumento } from "../../utilidades/tipoDocumento";
+import { parentescos, getParentescoNombre } from "../../utilidades/parentesco";
 
+const hoyISO = () => new Date().toISOString().split("T")[0];
 const padNumeroAfiliado = (n) => String(Number(n) || 0).padStart(7, "0");
 const padIntegrante = (n) => String(Number(n) || 0).padStart(2, "0");
 
@@ -32,20 +36,19 @@ export default function PersonaFormDialog({
   open,
   selectedAfiliado,
   selectedFamiliar,
-  isEditing,
-  formData,
-  parentescos = [],
+  isEditing = false,
+  formData = {},
   editTelefonos = [],
   editEmails = [],
   editDirecciones = [],
   editSituaciones = [],
-  onEditTelefonosChange,
-  onEditEmailsChange,
-  onEditDireccionesChange,
-  onEditSituacionesChange,
-  onClose,
-  onSave,
-  onFormChange,
+  onEditTelefonosChange = () => {},
+  onEditEmailsChange = () => {},
+  onEditDireccionesChange = () => {},
+  onEditSituacionesChange = () => {},
+  onClose = () => {},
+  onSave = () => {},
+  onFormChange = () => {},
 }) {
   const situacionesCatalogo = useSelector(selectSituaciones) || [];
 
@@ -53,7 +56,7 @@ export default function PersonaFormDialog({
   const [newEmail, setNewEmail] = useState("");
   const [newDireccion, setNewDireccion] = useState("");
 
-  const isViewMode = selectedFamiliar && !isEditing;
+  const isViewMode = !!selectedFamiliar && !isEditing;
 
   useEffect(() => {
     if (open) {
@@ -63,77 +66,101 @@ export default function PersonaFormDialog({
     }
   }, [open]);
 
-  // Helpers para normalizar valores (pueden venir como string o como objeto)
+  // Helpers para normalizar valores
   const telefonoToString = (t) => (t && (t.numero ?? t.Numero ?? t)) ?? "";
   const emailToString = (e) => (e && (e.correo ?? e.Correo ?? e)) ?? "";
   const direccionToString = (d) => {
     if (!d) return "";
-    if (d.calle) {
+    if (typeof d === "object") {
       const altura = d.altura ? ` ${d.altura}` : "";
-      const piso = d.piso ? ` Piso ${d.piso}` : "";
-      const dept = d.departamento ? ` Dept ${d.departamento}` : "";
+      const piso = d.piso ? `, Piso ${d.piso}` : "";
+      const dept = d.departamento ? `, Dept ${d.departamento}` : "";
       const provincia = d.provinciaCiudad ?? "";
-      return `${d.calle}${altura}${piso}${dept} - ${provincia}`;
+      const calle = d.calle ?? "";
+      return `${calle}${altura}${piso}${dept}${
+        provincia ? `, ${provincia}` : ""
+      }`.trim();
     }
-    // si 'd' no tiene propiedades, asumimos que es un string con la dirección
     return String(d);
   };
 
-  // Teléfonos
   const handleAddTelefono = () => {
-    if (!newTelefono?.trim()) return;
-    const updated = [...(editTelefonos || []), newTelefono.trim()];
-    onEditTelefonosChange?.(updated);
+    if (!newTelefono.trim()) return;
+    onEditTelefonosChange([...(editTelefonos || []), newTelefono.trim()]);
     setNewTelefono("");
   };
-  const handleRemoveTelefono = (index) => {
-    const updated = (editTelefonos || []).filter((_, i) => i !== index);
-    onEditTelefonosChange?.(updated);
-  };
 
-  // Emails
+  const handleRemoveTelefono = (index) =>
+    onEditTelefonosChange((editTelefonos || []).filter((_, i) => i !== index));
+
   const handleAddEmail = () => {
-    if (!newEmail?.trim()) return;
-    const updated = [...(editEmails || []), newEmail.trim()];
-    onEditEmailsChange?.(updated);
+    if (!newEmail.trim()) return;
+    onEditEmailsChange([...(editEmails || []), newEmail.trim()]);
     setNewEmail("");
   };
-  const handleRemoveEmail = (index) => {
-    const updated = (editEmails || []).filter((_, i) => i !== index);
-    onEditEmailsChange?.(updated);
-  };
 
-  // Direcciones
+  const handleRemoveEmail = (index) =>
+    onEditEmailsChange((editEmails || []).filter((_, i) => i !== index));
+
+  // Direcciones: convertimos la string nueva en objeto simple { calle: value }
   const handleAddDireccion = () => {
-    if (!newDireccion?.trim()) return;
-    const updated = [...(editDirecciones || []), newDireccion.trim()];
-    onEditDireccionesChange?.(updated);
+    if (!newDireccion.trim()) return;
+    // Si el caller ya maneja objetos, permitimos pasar strings o objetos.
+    const parsed =
+      typeof newDireccion === "string"
+        ? {
+            calle: newDireccion.trim(),
+            altura: "",
+            piso: "",
+            departamento: "",
+            provinciaCiudad: "",
+          }
+        : newDireccion;
+    onEditDireccionesChange([...(editDirecciones || []), parsed]);
     setNewDireccion("");
   };
-  const handleRemoveDireccion = (index) => {
-    const updated = (editDirecciones || []).filter((_, i) => i !== index);
-    onEditDireccionesChange?.(updated);
-  };
 
-  // Situaciones
-  const handleAddSituacion = (s) => {
-    const updated = [...(editSituaciones || []), s];
-    onEditSituacionesChange?.(updated);
-  };
-  const handleRemoveSituacion = (idx) => {
-    const updated = (editSituaciones || []).filter((_, i) => i !== idx);
-    onEditSituacionesChange?.(updated);
-  };
+  const handleRemoveDireccion = (index) =>
+    onEditDireccionesChange(
+      (editDirecciones || []).filter((_, i) => i !== index)
+    );
 
-  const handleFormChange = (field, value) => onFormChange?.(field, value);
+  const handleFormChange = (field, value) => onFormChange(field, value);
+
   const handleParentescoChange = (e) =>
-    handleFormChange("parentesco", parseInt(e.target.value, 10));
+    handleFormChange("parentesco", Number(e.target.value));
+
   const handleTipoDocumentoChange = (e) =>
     handleFormChange("tipoDocumento", e.target.value);
 
-  const getParentescoNombre = (parentescoId) => {
-    const p = (parentescos || []).find((x) => x.id === parentescoId);
-    return p ? p.nombre : "Desconocido";
+  // Validación mínima local
+  const validateBeforeSave = () => {
+    if (!formData.nombre || !formData.apellido) {
+      return { isValid: false, message: "Nombre y apellido son requeridos" };
+    }
+    if (!formData.tipoDocumento || !formData.numeroDocumento) {
+      return {
+        isValid: false,
+        message: "Tipo y número de documento son requeridos",
+      };
+    }
+    if (!formData.fechaNacimiento) {
+      return { isValid: false, message: "Fecha de nacimiento es requerida" };
+    }
+    if (!formData.parentesco) {
+      return { isValid: false, message: "Parentesco es requerido" };
+    }
+    return { isValid: true };
+  };
+
+  const handleSaveClick = () => {
+    const validation = validateBeforeSave();
+    if (!validation.isValid) {
+      // Podrías mostrar un snackbar aquí o manejar el error de otra forma
+      console.warn(validation.message);
+      return;
+    }
+    onSave();
   };
 
   return (
@@ -163,17 +190,24 @@ export default function PersonaFormDialog({
             </Typography>
 
             <Typography variant="body2" gutterBottom>
-              <strong>Documento:</strong> {selectedFamiliar.tipoDocumento}{" "}
-              {selectedFamiliar.numeroDocumento}
+              <strong>Documento:</strong>{" "}
+              {tiposDocumento[selectedFamiliar.documentacion?.tipoDocumento] ||
+                selectedFamiliar.tipoDocumento ||
+                "Tipo desconocido"}{" "}
+              {selectedFamiliar.documentacion?.numero ||
+                selectedFamiliar.numeroDocumento}
             </Typography>
+
             <Typography variant="body2" gutterBottom>
               <strong>Número de Integrante:</strong>{" "}
               {padIntegrante(selectedFamiliar.numeroIntegrante)}
             </Typography>
+
             <Typography variant="body2" gutterBottom>
               <strong>Parentesco:</strong>{" "}
               {getParentescoNombre(selectedFamiliar.parentesco)}
             </Typography>
+
             <Typography variant="body2" gutterBottom>
               <strong>Fecha de Nacimiento:</strong>{" "}
               {selectedFamiliar.fechaNacimiento
@@ -182,6 +216,20 @@ export default function PersonaFormDialog({
                   )
                 : ""}
             </Typography>
+
+            <Typography variant="body2" gutterBottom>
+              <strong>Fecha de Alta:</strong>{" "}
+              {selectedFamiliar.alta
+                ? new Date(selectedFamiliar.alta).toLocaleDateString("es-AR")
+                : ""}
+            </Typography>
+
+            {selectedFamiliar.baja && (
+              <Typography variant="body2" gutterBottom>
+                <strong>Fecha de Baja:</strong>{" "}
+                {new Date(selectedFamiliar.baja).toLocaleDateString("es-AR")}
+              </Typography>
+            )}
 
             <Divider sx={{ my: 2 }} />
 
@@ -306,7 +354,7 @@ export default function PersonaFormDialog({
                     []
                   ).map((s, i) => (
                     <Typography key={i} variant="body2">
-                      • {typeof s === "string" ? s : s.nombre ?? s}
+                      • {typeof s === "string" ? s : s?.nombre ?? String(s)}
                     </Typography>
                   ))}
                 </Box>
@@ -323,7 +371,6 @@ export default function PersonaFormDialog({
                   value={formData.nombre || ""}
                   onChange={(e) => handleFormChange("nombre", e.target.value)}
                   required
-                  disabled={isViewMode}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -333,22 +380,26 @@ export default function PersonaFormDialog({
                   value={formData.apellido || ""}
                   onChange={(e) => handleFormChange("apellido", e.target.value)}
                   required
-                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth disabled={isViewMode}>
+                <FormControl fullWidth>
                   <InputLabel>Tipo de Documento</InputLabel>
                   <Select
                     value={formData.tipoDocumento || ""}
                     label="Tipo de Documento"
                     onChange={handleTipoDocumentoChange}
+                    required
                   >
-                    <MenuItem value="DNI">DNI</MenuItem>
-                    <MenuItem value="Pasaporte">Pasaporte</MenuItem>
+                    <MenuItem value="">Seleccione</MenuItem>
+                    {Object.entries(tiposDocumento).map(([key, value]) => (
+                      <MenuItem key={key} value={key}>
+                        {value}
+                      </MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>
@@ -361,7 +412,6 @@ export default function PersonaFormDialog({
                     handleFormChange("numeroDocumento", e.target.value)
                   }
                   required
-                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
@@ -373,27 +423,48 @@ export default function PersonaFormDialog({
                   label="Fecha de Nacimiento"
                   type="date"
                   InputLabelProps={{ shrink: true }}
-                  value={formData.fechaNacimiento || ""}
+                  value={
+                    formData.fechaNacimiento
+                      ? new Date(formData.fechaNacimiento)
+                          .toISOString()
+                          .split("T")[0]
+                      : hoyISO()
+                  }
                   onChange={(e) =>
                     handleFormChange("fechaNacimiento", e.target.value)
                   }
                   required
-                  disabled={isViewMode}
+                />
+              </Grid>
+
+              <Grid item xs={12} sm={6}>
+                <TextField
+                  fullWidth
+                  label="Fecha de Alta"
+                  type="date"
+                  InputLabelProps={{ shrink: true }}
+                  value={
+                    formData.alta
+                      ? new Date(formData.alta).toISOString().split("T")[0]
+                      : hoyISO()
+                  }
+                  onChange={(e) => handleFormChange("alta", e.target.value)}
                 />
               </Grid>
             </Grid>
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12}>
-                <FormControl fullWidth disabled={isViewMode}>
+                <FormControl fullWidth required>
                   <InputLabel>Parentesco</InputLabel>
                   <Select
                     value={formData.parentesco ?? ""}
                     label="Parentesco"
                     onChange={handleParentescoChange}
                   >
-                    {(parentescos || [])
-                      .filter((p) => p.id !== 1)
+                    <MenuItem value="">Seleccione</MenuItem>
+                    {parentescos
+                      .filter((p) => p.id !== 1) // Excluir Titular
                       .map((parentesco) => (
                         <MenuItem key={parentesco.id} value={parentesco.id}>
                           {parentesco.nombre}
@@ -409,13 +480,12 @@ export default function PersonaFormDialog({
                 <ContactInfoEditor
                   icon={<PhoneIcon sx={{ mr: 1, color: "#1976d2" }} />}
                   title="Teléfonos"
-                  items={editTelefonos}
+                  items={editTelefonos || []}
                   newValue={newTelefono}
                   placeholder="Agregar teléfono"
                   onNewValueChange={setNewTelefono}
                   onAdd={handleAddTelefono}
                   onRemove={handleRemoveTelefono}
-                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
@@ -425,42 +495,48 @@ export default function PersonaFormDialog({
                 <ContactInfoEditor
                   icon={<EmailIcon sx={{ mr: 1, color: "#1976d2" }} />}
                   title="Emails"
-                  items={editEmails}
+                  items={editEmails || []}
                   newValue={newEmail}
                   placeholder="Agregar email"
                   inputType="email"
                   onNewValueChange={setNewEmail}
                   onAdd={handleAddEmail}
                   onRemove={handleRemoveEmail}
-                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
 
-            <Grid container spacing={2}>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12}>
                 <ContactInfoEditor
                   icon={<HomeIcon sx={{ mr: 1, color: "#1976d2" }} />}
                   title="Direcciones"
-                  items={editDirecciones}
+                  items={editDirecciones || []}
                   newValue={newDireccion}
                   placeholder="Agregar dirección"
                   onNewValueChange={setNewDireccion}
                   onAdd={handleAddDireccion}
                   onRemove={handleRemoveDireccion}
-                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
 
-            <Grid container spacing={2} sx={{ mt: 3 }}>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12}>
                 <SituacionesSelector
                   items={editSituaciones || []}
                   opciones={situacionesCatalogo}
-                  onAdd={handleAddSituacion}
-                  onRemove={handleRemoveSituacion}
-                  disabled={isViewMode}
+                  onAdd={(nombre) =>
+                    onEditSituacionesChange([
+                      ...(editSituaciones || []),
+                      nombre,
+                    ])
+                  }
+                  onRemove={(idx) =>
+                    onEditSituacionesChange(
+                      (editSituaciones || []).filter((_, i) => i !== idx)
+                    )
+                  }
                 />
               </Grid>
             </Grid>
@@ -472,8 +548,13 @@ export default function PersonaFormDialog({
         <Button variant="outlined" onClick={onClose}>
           {isViewMode ? "Cerrar" : "Cancelar"}
         </Button>
+
         {!isViewMode && (
-          <Button variant="contained" color="secondary" onClick={onSave}>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={handleSaveClick}
+          >
             {selectedFamiliar && isEditing
               ? "Guardar Cambios"
               : "Agregar Persona"}

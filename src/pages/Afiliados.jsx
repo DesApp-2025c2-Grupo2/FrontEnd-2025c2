@@ -1,5 +1,5 @@
 // src/pages/Afiliados.jsx
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSelector, useDispatch, shallowEqual } from "react-redux";
 import { Box, Typography, Fab, Snackbar, Alert } from "@mui/material";
 import { Add as AddIcon, Person as PersonIcon } from "@mui/icons-material";
@@ -19,6 +19,9 @@ import {
 
 import { selectSituaciones } from "../store/situacionesTerapeuticasSlice";
 import { cargarPlanes, selectPlanes } from "../store/planesSlice";
+import { personasService } from "../services/personasService";
+
+import { parentescos } from "../utilidades/parentesco";
 
 const startOfDay = (d) => {
   const dt = new Date(d);
@@ -50,7 +53,7 @@ const tieneAltaProgramada = (alta) => {
   return startOfDay(new Date(alta)) > startOfDay(new Date());
 };
 
-// helpers puros (no usan estado)
+// helpers puros
 const getTitularDelAfiliado = (afiliado) => {
   if (!afiliado) return null;
   const titularId = afiliado.titularID ?? afiliado.titularId;
@@ -74,32 +77,44 @@ const getPlanMedicoNombre = (planMedicoId, planesMedicos) => {
 export default function Afiliados() {
   const dispatch = useDispatch();
 
-  // NO crear literales dentro de useSelector: devolvemos valores del estado tal cual
   const afiliadosState = useSelector(
     (state) => state.afiliados.lista,
     shallowEqual
   );
-  const afiliados = afiliadosState ?? [];
+  const afiliados = useMemo(() => afiliadosState ?? [], [afiliadosState]);
 
   const planesMedicos = useSelector(selectPlanes, shallowEqual) ?? [];
   const situacionesCatalogo =
     useSelector(selectSituaciones, shallowEqual) ?? [];
-
-  // Si manejabas parentescos en otro slice, reemplazá la siguiente línea por la fuente real
-  const parentescos = [];
 
   const [filteredAfiliados, setFilteredAfiliados] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedAfiliado, setSelectedAfiliado] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  // integrants local: titular + familiares (se mantiene local mientras editás)
   const [integrantes, setIntegrantes] = useState([]);
 
+  // Familiares
   const [openFamiliarDialog, setOpenFamiliarDialog] = useState(false);
-  const [selectedFamiliarIndex, setSelectedFamiliarIndex] = useState(null);
   const [isEditingFamiliar, setIsEditingFamiliar] = useState(false);
+  const [selectedFamiliar, setSelectedFamiliar] = useState(null); // solo vista
+  const [formFamiliar, setFormFamiliar] = useState({
+    id: undefined,
+    numeroIntegrante: 0,
+    nombre: "",
+    apellido: "",
+    tipoDocumento: "DNI",
+    numeroDocumento: "",
+    fechaNacimiento: "",
+    parentesco: 2,
+    alta: hoyISO(),
+    telefonos: [],
+    emails: [],
+    direcciones: [],
+    situacionesTerapeuticasIds: [],
+  });
 
+  // Alta / Baja
   const [openBajaDialog, setOpenBajaDialog] = useState(false);
   const [openAltaDialog, setOpenAltaDialog] = useState(false);
   const [afiliadoParaBaja, setAfiliadoParaBaja] = useState(null);
@@ -121,29 +136,12 @@ export default function Afiliados() {
     alta: hoyISO(),
   });
 
-  const [formFamiliar, setFormFamiliar] = useState({
-    id: undefined,
-    numeroIntegrante: 0,
-    nombre: "",
-    apellido: "",
-    tipoDocumento: "DNI",
-    numeroDocumento: "",
-    fechaNacimiento: "",
-    parentesco: 2,
-    alta: hoyISO(),
-    telefonos: [],
-    emails: [],
-    direcciones: [],
-    situacionesTerapeuticasIds: [],
-  });
-
-  // fetch inicial (dependencias estables)
+  // fetch inicial
   useEffect(() => {
     dispatch(fetchAfiliados());
     dispatch(cargarPlanes());
   }, [dispatch]);
 
-  // sincronizar filtered cuando cambien afiliados
   useEffect(() => {
     setFilteredAfiliados(afiliados);
   }, [afiliados]);
@@ -151,13 +149,11 @@ export default function Afiliados() {
   const showSnackbar = (message, severity = "success") =>
     setSnackbar({ open: true, message, severity });
 
-  // callback memoizado que recibe la lista filtrada desde AdvancedSearchBar
   const handleFilteredChange = useCallback((lista) => {
-    // evitamos set si es exactamente la misma referencia
     setFilteredAfiliados((prev) => (prev === lista ? prev : lista));
   }, []);
 
-  // Abrir diálogo nuevo afiliado (titular)
+  // ---------- Afiliados: agregar/editar/ver ----------
   const handleAddAfiliado = useCallback(() => {
     setSelectedAfiliado(null);
     setIsEditing(false);
@@ -170,11 +166,10 @@ export default function Afiliados() {
       planMedicoId: "1",
       alta: hoyISO(),
     });
-    setIntegrantes([]); // integrants vacíos; el titular se construye desde formAfiliado al guardar
+    setIntegrantes([]);
     setOpenDialog(true);
   }, []);
 
-  // Editar afiliado: precargar titular y familiares en estado local
   const handleEditAfiliado = useCallback((afiliado) => {
     if (!afiliado) return showSnackbar("Afiliado inválido", "error");
     setSelectedAfiliado(afiliado);
@@ -194,9 +189,20 @@ export default function Afiliados() {
       fechaNacimiento: titular?.fechaNacimiento ?? "",
       planMedicoId: afiliado.planMedicoId ?? "1",
       alta: afiliado.alta ?? hoyISO(),
+      telefonos: titular?.telefonos?.map((t) => t.numero) ?? [],
+      emails: titular?.emails?.map((e) => e.correo) ?? [],
+      direcciones:
+        titular?.direcciones?.map((d) =>
+          `${d.calle ?? ""} ${d.altura ?? ""}${
+            d.piso ? `, Piso ${d.piso}` : ""
+          }${d.departamento ? `, Dpto ${d.departamento}` : ""}${
+            d.provinciaCiudad ? `, ${d.provinciaCiudad}` : ""
+          }`.trim()
+        ) ?? [],
+      situacionesTerapeuticasIds:
+        titular?.situacionesTerapeuticas?.map((s) => s.id ?? s) ?? [],
     });
 
-    // Aseguramos que el arreglo de integrantes tenga al titular en la posición 0
     const miembros = Array.isArray(afiliado.integrantes)
       ? [...afiliado.integrantes]
       : [];
@@ -225,6 +231,18 @@ export default function Afiliados() {
       fechaNacimiento: titular?.fechaNacimiento ?? "",
       planMedicoId: afiliado.planMedicoId ?? "1",
       alta: afiliado.alta ?? hoyISO(),
+      telefonos: titular?.telefonos?.map((t) => t.numero) ?? [],
+      emails: titular?.emails?.map((e) => e.correo) ?? [],
+      direcciones:
+        titular?.direcciones?.map((d) =>
+          `${d.calle ?? ""} ${d.altura ?? ""}${
+            d.piso ? `, Piso ${d.piso}` : ""
+          }${d.departamento ? `, Dpto ${d.departamento}` : ""}${
+            d.provinciaCiudad ? `, ${d.provinciaCiudad}` : ""
+          }`.trim()
+        ) ?? [],
+      situacionesTerapeuticasIds:
+        titular?.situacionesTerapeuticas?.map((s) => s.id ?? s) ?? [],
     });
 
     setIntegrantes(
@@ -233,17 +251,43 @@ export default function Afiliados() {
     setOpenDialog(true);
   }, []);
 
-  // ---------- Familiares (manejo local) ----------
-  const handleAddFamiliar = useCallback(
-    (afiliado) => {
+  // ---------- Familiares ----------
+  const handleViewFamiliar = useCallback(async (afiliado, fam) => {
+    try {
+      const familiarCompleto = await personasService.getPersona(fam.id); {console.log("fam",fam,fam.id)} {console.log("afiliado",afiliado, afiliado.id)}
       setSelectedAfiliado(afiliado);
-      setSelectedFamiliarIndex(null);
+      setSelectedFamiliar(familiarCompleto); // solo vista
       setIsEditingFamiliar(false);
+      setOpenFamiliarDialog(true);
+    } catch (error) {
+      showSnackbar("Error al cargar los datos del familiar", "error");
+    }
+  }, []);
 
-      const maxIntegrante = integrantes.length
-        ? Math.max(...integrantes.map((i) => Number(i.numeroIntegrante) || 1))
+  const handleEditFamiliar = useCallback(async (afiliado, fam) => {
+    try {
+      const familiarCompleto = await personasService.getPersona(fam.id);
+      setSelectedAfiliado(afiliado);
+      setFormFamiliar(familiarCompleto); // edición
+      setSelectedFamiliar(familiarCompleto);
+      setIsEditingFamiliar(true);
+      setOpenFamiliarDialog(true);
+    } catch (error) {
+      showSnackbar("Error al cargar el familiar para edición", "error");
+    }
+  }, []);
+
+  const handleAddFamiliar = useCallback(async (afiliado) => {
+    try {
+      const maxIntegrante = afiliado.integrantes?.length
+        ? Math.max(
+            ...afiliado.integrantes.map((i) => Number(i.numeroIntegrante) || 1)
+          )
         : 1;
 
+      setSelectedAfiliado(afiliado);
+      setIsEditingFamiliar(false);
+      setSelectedFamiliar(null);
       setFormFamiliar({
         id: undefined,
         numeroIntegrante: maxIntegrante + 1,
@@ -260,121 +304,98 @@ export default function Afiliados() {
         situacionesTerapeuticasIds: [],
       });
       setOpenFamiliarDialog(true);
-    },
-    [integrantes]
-  );
+    } catch (error) {
+      showSnackbar("Error al preparar formulario de familiar", "error");
+    }
+  }, []);
 
-  const handleEditFamiliar = useCallback(
-    (index) => {
-      const fam = integrantes[index];
-      if (!fam) return showSnackbar("Familiar no encontrado", "error");
-      setSelectedFamiliarIndex(index);
-      setIsEditingFamiliar(true);
-
-      setFormFamiliar({
-        id: fam.id,
-        numeroIntegrante: fam.numeroIntegrante,
-        nombre: fam.nombre,
-        apellido: fam.apellido,
-        tipoDocumento:
-          fam.documentacion?.tipoDocumento ?? fam.tipoDocumento ?? "DNI",
-        numeroDocumento: fam.documentacion?.numero ?? fam.numeroDocumento ?? "",
-        fechaNacimiento: fam.fechaNacimiento,
-        parentesco: fam.parentesco,
-        alta: fam.alta ?? hoyISO(),
-        telefonos: fam.telefonos ?? [],
-        emails: fam.emails ?? [],
-        direcciones: fam.direcciones ?? [],
-        situacionesTerapeuticasIds: (
-          fam.situacionesTerapeuticas ||
-          fam.situacionesTerapeuticasIds ||
-          []
-        ).map((s) => s.id ?? s),
-      });
-
-      setOpenFamiliarDialog(true);
-    },
-    [integrantes]
-  );
-
-  const handleDeleteFamiliar = useCallback(
-    (index) => {
-      if (!integrantes[index]) return;
-      if (
-        window.confirm(
-          `¿Eliminar a ${integrantes[index].nombre} ${integrantes[index].apellido}?`
-        )
-      ) {
-        const copy = [...integrantes];
-        copy.splice(index, 1);
-        setIntegrantes(copy);
-        showSnackbar("Familiar eliminado (local)");
-      }
-    },
-    [integrantes]
-  );
-
-  const handleSaveFamiliar = useCallback(() => {
+  const handleSaveFamiliar = useCallback(async () => {
     if (!formFamiliar.nombre || !formFamiliar.apellido) {
       showSnackbar("Complete los campos del familiar", "error");
       return;
     }
 
-    const famPayload = {
-      id: formFamiliar.id ?? `new-${Date.now()}`, // id temporal si no existe
-      numeroIntegrante: formFamiliar.numeroIntegrante,
-      nombre: formFamiliar.nombre,
-      apellido: formFamiliar.apellido,
-      fechaNacimiento: formFamiliar.fechaNacimiento,
-      parentesco: formFamiliar.parentesco,
-      afiliadoId: selectedAfiliado ? selectedAfiliado.id : undefined,
-      alta: formFamiliar.alta,
-      baja: formFamiliar.baja ?? null,
-      documentacion:
-        formFamiliar.tipoDocumento || formFamiliar.documentacion
-          ? {
-              tipoDocumento:
-                formFamiliar.tipoDocumento ??
-                formFamiliar.documentacion?.tipoDocumento,
-              numero:
-                formFamiliar.numeroDocumento ??
-                formFamiliar.documentacion?.numero,
-            }
-          : null,
-      telefonos: formFamiliar.telefonos ?? [],
-      emails: formFamiliar.emails ?? [],
-      direcciones: formFamiliar.direcciones ?? [],
-      situacionesTerapeuticasIds: formFamiliar.situacionesTerapeuticasIds ?? [],
-    };
-
-    if (isEditingFamiliar && selectedFamiliarIndex !== null) {
-      const copy = [...integrantes];
-      copy[selectedFamiliarIndex] = {
-        ...copy[selectedFamiliarIndex],
-        ...famPayload,
+    try {
+      const familiarPayload = {
+        numeroIntegrante: formFamiliar.numeroIntegrante,
+        nombre: formFamiliar.nombre,
+        apellido: formFamiliar.apellido,
+        fechaNacimiento: formFamiliar.fechaNacimiento,
+        parentesco: formFamiliar.parentesco,
+        afiliadoId: selectedAfiliado ? selectedAfiliado.id : undefined,
+        alta: formFamiliar.alta,
+        baja: formFamiliar.baja ?? null,
+        documentacion:
+          formFamiliar.tipoDocumento || formFamiliar.documentacion
+            ? {
+                tipoDocumento:
+                  formFamiliar.tipoDocumento ??
+                  formFamiliar.documentacion?.tipoDocumento,
+                numero:
+                  formFamiliar.numeroDocumento ??
+                  formFamiliar.documentacion?.numero,
+              }
+            : null,
+        telefonos: (formFamiliar.telefonos || []).map((t) => ({
+          numero: t.numero ?? t.Numero ?? t ?? "",
+        })),
+        emails: (formFamiliar.emails || []).map((e) => ({
+          correo: e.correo ?? e.Correo ?? e ?? "",
+        })),
+        direcciones: (formFamiliar.direcciones || []).map((d) => ({
+          calle: d.calle ?? d.Calle ?? "",
+          altura: d.altura ?? d.Altura ?? "",
+          piso: d.piso ?? d.Piso ?? "",
+          departamento: d.departamento ?? d.Departamento ?? "",
+          provinciaCiudad: d.provinciaCiudad ?? d.ProvinciaCiudad ?? "",
+        })),
+        situacionesTerapeuticasIds:
+          formFamiliar.situacionesTerapeuticasIds ?? [],
       };
-      setIntegrantes(copy);
-      showSnackbar("Familiar actualizado (local)");
-    } else {
-      setIntegrantes((prev) => [...prev, famPayload]);
-      showSnackbar("Familiar agregado (local)");
+
+      if (isEditingFamiliar && formFamiliar.id) {
+        await personasService.updatePersona(formFamiliar.id, familiarPayload);
+        showSnackbar("Familiar actualizado correctamente");
+      } else {
+        await personasService.createPersona(familiarPayload);
+        showSnackbar("Familiar agregado correctamente");
+      }
+
+      await dispatch(fetchAfiliados()).unwrap();
+
+      setOpenFamiliarDialog(false);
+      setSelectedFamiliar(null);
+      setIsEditingFamiliar(false);
+    } catch (error) {
+      console.error("Error al guardar familiar:", error);
+      showSnackbar("Error al guardar el familiar", "error");
     }
+  }, [formFamiliar, isEditingFamiliar, selectedAfiliado, dispatch]);
 
-    setOpenFamiliarDialog(false);
-    setSelectedFamiliarIndex(null);
-    setIsEditingFamiliar(false);
-  }, [
-    formFamiliar,
-    integrantes,
-    isEditingFamiliar,
-    selectedFamiliarIndex,
-    selectedAfiliado,
-  ]);
+  const handleDeleteFamiliar = useCallback(
+    async (afiliado, fam) => {
+      if (!fam.id) {
+        showSnackbar("No se puede eliminar un familiar sin ID", "error");
+        return;
+      }
 
-  // ---------- Construcción del payload para enviar al backend ----------
+      if (window.confirm(`¿Eliminar a ${fam.nombre} ${fam.apellido}?`)) {
+        try {
+          await personasService.deletePersona(fam.id);
+          showSnackbar("Familiar eliminado correctamente");
+          await dispatch(fetchAfiliados()).unwrap();
+        } catch (error) {
+          console.error("Error al eliminar familiar:", error);
+          showSnackbar("Error al eliminar el familiar", "error");
+        }
+      }
+    },
+    [dispatch]
+  );
+
+  // ---------- Construcción payload afiliado ----------
   const buildAfiliadoPayload = useCallback(
     (afiliadoToEdit = null) => {
-      // titular desde formAfiliado
       const titularFromForm = {
         id: afiliadoToEdit
           ? getTitularDelAfiliado(afiliadoToEdit)?.id ?? undefined
@@ -383,7 +404,7 @@ export default function Afiliados() {
         nombre: formAfiliado.nombre,
         apellido: formAfiliado.apellido,
         fechaNacimiento: formAfiliado.fechaNacimiento,
-        parentesco: 0,
+        parentesco: 0, // ajusta según catálogo
         afiliadoId: afiliadoToEdit ? afiliadoToEdit.id : undefined,
         alta: formAfiliado.alta,
         baja: null,
@@ -418,7 +439,6 @@ export default function Afiliados() {
         ).map((s) => s.id ?? s),
       };
 
-      // resto integrants (excluir posible titular duplicado)
       const resto = integrantes.filter(
         (i) =>
           !(
@@ -481,7 +501,7 @@ export default function Afiliados() {
     [formAfiliado, integrantes]
   );
 
-  // ---------- Guardar afiliado (crear o actualizar) ----------
+  // ---------- Guardar afiliado ----------
   const handleSaveAfiliado = useCallback(async () => {
     if (
       !formAfiliado.nombre ||
@@ -512,7 +532,7 @@ export default function Afiliados() {
         await dispatch(createAfiliado(payload)).unwrap();
         showSnackbar("Afiliado creado");
       }
-      dispatch(fetchAfiliados());
+      await dispatch(fetchAfiliados()).unwrap();
     } catch (err) {
       console.error(err);
       showSnackbar("Error al guardar en backend", "error");
@@ -530,7 +550,7 @@ export default function Afiliados() {
     dispatch,
   ]);
 
-  // ---------- Alta / Baja handlers (actualizan afiliado con thunk) ----------
+  // ---------- Alta / Baja ----------
   const handleProgramarAltaAfiliado = useCallback(
     async (afiliado, fechaAlta) => {
       try {
@@ -538,7 +558,7 @@ export default function Afiliados() {
           updateAfiliado({ id: afiliado.id, payload: { alta: fechaAlta } })
         ).unwrap();
         showSnackbar("Alta programada correctamente");
-        dispatch(fetchAfiliados());
+        await dispatch(fetchAfiliados()).unwrap();
       } catch (err) {
         showSnackbar("Error al programar alta", "error");
       }
@@ -554,7 +574,7 @@ export default function Afiliados() {
           updateAfiliado({ id: afiliado.id, payload: { alta: hoy } })
         ).unwrap();
         showSnackbar("Alta programada cancelada");
-        dispatch(fetchAfiliados());
+        await dispatch(fetchAfiliados()).unwrap();
       } catch (err) {
         showSnackbar("Error al cancelar alta", "error");
       }
@@ -573,7 +593,7 @@ export default function Afiliados() {
           })
         ).unwrap();
         showSnackbar("Afiliado reactivado inmediatamente");
-        dispatch(fetchAfiliados());
+        await dispatch(fetchAfiliados()).unwrap();
       } catch (err) {
         showSnackbar("Error al reactivar", "error");
       }
@@ -588,7 +608,7 @@ export default function Afiliados() {
           updateAfiliado({ id: afiliado.id, payload: { baja: fechaBaja } })
         ).unwrap();
         showSnackbar("Baja programada");
-        dispatch(fetchAfiliados());
+        await dispatch(fetchAfiliados()).unwrap();
       } catch (err) {
         showSnackbar("Error al programar baja", "error");
       }
@@ -603,7 +623,7 @@ export default function Afiliados() {
           updateAfiliado({ id: afiliado.id, payload: { baja: null } })
         ).unwrap();
         showSnackbar("Baja cancelada");
-        dispatch(fetchAfiliados());
+        await dispatch(fetchAfiliados()).unwrap();
       } catch (err) {
         showSnackbar("Error al cancelar baja", "error");
       }
@@ -640,7 +660,7 @@ export default function Afiliados() {
 
       <AdvancedSearchBar
         afiliados={afiliados}
-        personas={[]} // ya no usamos personas slice
+        personas={[]}
         planesMedicos={planesMedicos}
         onFilteredAfiliadosChange={handleFilteredChange}
         estaActivo={estaActivo}
@@ -677,26 +697,9 @@ export default function Afiliados() {
                 setOpenAltaDialog(true);
               }}
               onAddFamiliar={() => handleAddFamiliar(afiliado)}
-              onViewFamiliar={(fam) => {
-                const idx = (integrantes || []).findIndex(
-                  (i) => String(i.id) === String(fam.id)
-                );
-                if (idx >= 0) handleEditFamiliar(idx);
-                else showSnackbar("Familiar no encontrado localmente");
-              }}
-              onEditFamiliar={(fam) => {
-                const idx = (integrantes || []).findIndex(
-                  (i) => String(i.id) === String(fam.id)
-                );
-                if (idx >= 0) handleEditFamiliar(idx);
-                else showSnackbar("Familiar no encontrado localmente");
-              }}
-              onDeleteFamiliar={(fam) => {
-                const idx = (integrantes || []).findIndex(
-                  (i) => String(i.id) === String(fam.id)
-                );
-                if (idx >= 0) handleDeleteFamiliar(idx);
-              }}
+              onViewFamiliar={(fam) => handleViewFamiliar(afiliado, fam)}
+              onEditFamiliar={(fam) => handleEditFamiliar(afiliado, fam)}
+              onDeleteFamiliar={(fam) => handleDeleteFamiliar(afiliado, fam)}
               getParentescoColor={getParentescoColor}
               getPlanColor={getPlanColor}
               parentescos={parentescos}
@@ -728,11 +731,29 @@ export default function Afiliados() {
         isEditing={isEditing}
         formData={formAfiliado}
         planesMedicos={planesMedicos}
-        integrantes={integrantes}
-        setIntegrantes={setIntegrantes}
-        situacionesCatalogo={situacionesCatalogo}
+        personas={integrantes}
+        editTelefonos={formAfiliado.telefonos}
+        editEmails={formAfiliado.emails}
+        editDirecciones={formAfiliado.direcciones}
+        editSituaciones={formAfiliado.situacionesTerapeuticasIds}
+        onEditTelefonosChange={(t) =>
+          setFormAfiliado((prev) => ({ ...prev, telefonos: t }))
+        }
+        onEditEmailsChange={(e) =>
+          setFormAfiliado((prev) => ({ ...prev, emails: e }))
+        }
+        onEditDireccionesChange={(d) =>
+          setFormAfiliado((prev) => ({ ...prev, direcciones: d }))
+        }
+        onEditSituacionesChange={(s) =>
+          setFormAfiliado((prev) => ({
+            ...prev,
+            situacionesTerapeuticasIds: s,
+          }))
+        }
         onClose={() => setOpenDialog(false)}
         onSave={handleSaveAfiliado}
+        onEdit={() => setIsEditing(true)}
         onFormChange={(field, value) =>
           setFormAfiliado((prev) => ({ ...prev, [field]: value }))
         }
@@ -741,15 +762,14 @@ export default function Afiliados() {
       <PersonaFormDialog
         open={openFamiliarDialog}
         selectedAfiliado={selectedAfiliado}
-        selectedFamiliar={formFamiliar}
+        selectedFamiliar={isEditingFamiliar ? null : selectedFamiliar}
         isEditing={isEditingFamiliar}
         formData={formFamiliar}
         parentescos={parentescos}
-        situacionesCatalogo={situacionesCatalogo}
-        editTelefonos={formFamiliar.telefonos}
-        editEmails={formFamiliar.emails}
-        editDirecciones={formFamiliar.direcciones}
-        editSituaciones={formFamiliar.situacionesTerapeuticasIds}
+        editTelefonos={formFamiliar.telefonos || []}
+        editEmails={formFamiliar.emails || []}
+        editDirecciones={formFamiliar.direcciones || []}
+        editSituaciones={formFamiliar.situacionesTerapeuticasIds || []}
         onEditTelefonosChange={(t) =>
           setFormFamiliar((prev) => ({ ...prev, telefonos: t }))
         }
@@ -765,7 +785,12 @@ export default function Afiliados() {
             situacionesTerapeuticasIds: s,
           }))
         }
-        onClose={() => setOpenFamiliarDialog(false)}
+        onClose={() => {
+          setOpenFamiliarDialog(false);
+          setSelectedFamiliar(null);
+          setFormFamiliar({});
+          setIsEditingFamiliar(false);
+        }}
         onSave={handleSaveFamiliar}
         onFormChange={(field, value) =>
           setFormFamiliar((prev) => ({ ...prev, [field]: value }))

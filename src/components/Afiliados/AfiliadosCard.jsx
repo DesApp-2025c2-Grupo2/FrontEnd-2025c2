@@ -259,8 +259,8 @@ export default function AfiliadosCard({
                   key={familiar.id}
                   persona={familiar}
                   afiliado={afiliado}
-                  onEdit={() => onEditFamiliar(familiar, afiliado)}
-                  onView={() => onViewFamiliar(familiar, afiliado)}
+                  onEdit={() => onEditFamiliar(afiliado, familiar)}
+                  onView={() => onViewFamiliar(afiliado, familiar)}
                   onDelete={() => onDeleteFamiliar(familiar)}
                   getParentescoColor={getParentescoColor}
                   getParentescoNombre={getParentescoNombre}
