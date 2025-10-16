@@ -66,7 +66,7 @@ function PlanesMedicos() {
   return (
     <Container maxWidth="lg">
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" sx={{ color: '#2563eb', fontWeight: 700, mb: 1 }}>
+        <Typography variant="h4" component="h1" >
           Planes Médicos
         </Typography>
         <Typography variant="subtitle1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
