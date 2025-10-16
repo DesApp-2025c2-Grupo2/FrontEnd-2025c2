@@ -61,15 +61,11 @@ export default function DialogoPlan({
 
   return (
     <Dialog open={abierto} onClose={onCerrar} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ fontWeight: 800, color: "#111827" }}>
+      <DialogTitle>
         {form.id ? "Editar plan" : "Agregar plan"}
       </DialogTitle>
       <DialogContent
         dividers
-        sx={{
-          "& .MuiFormControlLabel-label": { fontWeight: 700, color: "#111827" },
-          "& .MuiInputBase-input": { color: "#111827", fontWeight: 600 },
-        }}
       >
         <div
           style={{
@@ -86,8 +82,6 @@ export default function DialogoPlan({
             fullWidth
             error={!!errores.nombre}
             helperText={errores.nombre}
-            InputLabelProps={{ sx: { fontWeight: 700, color: "#111827" } }}
-            inputProps={{ sx: { color: "#111827", fontWeight: 600 } }}
           />
           <TextField
             label="Descripción"
@@ -96,8 +90,6 @@ export default function DialogoPlan({
             fullWidth
             multiline
             rows={2}
-            InputLabelProps={{ sx: { fontWeight: 700, color: "#111827" } }}
-            inputProps={{ sx: { color: "#111827", fontWeight: 600 } }}
           />
           <TextField
             label="Costo mensual"
@@ -105,20 +97,16 @@ export default function DialogoPlan({
             onChange={cambiar("costoMensual")}
             type="number"
             fullWidth
-            InputLabelProps={{ sx: { fontWeight: 700, color: "#111827" } }}
-            inputProps={{ sx: { color: "#111827", fontWeight: 600 } }}
           />
           <TextField
             label="Moneda"
             value={form.moneda}
             onChange={cambiar("moneda")}
             fullWidth
-            InputLabelProps={{ sx: { fontWeight: 700, color: "#111827" } }}
-            inputProps={{ sx: { color: "#111827", fontWeight: 600 } }}
           />
           <FormControlLabel
             control={
-              <Switch checked={!!form.activo} onChange={cambiar("activo")} />
+              <Switch checked={!!form.activo} color="secondary" onChange={cambiar("activo")} />
             }
             label="Activo"
           />
@@ -129,7 +117,6 @@ export default function DialogoPlan({
           color="secondary"
           variant="outlined"
           onClick={onCerrar}
-          sx={{ fontWeight: 700 }}
         >
           Cancelar
         </Button>
@@ -138,7 +125,6 @@ export default function DialogoPlan({
           color="secondary"
           onClick={guardar}
           disabled={Object.keys(errores).length > 0}
-          sx={{ fontWeight: 700 }}
         >
           Guardar
         </Button>
