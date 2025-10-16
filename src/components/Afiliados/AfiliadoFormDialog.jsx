@@ -23,8 +23,6 @@ import {
 } from "@mui/icons-material";
 import ContactInfoEditor from "./ContactInfoEditor";
 import SituacionesSelector from "./SituacionesSelector";
-import { useSelector } from "react-redux";
-import { selectSituaciones } from "../../store/situacionesTerapeuticasSlice";
 import { tiposDocumento } from "../../utilidades/tipoDocumento";
 
 const hoyISO = () => new Date().toISOString().split("T")[0];
@@ -38,6 +36,7 @@ export default function AfiliadoFormDialog({
   formData = {},
   planesMedicos = [],
   editTelefonos = [],
+  situacionesCatalogo = [],
   editEmails = [],
   editDirecciones = [],
   editSituaciones = [],
@@ -54,8 +53,6 @@ export default function AfiliadoFormDialog({
   const [newTelefono, setNewTelefono] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newDireccion, setNewDireccion] = useState("");
-
-  const situacionesCatalogo = useSelector(selectSituaciones) || [];
 
   const getPlanMedicoNombre = (planMedicoId, planesMedicos) => {
     const plan = (planesMedicos || []).find(

@@ -50,6 +50,12 @@ export default function PersonaFormDialog({
   onSave = () => {},
   onFormChange = () => {},
 }) {
+  console.log("PROPS RECIBIDAS:", {
+    selectedFamiliar,
+    isEditing,
+    formData,
+    open,
+  });
   const situacionesCatalogo = useSelector(selectSituaciones) || [];
 
   const [newTelefono, setNewTelefono] = useState("");
@@ -58,17 +64,19 @@ export default function PersonaFormDialog({
 
   const isViewMode = !!selectedFamiliar && !isEditing;
 
-  useEffect(() => {
-    if (open) {
-      setNewTelefono("");
-      setNewEmail("");
-      setNewDireccion("");
-    }
-  }, [open]);
-
   // Helpers para normalizar valores
-  const telefonoToString = (t) => (t && (t.numero ?? t.Numero ?? t)) ?? "";
-  const emailToString = (e) => (e && (e.correo ?? e.Correo ?? e)) ?? "";
+  const telefonoToString = (t) => {
+    if (!t) return "";
+    if (typeof t === "object") return t.numero ?? t.Numero ?? "";
+    return String(t);
+  };
+
+  const emailToString = (e) => {
+    if (!e) return "";
+    if (typeof e === "object") return e.correo ?? e.Correo ?? "";
+    return String(e);
+  };
+
   const direccionToString = (d) => {
     if (!d) return "";
     if (typeof d === "object") {
@@ -83,6 +91,67 @@ export default function PersonaFormDialog({
     }
     return String(d);
   };
+
+  // Función para obtener el valor inicial del formulario
+  const getInitialFormData = () => {
+    if (selectedFamiliar && isEditing) {
+      return {
+        nombre: selectedFamiliar.nombre || "",
+        apellido: selectedFamiliar.apellido || "",
+        tipoDocumento:
+          selectedFamiliar.documentacion?.tipoDocumento ??
+          selectedFamiliar.tipoDocumento ??
+          "",
+        numeroDocumento:
+          selectedFamiliar.documentacion?.numero ??
+          selectedFamiliar.numeroDocumento ??
+          "",
+        fechaNacimiento: selectedFamiliar.fechaNacimiento || hoyISO(),
+        alta: selectedFamiliar.alta || hoyISO(),
+        parentesco: selectedFamiliar.parentesco || "",
+      };
+    }
+    return formData;
+  };
+
+  useEffect(() => {
+    if (open) {
+      setNewTelefono("");
+      setNewEmail("");
+      setNewDireccion("");
+
+      // Inicializar datos del formulario cuando se abre en modo edición
+      if (selectedFamiliar && isEditing) {
+        const initialData = getInitialFormData();
+        Object.entries(initialData).forEach(([key, value]) => {
+          if (value !== undefined) {
+            onFormChange(key, value);
+          }
+        });
+
+        // Inicializar contactos usando los helpers
+        if (selectedFamiliar.telefonos) {
+          const telefonosNormalizados =
+            selectedFamiliar.telefonos.map(telefonoToString);
+          onEditTelefonosChange(telefonosNormalizados);
+        }
+
+        if (selectedFamiliar.emails) {
+          const emailsNormalizados = selectedFamiliar.emails.map(emailToString);
+          onEditEmailsChange(emailsNormalizados);
+        }
+
+        if (selectedFamiliar.direcciones) {
+          // Para direcciones mantenemos los objetos completos
+          onEditDireccionesChange(selectedFamiliar.direcciones);
+        }
+
+        if (selectedFamiliar.situacionesTerapeuticas) {
+          onEditSituacionesChange(selectedFamiliar.situacionesTerapeuticas);
+        }
+      }
+    }
+  }, [open, selectedFamiliar, isEditing]);
 
   const handleAddTelefono = () => {
     if (!newTelefono.trim()) return;
@@ -102,7 +171,6 @@ export default function PersonaFormDialog({
   const handleRemoveEmail = (index) =>
     onEditEmailsChange((editEmails || []).filter((_, i) => i !== index));
 
-  // Direcciones: convertimos la string nueva en objeto simple { calle: value }
   const handleAddDireccion = () => {
     if (!newDireccion.trim()) return;
     // Si el caller ya maneja objetos, permitimos pasar strings o objetos.
@@ -191,11 +259,9 @@ export default function PersonaFormDialog({
 
             <Typography variant="body2" gutterBottom>
               <strong>Documento:</strong>{" "}
-              {tiposDocumento[selectedFamiliar.documentacion?.tipoDocumento] ||
-                selectedFamiliar.tipoDocumento ||
+              {tiposDocumento[selectedFamiliar.documentacion.tipoDocumento] ||
                 "Tipo desconocido"}{" "}
-              {selectedFamiliar.documentacion?.numero ||
-                selectedFamiliar.numeroDocumento}
+              {selectedFamiliar.documentacion.numero}
             </Typography>
 
             <Typography variant="body2" gutterBottom>
@@ -392,7 +458,6 @@ export default function PersonaFormDialog({
                     value={formData.tipoDocumento || ""}
                     label="Tipo de Documento"
                     onChange={handleTipoDocumentoChange}
-                    required
                   >
                     <MenuItem value="">Seleccione</MenuItem>
                     {Object.entries(tiposDocumento).map(([key, value]) => (
@@ -403,6 +468,7 @@ export default function PersonaFormDialog({
                   </Select>
                 </FormControl>
               </Grid>
+
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
@@ -480,7 +546,7 @@ export default function PersonaFormDialog({
                 <ContactInfoEditor
                   icon={<PhoneIcon sx={{ mr: 1, color: "#1976d2" }} />}
                   title="Teléfonos"
-                  items={editTelefonos || []}
+                  items={(editTelefonos || []).map(telefonoToString)}
                   newValue={newTelefono}
                   placeholder="Agregar teléfono"
                   onNewValueChange={setNewTelefono}
@@ -495,7 +561,7 @@ export default function PersonaFormDialog({
                 <ContactInfoEditor
                   icon={<EmailIcon sx={{ mr: 1, color: "#1976d2" }} />}
                   title="Emails"
-                  items={editEmails || []}
+                  items={(editEmails || []).map(emailToString)}
                   newValue={newEmail}
                   placeholder="Agregar email"
                   inputType="email"
@@ -511,7 +577,7 @@ export default function PersonaFormDialog({
                 <ContactInfoEditor
                   icon={<HomeIcon sx={{ mr: 1, color: "#1976d2" }} />}
                   title="Direcciones"
-                  items={editDirecciones || []}
+                  items={(editDirecciones || []).map(direccionToString)}
                   newValue={newDireccion}
                   placeholder="Agregar dirección"
                   onNewValueChange={setNewDireccion}
