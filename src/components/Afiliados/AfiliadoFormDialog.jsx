@@ -1,3 +1,4 @@
+// AfiliadoFormDialog.jsx
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -26,28 +27,27 @@ import { useSelector } from "react-redux";
 import { selectSituaciones } from "../../store/situacionesTerapeuticasSlice";
 
 const hoyISO = () => new Date().toISOString().split("T")[0];
-
 const padNumeroAfiliado = (n) => String(Number(n) || 0).padStart(7, "0");
 const padIntegrante = (n) => String(Number(n) || 0).padStart(2, "0");
 
 export default function AfiliadoFormDialog({
   open,
-  selectedAfiliado,
-  isEditing,
-  formData,
-  planesMedicos,
-  editTelefonos,
-  editEmails,
-  editDirecciones,
-  editSituaciones,
-  onEditTelefonosChange,
-  onEditEmailsChange,
-  onEditDireccionesChange,
-  onEditSituacionesChange,
-  onClose,
-  onSave,
-  onEdit,
-  onFormChange,
+  selectedAfiliado = null,
+  isEditing = false,
+  formData = {},
+  planesMedicos = [],
+  editTelefonos = [],
+  editEmails = [],
+  editDirecciones = [],
+  editSituaciones = [],
+  onEditTelefonosChange = () => {},
+  onEditEmailsChange = () => {},
+  onEditDireccionesChange = () => {},
+  onEditSituacionesChange = () => {},
+  onClose = () => {},
+  onSave = () => {},
+  onEdit = () => {},
+  onFormChange = () => {},
   personas = [],
 }) {
   const [newTelefono, setNewTelefono] = useState("");
@@ -64,45 +64,45 @@ export default function AfiliadoFormDialog({
     }
   }, [open]);
 
-  const getTitularDelAfiliado = (afiliado) => {
-    if (!afiliado || !afiliado.titularId) return null;
-    return personas.find((p) => p.id === afiliado.titularId);
+  const getTitularDelAfiliado = (af) => {
+    if (!af) return null;
+    const id = af.titularId ?? af.titularID;
+    return personas.find((p) => String(p.id) === String(id)) ?? null;
   };
 
+  const titular = selectedAfiliado
+    ? getTitularDelAfiliado(selectedAfiliado)
+    : null;
+
   const handleAddTelefono = () => {
-    if (newTelefono.trim()) {
-      onEditTelefonosChange([...editTelefonos, newTelefono.trim()]);
-      setNewTelefono("");
-    }
+    if (!newTelefono.trim()) return;
+    onEditTelefonosChange([...(editTelefonos || []), newTelefono.trim()]);
+    setNewTelefono("");
   };
   const handleRemoveTelefono = (index) =>
-    onEditTelefonosChange(editTelefonos.filter((_, i) => i !== index));
+    onEditTelefonosChange((editTelefonos || []).filter((_, i) => i !== index));
   const handleAddEmail = () => {
-    if (newEmail.trim()) {
-      onEditEmailsChange([...editEmails, newEmail.trim()]);
-      setNewEmail("");
-    }
+    if (!newEmail.trim()) return;
+    onEditEmailsChange([...(editEmails || []), newEmail.trim()]);
+    setNewEmail("");
   };
   const handleRemoveEmail = (index) =>
-    onEditEmailsChange(editEmails.filter((_, i) => i !== index));
+    onEditEmailsChange((editEmails || []).filter((_, i) => i !== index));
   const handleAddDireccion = () => {
-    if (newDireccion.trim()) {
-      onEditDireccionesChange([...editDirecciones, newDireccion.trim()]);
-      setNewDireccion("");
-    }
+    if (!newDireccion.trim()) return;
+    onEditDireccionesChange([...(editDirecciones || []), newDireccion.trim()]);
+    setNewDireccion("");
   };
   const handleRemoveDireccion = (index) =>
-    onEditDireccionesChange(editDirecciones.filter((_, i) => i !== index));
+    onEditDireccionesChange(
+      (editDirecciones || []).filter((_, i) => i !== index)
+    );
 
   const handleFormChange = (field, value) => onFormChange(field, value);
   const handlePlanMedicoChange = (e) =>
     handleFormChange("planMedicoId", e.target.value);
   const handleTipoDocumentoChange = (e) =>
     handleFormChange("tipoDocumento", e.target.value);
-
-  const titular = selectedAfiliado
-    ? getTitularDelAfiliado(selectedAfiliado)
-    : null;
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -125,7 +125,7 @@ export default function AfiliadoFormDialog({
 
                 <Typography variant="body2" gutterBottom>
                   <strong>Credencial:</strong>{" "}
-                  {padNumeroAfiliado(afiliadoNumero(selectedAfiliado))}-
+                  {padNumeroAfiliado(selectedAfiliado.numeroAfiliado)}-
                   {padIntegrante(titular.numeroIntegrante)}
                 </Typography>
 
@@ -139,7 +139,7 @@ export default function AfiliadoFormDialog({
                   {planesMedicos.find(
                     (p) =>
                       String(p.id) === String(selectedAfiliado.planMedicoId)
-                  )?.nombre || "Desconocido"}
+                  )?.nombre ?? "Desconocido"}
                 </Typography>
 
                 <Typography variant="body2" gutterBottom>
@@ -155,8 +155,7 @@ export default function AfiliadoFormDialog({
                   <strong>Fecha de Alta:</strong>{" "}
                   {selectedAfiliado.alta
                     ? new Date(selectedAfiliado.alta).toLocaleDateString(
-                        "es-AR",
-                        { timeZone: "UTC" }
+                        "es-AR"
                       )
                     : ""}
                 </Typography>
@@ -165,8 +164,7 @@ export default function AfiliadoFormDialog({
                   <Typography variant="body2" gutterBottom>
                     <strong>Fecha de Baja:</strong>{" "}
                     {new Date(selectedAfiliado.baja).toLocaleDateString(
-                      "es-AR",
-                      { timeZone: "UTC" }
+                      "es-AR"
                     )}
                   </Typography>
                 )}
@@ -188,14 +186,16 @@ export default function AfiliadoFormDialog({
                       ml: 2,
                     }}
                   >
-                    {titular.telefonos?.length ? (
-                      titular.telefonos.map((t, i) => (
+                    {(titular.telefonos || []).length ? (
+                      (titular.telefonos || []).map((t, i) => (
                         <Box
                           key={i}
                           sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
                           <PhoneIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                          <Typography variant="body2">{t}</Typography>
+                          <Typography variant="body2">
+                            {typeof t === "string" ? t : JSON.stringify(t)}
+                          </Typography>
                         </Box>
                       ))
                     ) : (
@@ -221,14 +221,16 @@ export default function AfiliadoFormDialog({
                       ml: 2,
                     }}
                   >
-                    {titular.emails?.length ? (
-                      titular.emails.map((e, i) => (
+                    {(titular.emails || []).length ? (
+                      (titular.emails || []).map((e, i) => (
                         <Box
                           key={i}
                           sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
                           <EmailIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                          <Typography variant="body2">{e}</Typography>
+                          <Typography variant="body2">
+                            {typeof e === "string" ? e : JSON.stringify(e)}
+                          </Typography>
                         </Box>
                       ))
                     ) : (
@@ -254,14 +256,16 @@ export default function AfiliadoFormDialog({
                       ml: 2,
                     }}
                   >
-                    {titular.direcciones?.length ? (
-                      titular.direcciones.map((d, i) => (
+                    {(titular.direcciones || []).length ? (
+                      (titular.direcciones || []).map((d, i) => (
                         <Box
                           key={i}
                           sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
                           <HomeIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                          <Typography variant="body2">{d}</Typography>
+                          <Typography variant="body2">
+                            {typeof d === "string" ? d : JSON.stringify(d)}
+                          </Typography>
                         </Box>
                       ))
                     ) : (
@@ -272,7 +276,7 @@ export default function AfiliadoFormDialog({
                   </Box>
                 </Box>
 
-                {titular.situacionesTerapeuticas?.length > 0 && (
+                {(titular.situacionesTerapeuticas || []).length > 0 && (
                   <Box sx={{ mb: 2 }}>
                     <Typography
                       variant="body2"
@@ -288,9 +292,9 @@ export default function AfiliadoFormDialog({
                         ml: 2,
                       }}
                     >
-                      {titular.situacionesTerapeuticas.map((s, i) => (
+                      {(titular.situacionesTerapeuticas || []).map((s, i) => (
                         <Typography key={i} variant="body2">
-                          • {s}
+                          • {typeof s === "string" ? s : s?.nombre ?? String(s)}
                         </Typography>
                       ))}
                     </Box>
@@ -391,10 +395,11 @@ export default function AfiliadoFormDialog({
                 <FormControl fullWidth>
                   <InputLabel>Plan Médico</InputLabel>
                   <Select
-                    value={formData.planMedicoId || ""}
+                    value={String(formData.planMedicoId ?? "")}
                     label="Plan Médico"
                     onChange={handlePlanMedicoChange}
                   >
+                    <MenuItem value="">Seleccione</MenuItem>
                     {(planesMedicos || []).map((plan) => (
                       <MenuItem key={plan.id} value={String(plan.id)}>
                         {plan.nombre}
@@ -410,7 +415,7 @@ export default function AfiliadoFormDialog({
                 <ContactInfoEditor
                   icon={<PhoneIcon sx={{ mr: 1, color: "#1976d2" }} />}
                   title="Teléfonos"
-                  items={editTelefonos}
+                  items={editTelefonos || []}
                   newValue={newTelefono}
                   placeholder="Agregar teléfono"
                   onNewValueChange={setNewTelefono}
@@ -425,7 +430,7 @@ export default function AfiliadoFormDialog({
                 <ContactInfoEditor
                   icon={<EmailIcon sx={{ mr: 1, color: "#1976d2" }} />}
                   title="Emails"
-                  items={editEmails}
+                  items={editEmails || []}
                   newValue={newEmail}
                   placeholder="Agregar email"
                   inputType="email"
@@ -441,7 +446,7 @@ export default function AfiliadoFormDialog({
                 <ContactInfoEditor
                   icon={<HomeIcon sx={{ mr: 1, color: "#1976d2" }} />}
                   title="Direcciones"
-                  items={editDirecciones}
+                  items={editDirecciones || []}
                   newValue={newDireccion}
                   placeholder="Agregar dirección"
                   onNewValueChange={setNewDireccion}
@@ -478,11 +483,13 @@ export default function AfiliadoFormDialog({
         <Button variant="outlined" onClick={onClose}>
           {selectedAfiliado && !isEditing ? "Cerrar" : "Cancelar"}
         </Button>
+
         {(!selectedAfiliado || isEditing) && (
           <Button variant="contained" color="secondary" onClick={onSave}>
             {selectedAfiliado ? "Guardar Cambios" : "Crear Afiliado"}
           </Button>
         )}
+
         {selectedAfiliado && !isEditing && (
           <Button variant="contained" color="secondary" onClick={onEdit}>
             Editar
@@ -491,13 +498,4 @@ export default function AfiliadoFormDialog({
       </DialogActions>
     </Dialog>
   );
-}
-
-/**
- * Helper local: obtiene número de afiliado (por si selectedAfiliado.numeroAfiliado pudiera venir como string)
- * definido abajo para evitar repetir coerciones en JSX
- */
-function afiliadoNumero(afiliado) {
-  if (!afiliado) return 0;
-  return Number(afiliado.numeroAfiliado) || 0;
 }

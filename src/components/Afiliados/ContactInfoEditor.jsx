@@ -4,19 +4,32 @@ import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 export default function ContactInfoEditor({
   icon,
   title,
-  items,
-  newValue,
+  items = [],
+  newValue = "",
   placeholder,
   inputType = "text",
-  onNewValueChange,
-  onAdd,
-  onRemove,
+  onNewValueChange = () => {},
+  onAdd = () => {},
+  onRemove = () => {},
+  disabled = false,
 }) {
+  // defensive: ensure items is array
+  const list = Array.isArray(items) ? items : [];
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!disabled) onAdd();
+    }
+  };
+
   return (
     <Card sx={{ p: 2, backgroundColor: "#f8f9fa" }}>
       <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
         {icon}
-        <Typography variant="subtitle2">{title}</Typography>
+        <Typography variant="subtitle2" sx={{ ml: 1 }}>
+          {title}
+        </Typography>
       </Box>
 
       <Box sx={{ display: "flex", gap: 1, mb: 2 }}>
@@ -27,30 +40,46 @@ export default function ContactInfoEditor({
           placeholder={placeholder}
           value={newValue}
           onChange={(e) => onNewValueChange(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onAdd()}
+          onKeyDown={handleKeyDown}
+          disabled={disabled}
         />
-        <IconButton onClick={onAdd} color="secondary">
+        <IconButton
+          onClick={() => !disabled && onAdd()}
+          color="secondary"
+          aria-label={`Agregar ${title}`}
+          disabled={disabled}
+        >
           <AddIcon />
         </IconButton>
       </Box>
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-        {items.map((item, index) => (
+        {list.length === 0 && (
+          <Typography variant="body2" color="textSecondary">
+            No hay {title.toLowerCase()} registrados
+          </Typography>
+        )}
+
+        {list.map((item, index) => (
           <Card
             key={index}
             sx={{
-              p: 2,
+              p: 1,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               minHeight: 48,
             }}
+            variant="outlined"
           >
-            <Typography variant="body1">{item}</Typography>
+            <Typography variant="body1" sx={{ wordBreak: "break-word" }}>
+              {typeof item === "string" ? item : JSON.stringify(item)}
+            </Typography>
             <IconButton
               size="small"
               onClick={() => onRemove(index)}
               color="error"
+              aria-label={`Eliminar ${title} ${index + 1}`}
             >
               <DeleteIcon />
             </IconButton>

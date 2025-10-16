@@ -1,138 +1,127 @@
-import { createSlice } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { AfiliadosService } from '../services/AfiliadosService';
 
-const initialState = {
-  afiliados: [
-    {
-      id: "1",
-      numeroAfiliado: 1,
-      titularId: "1",
-      planMedicoId: "1", // Cambiado a string
-      alta: "2024-01-15",
-      baja: null,
-      situacionesTerapeuticas: [],
-    },
-    {
-      id: "2",
-      numeroAfiliado: 2,
-      titularId: "4",
-      planMedicoId: "4", // Cambiado a string
-      alta: "2024-02-01",
-      baja: null,
-      situacionesTerapeuticas: [],
-    },
-    {
-      id: "3",
-      numeroAfiliado: 3,
-      titularId: "6",
-      planMedicoId: "3", // Cambiado a string
-      alta: "2024-01-25",
-      baja: "2024-12-31",
-      situacionesTerapeuticas: [],
-    },
-  ],
-  // Se eliminó planesMedicos de aquí
-};
+// --- Async Thunks ---
+export const fetchAfiliados = createAsyncThunk(
+  'afiliados/fetchAll',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await AfiliadosService.getAll();
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
 
+export const createAfiliado = createAsyncThunk(
+  'afiliados/create',
+  async (payload, { rejectWithValue }) => {
+    try {
+      return await AfiliadosService.create(payload);
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
+export const updateAfiliado = createAsyncThunk(
+  'afiliados/update',
+  async ({ id, payload }, { rejectWithValue }) => {
+    try {
+      return await AfiliadosService.update(id, payload);
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
+export const deleteAfiliado = createAsyncThunk(
+  'afiliados/delete',
+  async (id, { rejectWithValue }) => {
+    try {
+      return await AfiliadosService.delete(id);
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
+// --- Slice ---
 const afiliadosSlice = createSlice({
-  name: "afiliados",
-  initialState,
+  name: 'afiliados',
+  initialState: {
+    lista: [],
+    selected: null,
+    loading: false,
+    error: null,
+  },
   reducers: {
-    addAfiliado: (state, action) => {
-      state.afiliados.unshift(action.payload);
+    selectAfiliado: (state, action) => {
+      state.selected = action.payload;
     },
-    updateAfiliado: (state, action) => {
-      const idx = state.afiliados.findIndex((a) => a.id === action.payload.id);
-      if (idx !== -1)
-        state.afiliados[idx] = { ...state.afiliados[idx], ...action.payload };
+    clearSelected: (state) => {
+      state.selected = null;
     },
-    setBajaAfiliado: (state, action) => {
-      const { afiliadoId, fechaBaja } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado) afiliado.baja = fechaBaja;
-    },
-    cancelBajaAfiliado: (state, action) => {
-      const afiliado = state.afiliados.find((a) => a.id === action.payload);
-      if (afiliado) afiliado.baja = null;
-    },
-    updatePlanMedicoAfiliado: (state, action) => {
-      const { afiliadoId, planMedicoId } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado) afiliado.planMedicoId = planMedicoId;
-    },
-    programarAltaAfiliado: (state, action) => {
-      const { afiliadoId, fechaAlta } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado) {
-        afiliado.baja = null;
-        afiliado.alta = fechaAlta;
-      }
-    },
-    cancelarAltaProgramada: (state, action) => {
-      const { afiliadoId, fechaAltaInmediata } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado && fechaAltaInmediata) afiliado.alta = fechaAltaInmediata;
-    },
-    reactivarAfiliado: (state, action) => {
-      const { afiliadoId } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado) {
-        const hoyISO = new Date().toISOString().split("T")[0];
-        afiliado.baja = null;
-        afiliado.alta = hoyISO;
-      }
-    },
-    updateAltaAfiliado: (state, action) => {
-      const { afiliadoId, fechaAlta } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado) afiliado.alta = fechaAlta;
-    },
-    addSituacionAfiliado: (state, action) => {
-      const { afiliadoId, situacionNombre } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado) {
-        const exists = afiliado.situacionesTerapeuticas?.some(
-          (s) => s?.toLowerCase?.() === String(situacionNombre).toLowerCase()
-        );
-        if (!exists) {
-          afiliado.situacionesTerapeuticas = [
-            ...(afiliado.situacionesTerapeuticas || []),
-            situacionNombre,
-          ];
-        }
-      }
-    },
-    removeSituacionAfiliado: (state, action) => {
-      const { afiliadoId, index } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado) {
-        afiliado.situacionesTerapeuticas = (
-          afiliado.situacionesTerapeuticas || []
-        ).filter((_, i) => i !== index);
-      }
-    },
-    setSituacionesAfiliado: (state, action) => {
-      const { afiliadoId, situaciones } = action.payload;
-      const afiliado = state.afiliados.find((a) => a.id === afiliadoId);
-      if (afiliado) afiliado.situacionesTerapeuticas = situaciones || [];
-    },
+  },
+  extraReducers: (builder) => {
+    builder
+      // --- fetchAfiliados ---
+      .addCase(fetchAfiliados.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchAfiliados.fulfilled, (state, action) => {
+        state.loading = false;
+        state.lista = action.payload;
+      })
+      .addCase(fetchAfiliados.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // --- createAfiliado ---
+      .addCase(createAfiliado.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createAfiliado.fulfilled, (state, action) => {
+        state.loading = false;
+        state.lista.push(action.payload);
+      })
+      .addCase(createAfiliado.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // --- updateAfiliado ---
+      .addCase(updateAfiliado.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updateAfiliado.fulfilled, (state, action) => {
+        state.loading = false;
+        const index = state.lista.findIndex((a) => a.id === action.payload.id);
+        if (index >= 0) state.lista[index] = action.payload;
+        if (state.selected?.id === action.payload.id) state.selected = action.payload;
+      })
+      .addCase(updateAfiliado.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // --- deleteAfiliado ---
+      .addCase(deleteAfiliado.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteAfiliado.fulfilled, (state, action) => {
+        state.loading = false;
+        state.lista = state.lista.filter((a) => a.id !== action.meta.arg);
+        if (state.selected?.id === action.meta.arg) state.selected = null;
+      })
+      .addCase(deleteAfiliado.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
   },
 });
 
-export const {
-  addAfiliado,
-  updateAfiliado,
-  setBajaAfiliado,
-  cancelBajaAfiliado,
-  updatePlanMedicoAfiliado,
-  programarAltaAfiliado,
-  cancelarAltaProgramada,
-  reactivarAfiliado,
-  updateAltaAfiliado,
-  addSituacionAfiliado,
-  removeSituacionAfiliado,
-  setSituacionesAfiliado,
-} = afiliadosSlice.actions;
-
-export const selectAfiliados = (state) => state.afiliados.afiliados;
-
+export const { selectAfiliado, clearSelected } = afiliadosSlice.actions;
 export default afiliadosSlice.reducer;

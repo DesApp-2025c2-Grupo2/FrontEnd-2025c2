@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   Box,
   TextField,
@@ -21,10 +21,10 @@ import {
 } from "@mui/icons-material";
 
 export default function AdvancedSearchBar({
-  afiliados,
-  personas,
-  planesMedicos,
-  onFilteredAfiliadosChange,
+  afiliados = [],
+  personas = [],
+  planesMedicos = [],
+  onFilteredAfiliadosChange = () => {},
   estaActivo,
   tieneBajaProgramada,
   tieneAltaProgramada,
@@ -44,34 +44,46 @@ export default function AdvancedSearchBar({
     orden: "",
   });
 
-  // Función para aplicar todos los filtros
+  // Ref para evitar notificar con la misma lista (compare by id)
+  const lastIdsRef = useRef(null);
+  const sameIdArray = (a = [], b = []) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (String(a[i].id ?? a[i]) !== String(b[i].id ?? b[i])) return false;
+    }
+    return true;
+  };
+
   const filteredAfiliados = useMemo(() => {
-    if (!afiliados) return [];
+    if (!Array.isArray(afiliados) || afiliados.length === 0) return [];
 
     return afiliados
       .filter((afiliado) => {
-        // Obtener el titular del afiliado para búsqueda
-        const titular = personas.find((p) => p.id === afiliado.titularId);
+        const titularId = afiliado.titularId ?? afiliado.titularID;
+        const titular =
+          Array.isArray(personas) && personas.length
+            ? personas.find((p) => String(p.id) === String(titularId))
+            : null;
+
+        // No encontramos titular: descartamos (defensivo)
         if (!titular) return false;
 
-        // Filtro por búsqueda rápida
-        const searchFields = [
-          titular.nombre.toLowerCase(),
-          titular.apellido.toLowerCase(),
-          titular.tipoDocumento?.toLowerCase() || "",
-          titular.numeroDocumento?.toLowerCase() || "",
-          afiliado.numeroAfiliado.toString(),
+        const fields = [
+          (titular.nombre || "").toString().toLowerCase(),
+          (titular.apellido || "").toString().toLowerCase(),
+          (titular.tipoDocumento || "").toString().toLowerCase(),
+          (titular.numeroDocumento || "").toString().toLowerCase(),
+          String(afiliado.numeroAfiliado ?? "").toLowerCase(),
         ].join(" ");
 
-        const matchesCurrentSearch =
-          searchTerm === "" || searchFields.includes(searchTerm.toLowerCase());
+        const search = searchTerm.trim().toLowerCase();
+        const matchesCurrentSearch = !search || fields.includes(search);
         const matchesActiveFilters =
           activeFilters.length === 0 ||
           activeFilters.every((filter) =>
-            searchFields.includes(filter.toLowerCase())
+            fields.includes(filter.toLowerCase())
           );
 
-        // Filtro por estado (activo/inactivo)
         const matchesEstado =
           filterState.estado === "todos" ||
           (filterState.estado === "activos" &&
@@ -79,7 +91,6 @@ export default function AdvancedSearchBar({
           (filterState.estado === "inactivos" &&
             !estaActivo(afiliado.alta, afiliado.baja));
 
-        // Filtro por estado de baja
         const matchesEstadoBaja =
           filterState.estadoBaja === "todos" ||
           (filterState.estadoBaja === "conBajaProgramada" &&
@@ -96,27 +107,22 @@ export default function AdvancedSearchBar({
           (filterState.estadoAlta === "sinAltaProgramada" &&
             !tieneAltaProgramada(afiliado.alta, afiliado.baja));
 
-        // Filtro por plan médico
         const matchesPlanMedico =
           filterState.planMedico === "todos" ||
-          afiliado.planMedicoId.toString() === filterState.planMedico;
+          String(afiliado.planMedicoId) === String(filterState.planMedico);
 
-        // Filtro por fecha de alta
-        const fechaAlta = new Date(afiliado.alta);
+        const fechaAlta = afiliado.alta ? new Date(afiliado.alta) : null;
         const matchesFechaAltaDesde =
           !filterState.fechaAltaDesde ||
-          fechaAlta >= new Date(filterState.fechaAltaDesde);
-
+          (fechaAlta && fechaAlta >= new Date(filterState.fechaAltaDesde));
         const matchesFechaAltaHasta =
           !filterState.fechaAltaHasta ||
-          fechaAlta <= new Date(filterState.fechaAltaHasta);
+          (fechaAlta && fechaAlta <= new Date(filterState.fechaAltaHasta));
 
-        // Filtro por fecha de baja
         const fechaBaja = afiliado.baja ? new Date(afiliado.baja) : null;
         const matchesFechaBajaDesde =
           !filterState.fechaBajaDesde ||
           (fechaBaja && fechaBaja >= new Date(filterState.fechaBajaDesde));
-
         const matchesFechaBajaHasta =
           !filterState.fechaBajaHasta ||
           (fechaBaja && fechaBaja <= new Date(filterState.fechaBajaHasta));
@@ -135,9 +141,7 @@ export default function AdvancedSearchBar({
         );
       })
       .sort((a, b) => {
-        // Ordenamiento
         if (!filterState.orden) return 0;
-
         switch (filterState.orden) {
           case "fechaAlta-asc":
             return new Date(a.alta) - new Date(b.alta);
@@ -154,9 +158,13 @@ export default function AdvancedSearchBar({
               (a.baja ? new Date(a.baja) : new Date("9999-12-31"))
             );
           case "numeroAfiliado-asc":
-            return a.numeroAfiliado - b.numeroAfiliado;
+            return (
+              (Number(a.numeroAfiliado) || 0) - (Number(b.numeroAfiliado) || 0)
+            );
           case "numeroAfiliado-desc":
-            return b.numeroAfiliado - a.numeroAfiliado;
+            return (
+              (Number(b.numeroAfiliado) || 0) - (Number(a.numeroAfiliado) || 0)
+            );
           default:
             return 0;
         }
@@ -172,30 +180,38 @@ export default function AdvancedSearchBar({
     tieneAltaProgramada,
   ]);
 
-  // Notificar al componente padre cuando cambien los afiliados filtrados
+  // Notificar al padre SOLO si cambió la lista filtrada (evita loops)
   useEffect(() => {
-    onFilteredAfiliadosChange(filteredAfiliados);
-  }, [filteredAfiliados, onFilteredAfiliadosChange]);
-
-  // Handlers
-  const handleKeyPress = (e) => {
-    if (
-      e.key === "Enter" &&
-      searchTerm.trim() &&
-      !activeFilters.includes(searchTerm.trim())
-    ) {
-      setActiveFilters([...activeFilters, searchTerm.trim()]);
-      setSearchTerm("");
+    const ids = filteredAfiliados.map((f) => f.id ?? f);
+    if (!lastIdsRef.current || !sameIdArray(lastIdsRef.current, ids)) {
+      lastIdsRef.current = ids.slice();
+      onFilteredAfiliadosChange(filteredAfiliados);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredAfiliados]);
 
-  const handleRemoveFilter = (filterToRemove) => {
-    setActiveFilters(
-      activeFilters.filter((filter) => filter !== filterToRemove)
+  // Handlers (memoizados para estabilidad)
+  const handleKeyPress = useCallback(
+    (e) => {
+      if (
+        e.key === "Enter" &&
+        searchTerm.trim() &&
+        !activeFilters.includes(searchTerm.trim())
+      ) {
+        setActiveFilters((prev) => [...prev, searchTerm.trim()]);
+        setSearchTerm("");
+      }
+    },
+    [searchTerm, activeFilters]
+  );
+
+  const handleRemoveFilter = useCallback((filterToRemove) => {
+    setActiveFilters((prev) =>
+      prev.filter((filter) => filter !== filterToRemove)
     );
-  };
+  }, []);
 
-  const handleClearAll = () => {
+  const handleClearAll = useCallback(() => {
     setActiveFilters([]);
     setSearchTerm("");
     setFilterState({
@@ -209,59 +225,59 @@ export default function AdvancedSearchBar({
       fechaBajaHasta: "",
       orden: "",
     });
-  };
+  }, []);
 
-  const handleFilterChange = (filterType, value) => {
-    setFilterState((prev) => ({
-      ...prev,
-      [filterType]: value,
-    }));
-  };
+  const handleFilterChange = useCallback((filterType, value) => {
+    setFilterState((prev) => ({ ...prev, [filterType]: value }));
+  }, []);
 
-  const getFilterDisplayText = (filterType, value) => {
-    const labels = {
-      estado:
-        value === "activos"
-          ? "Activos"
-          : value === "inactivos"
-          ? "Inactivos"
-          : "Todos",
-      estadoBaja:
-        value === "conBajaProgramada"
-          ? "Con baja programada"
-          : value === "sinBaja"
-          ? "Sin baja"
-          : value === "conBajaEfectiva"
-          ? "Con baja efectiva"
-          : "Todos",
-      estadoAlta:
-        value === "conAltaProgramada"
-          ? "Con alta programada"
-          : value === "sinAltaProgramada"
-          ? "Sin alta programada"
-          : "Todos",
-      planMedico:
-        value === "todos"
-          ? "Todos los planes"
-          : planesMedicos.find((p) => p.id.toString() === value)?.nombre ||
-            value,
-      orden:
-        value === "fechaAlta-asc"
-          ? "Fecha Alta (Asc)"
-          : value === "fechaAlta-desc"
-          ? "Fecha Alta (Desc)"
-          : value === "fechaBaja-asc"
-          ? "Fecha Baja (Asc)"
-          : value === "fechaBaja-desc"
-          ? "Fecha Baja (Desc)"
-          : value === "numeroAfiliado-asc"
-          ? "Nº Afiliado (Asc)"
-          : value === "numeroAfiliado-desc"
-          ? "Nº Afiliado (Desc)"
-          : "Sin orden",
-    };
-    return labels[filterType] || value;
-  };
+  const getFilterDisplayText = useCallback(
+    (filterType, value) => {
+      const labels = {
+        estado:
+          value === "activos"
+            ? "Activos"
+            : value === "inactivos"
+            ? "Inactivos"
+            : "Todos",
+        estadoBaja:
+          value === "conBajaProgramada"
+            ? "Con baja programada"
+            : value === "sinBaja"
+            ? "Sin baja"
+            : value === "conBajaEfectiva"
+            ? "Con baja efectiva"
+            : "Todos",
+        estadoAlta:
+          value === "conAltaProgramada"
+            ? "Con alta programada"
+            : value === "sinAltaProgramada"
+            ? "Sin alta programada"
+            : "Todos",
+        planMedico:
+          value === "todos"
+            ? "Todos los planes"
+            : planesMedicos.find((p) => String(p.id) === String(value))
+                ?.nombre || value,
+        orden:
+          value === "fechaAlta-asc"
+            ? "Fecha Alta (Asc)"
+            : value === "fechaAlta-desc"
+            ? "Fecha Alta (Desc)"
+            : value === "fechaBaja-asc"
+            ? "Fecha Baja (Asc)"
+            : value === "fechaBaja-desc"
+            ? "Fecha Baja (Desc)"
+            : value === "numeroAfiliado-asc"
+            ? "Nº Afiliado (Asc)"
+            : value === "numeroAfiliado-desc"
+            ? "Nº Afiliado (Desc)"
+            : "Sin orden",
+      };
+      return labels[filterType] || value;
+    },
+    [planesMedicos]
+  );
 
   return (
     <Box sx={{ mb: 3 }}>
@@ -285,13 +301,12 @@ export default function AdvancedSearchBar({
       </Box>
 
       {/* Filtros avanzados */}
-      <Accordion expanded={expanded} onChange={() => setExpanded(!expanded)}>
+      <Accordion expanded={expanded} onChange={() => setExpanded((s) => !s)}>
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
           <Typography variant="subtitle1">Filtros Avanzados</Typography>
         </AccordionSummary>
         <AccordionDetails>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2, mb: 2 }}>
-            {/* Filtro por estado activo/inactivo */}
             <FormControl sx={{ minWidth: 150 }}>
               <InputLabel>Estado</InputLabel>
               <Select
@@ -305,7 +320,6 @@ export default function AdvancedSearchBar({
               </Select>
             </FormControl>
 
-            {/* Filtro por estado de baja */}
             <FormControl sx={{ minWidth: 180 }}>
               <InputLabel>Estado de baja</InputLabel>
               <Select
@@ -324,7 +338,6 @@ export default function AdvancedSearchBar({
               </Select>
             </FormControl>
 
-            {/* Filtro por estado de alta */}
             <FormControl sx={{ minWidth: 180 }}>
               <InputLabel>Estado de alta</InputLabel>
               <Select
@@ -344,7 +357,6 @@ export default function AdvancedSearchBar({
               </Select>
             </FormControl>
 
-            {/* Filtro por plan médico */}
             <FormControl sx={{ minWidth: 150 }}>
               <InputLabel>Plan Médico</InputLabel>
               <Select
@@ -363,7 +375,6 @@ export default function AdvancedSearchBar({
               </Select>
             </FormControl>
 
-            {/* Filtro por fecha de alta */}
             <TextField
               label="Alta desde"
               type="date"
@@ -383,7 +394,6 @@ export default function AdvancedSearchBar({
               InputLabelProps={{ shrink: true }}
             />
 
-            {/* Filtro por fecha de baja */}
             <TextField
               label="Baja desde"
               type="date"
@@ -403,7 +413,6 @@ export default function AdvancedSearchBar({
               InputLabelProps={{ shrink: true }}
             />
 
-            {/* Ordenamiento */}
             <FormControl sx={{ minWidth: 180 }}>
               <InputLabel>Ordenar por</InputLabel>
               <Select
@@ -449,6 +458,7 @@ export default function AdvancedSearchBar({
       {(activeFilters.length > 0 ||
         filterState.estado !== "todos" ||
         filterState.estadoBaja !== "todos" ||
+        filterState.estadoAlta !== "todos" ||
         filterState.planMedico !== "todos" ||
         filterState.orden ||
         filterState.fechaAltaDesde ||
@@ -468,7 +478,6 @@ export default function AdvancedSearchBar({
             Filtros activos:
           </Typography>
 
-          {/* Chips para filtros de búsqueda rápida */}
           {activeFilters.map((filter, index) => (
             <Chip
               key={`search-${index}`}
@@ -479,7 +488,6 @@ export default function AdvancedSearchBar({
             />
           ))}
 
-          {/* Chips para filtros avanzados */}
           {filterState.estado !== "todos" && (
             <Chip
               label={getFilterDisplayText("estado", filterState.estado)}

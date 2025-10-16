@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
 import {
   Dialog,
   DialogTitle,
@@ -23,17 +22,8 @@ import {
 } from "@mui/icons-material";
 import ContactInfoEditor from "./ContactInfoEditor";
 import SituacionesSelector from "./SituacionesSelector";
-import {
-  addTelefonoToPersona,
-  removeTelefonoFromPersona,
-  addEmailToPersona,
-  removeEmailFromPersona,
-  addDireccionToPersona,
-  removeDireccionFromPersona,
-  addSituacionTerapeuticaToPersona,
-  removeSituacionTerapeuticaFromPersona,
-} from "../../store/personasSlice";
 import { selectSituaciones } from "../../store/situacionesTerapeuticasSlice";
+import { useSelector } from "react-redux";
 
 const padNumeroAfiliado = (n) => String(Number(n) || 0).padStart(7, "0");
 const padIntegrante = (n) => String(Number(n) || 0).padStart(2, "0");
@@ -44,11 +34,11 @@ export default function PersonaFormDialog({
   selectedFamiliar,
   isEditing,
   formData,
-  parentescos,
-  editTelefonos,
-  editEmails,
-  editDirecciones,
-  editSituaciones,
+  parentescos = [],
+  editTelefonos = [],
+  editEmails = [],
+  editDirecciones = [],
+  editSituaciones = [],
   onEditTelefonosChange,
   onEditEmailsChange,
   onEditDireccionesChange,
@@ -57,7 +47,6 @@ export default function PersonaFormDialog({
   onSave,
   onFormChange,
 }) {
-  const dispatch = useDispatch();
   const situacionesCatalogo = useSelector(selectSituaciones) || [];
 
   const [newTelefono, setNewTelefono] = useState("");
@@ -74,134 +63,77 @@ export default function PersonaFormDialog({
     }
   }, [open]);
 
+  // Helpers para normalizar valores (pueden venir como string o como objeto)
+  const telefonoToString = (t) => (t && (t.numero ?? t.Numero ?? t)) ?? "";
+  const emailToString = (e) => (e && (e.correo ?? e.Correo ?? e)) ?? "";
+  const direccionToString = (d) => {
+    if (!d) return "";
+    if (d.calle) {
+      const altura = d.altura ? ` ${d.altura}` : "";
+      const piso = d.piso ? ` Piso ${d.piso}` : "";
+      const dept = d.departamento ? ` Dept ${d.departamento}` : "";
+      const provincia = d.provinciaCiudad ?? "";
+      return `${d.calle}${altura}${piso}${dept} - ${provincia}`;
+    }
+    // si 'd' no tiene propiedades, asumimos que es un string con la dirección
+    return String(d);
+  };
+
+  // Teléfonos
   const handleAddTelefono = () => {
-    if (newTelefono.trim()) {
-      const updatedTelefonos = [...editTelefonos, newTelefono.trim()];
-      onEditTelefonosChange(updatedTelefonos);
-
-      if (selectedFamiliar && isEditing) {
-        dispatch(
-          addTelefonoToPersona({
-            personaId: selectedFamiliar.id,
-            telefono: newTelefono.trim(),
-          })
-        );
-      }
-      setNewTelefono("");
-    }
+    if (!newTelefono?.trim()) return;
+    const updated = [...(editTelefonos || []), newTelefono.trim()];
+    onEditTelefonosChange?.(updated);
+    setNewTelefono("");
   };
-
   const handleRemoveTelefono = (index) => {
-    const updatedTelefonos = editTelefonos.filter((_, i) => i !== index);
-    onEditTelefonosChange(updatedTelefonos);
-
-    if (selectedFamiliar && isEditing) {
-      dispatch(
-        removeTelefonoFromPersona({
-          personaId: selectedFamiliar.id,
-          telefonoIndex: index,
-        })
-      );
-    }
+    const updated = (editTelefonos || []).filter((_, i) => i !== index);
+    onEditTelefonosChange?.(updated);
   };
 
+  // Emails
   const handleAddEmail = () => {
-    if (newEmail.trim()) {
-      const updatedEmails = [...editEmails, newEmail.trim()];
-      onEditEmailsChange(updatedEmails);
-
-      if (selectedFamiliar && isEditing) {
-        dispatch(
-          addEmailToPersona({
-            personaId: selectedFamiliar.id,
-            email: newEmail.trim(),
-          })
-        );
-      }
-      setNewEmail("");
-    }
+    if (!newEmail?.trim()) return;
+    const updated = [...(editEmails || []), newEmail.trim()];
+    onEditEmailsChange?.(updated);
+    setNewEmail("");
   };
-
   const handleRemoveEmail = (index) => {
-    const updatedEmails = editEmails.filter((_, i) => i !== index);
-    onEditEmailsChange(updatedEmails);
-
-    if (selectedFamiliar && isEditing) {
-      dispatch(
-        removeEmailFromPersona({
-          personaId: selectedFamiliar.id,
-          emailIndex: index,
-        })
-      );
-    }
+    const updated = (editEmails || []).filter((_, i) => i !== index);
+    onEditEmailsChange?.(updated);
   };
 
+  // Direcciones
   const handleAddDireccion = () => {
-    if (newDireccion.trim()) {
-      const updatedDirecciones = [...editDirecciones, newDireccion.trim()];
-      onEditDireccionesChange(updatedDirecciones);
-
-      if (selectedFamiliar && isEditing) {
-        dispatch(
-          addDireccionToPersona({
-            personaId: selectedFamiliar.id,
-            direccion: newDireccion.trim(),
-          })
-        );
-      }
-      setNewDireccion("");
-    }
+    if (!newDireccion?.trim()) return;
+    const updated = [...(editDirecciones || []), newDireccion.trim()];
+    onEditDireccionesChange?.(updated);
+    setNewDireccion("");
   };
-
   const handleRemoveDireccion = (index) => {
-    const updatedDirecciones = editDirecciones.filter((_, i) => i !== index);
-    onEditDireccionesChange(updatedDirecciones);
-
-    if (selectedFamiliar && isEditing) {
-      dispatch(
-        removeDireccionFromPersona({
-          personaId: selectedFamiliar.id,
-          direccionIndex: index,
-        })
-      );
-    }
+    const updated = (editDirecciones || []).filter((_, i) => i !== index);
+    onEditDireccionesChange?.(updated);
   };
 
-  const handleAddSituacion = (nombre) => {
-    onEditSituacionesChange([...(editSituaciones || []), nombre]);
-    if (selectedFamiliar && isEditing) {
-      dispatch(
-        addSituacionTerapeuticaToPersona({
-          personaId: selectedFamiliar.id,
-          situacion: nombre,
-        })
-      );
-    }
+  // Situaciones
+  const handleAddSituacion = (s) => {
+    const updated = [...(editSituaciones || []), s];
+    onEditSituacionesChange?.(updated);
   };
-
   const handleRemoveSituacion = (idx) => {
-    onEditSituacionesChange(
-      (editSituaciones || []).filter((_, i) => i !== idx)
-    );
-    if (selectedFamiliar && isEditing) {
-      dispatch(
-        removeSituacionTerapeuticaFromPersona({
-          personaId: selectedFamiliar.id,
-          situacionIndex: idx,
-        })
-      );
-    }
+    const updated = (editSituaciones || []).filter((_, i) => i !== idx);
+    onEditSituacionesChange?.(updated);
   };
 
-  const handleFormChange = (field, value) => onFormChange(field, value);
+  const handleFormChange = (field, value) => onFormChange?.(field, value);
   const handleParentescoChange = (e) =>
-    handleFormChange("parentesco", parseInt(e.target.value));
+    handleFormChange("parentesco", parseInt(e.target.value, 10));
   const handleTipoDocumentoChange = (e) =>
     handleFormChange("tipoDocumento", e.target.value);
 
   const getParentescoNombre = (parentescoId) => {
-    const parentesco = parentescos.find((p) => p.id === parentescoId);
-    return parentesco ? parentesco.nombre : "Desconocido";
+    const p = (parentescos || []).find((x) => x.id === parentescoId);
+    return p ? p.nombre : "Desconocido";
   };
 
   return (
@@ -244,9 +176,11 @@ export default function PersonaFormDialog({
             </Typography>
             <Typography variant="body2" gutterBottom>
               <strong>Fecha de Nacimiento:</strong>{" "}
-              {new Date(selectedFamiliar.fechaNacimiento).toLocaleDateString(
-                "es-AR"
-              )}
+              {selectedFamiliar.fechaNacimiento
+                ? new Date(selectedFamiliar.fechaNacimiento).toLocaleDateString(
+                    "es-AR"
+                  )
+                : ""}
             </Typography>
 
             <Divider sx={{ my: 2 }} />
@@ -263,16 +197,19 @@ export default function PersonaFormDialog({
                   ml: 2,
                 }}
               >
-                {selectedFamiliar.telefonos?.map((telefono, index) => (
-                  <Box
-                    key={index}
-                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                  >
-                    <PhoneIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                    <Typography variant="body2">{telefono}</Typography>
-                  </Box>
-                ))}
-                {selectedFamiliar.telefonos?.length === 0 && (
+                {(selectedFamiliar.telefonos || []).length > 0 ? (
+                  (selectedFamiliar.telefonos || []).map((telefono, index) => (
+                    <Box
+                      key={index}
+                      sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                    >
+                      <PhoneIcon sx={{ fontSize: 16, color: "#1976d2" }} />
+                      <Typography variant="body2">
+                        {telefonoToString(telefono)}
+                      </Typography>
+                    </Box>
+                  ))
+                ) : (
                   <Typography variant="body2" color="textSecondary">
                     No hay teléfonos registrados
                   </Typography>
@@ -292,16 +229,19 @@ export default function PersonaFormDialog({
                   ml: 2,
                 }}
               >
-                {selectedFamiliar.emails?.map((email, index) => (
-                  <Box
-                    key={index}
-                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                  >
-                    <EmailIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                    <Typography variant="body2">{email}</Typography>
-                  </Box>
-                ))}
-                {selectedFamiliar.emails?.length === 0 && (
+                {(selectedFamiliar.emails || []).length > 0 ? (
+                  (selectedFamiliar.emails || []).map((email, index) => (
+                    <Box
+                      key={index}
+                      sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                    >
+                      <EmailIcon sx={{ fontSize: 16, color: "#1976d2" }} />
+                      <Typography variant="body2">
+                        {emailToString(email)}
+                      </Typography>
+                    </Box>
+                  ))
+                ) : (
                   <Typography variant="body2" color="textSecondary">
                     No hay emails registrados
                   </Typography>
@@ -321,16 +261,21 @@ export default function PersonaFormDialog({
                   ml: 2,
                 }}
               >
-                {selectedFamiliar.direcciones?.map((direccion, index) => (
-                  <Box
-                    key={index}
-                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                  >
-                    <HomeIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                    <Typography variant="body2">{direccion}</Typography>
-                  </Box>
-                ))}
-                {selectedFamiliar.direcciones?.length === 0 && (
+                {(selectedFamiliar.direcciones || []).length > 0 ? (
+                  (selectedFamiliar.direcciones || []).map(
+                    (direccion, index) => (
+                      <Box
+                        key={index}
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
+                        <HomeIcon sx={{ fontSize: 16, color: "#1976d2" }} />
+                        <Typography variant="body2">
+                          {direccionToString(direccion)}
+                        </Typography>
+                      </Box>
+                    )
+                  )
+                ) : (
                   <Typography variant="body2" color="textSecondary">
                     No hay direcciones registradas
                   </Typography>
@@ -338,7 +283,11 @@ export default function PersonaFormDialog({
               </Box>
             </Box>
 
-            {selectedFamiliar.situacionesTerapeuticas?.length > 0 && (
+            {(
+              selectedFamiliar.situacionesTerapeuticas ||
+              selectedFamiliar.situacionesTerapeuticasIds ||
+              []
+            ).length > 0 && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="body2" sx={{ fontWeight: "bold", mb: 1 }}>
                   Situaciones Terapéuticas:
@@ -351,9 +300,13 @@ export default function PersonaFormDialog({
                     ml: 2,
                   }}
                 >
-                  {selectedFamiliar.situacionesTerapeuticas.map((s, i) => (
+                  {(
+                    selectedFamiliar.situacionesTerapeuticas ||
+                    selectedFamiliar.situacionesTerapeuticasIds ||
+                    []
+                  ).map((s, i) => (
                     <Typography key={i} variant="body2">
-                      • {s}
+                      • {typeof s === "string" ? s : s.nombre ?? s}
                     </Typography>
                   ))}
                 </Box>
@@ -362,8 +315,6 @@ export default function PersonaFormDialog({
           </Box>
         ) : (
           <Box sx={{ pt: 2 }}>
-            {/* Nota: NO mostramos el número de afiliado en creación/edición (requerido) */}
-
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12} sm={6}>
                 <TextField
@@ -437,11 +388,11 @@ export default function PersonaFormDialog({
                 <FormControl fullWidth disabled={isViewMode}>
                   <InputLabel>Parentesco</InputLabel>
                   <Select
-                    value={formData.parentesco || ""}
+                    value={formData.parentesco ?? ""}
                     label="Parentesco"
                     onChange={handleParentescoChange}
                   >
-                    {parentescos
+                    {(parentescos || [])
                       .filter((p) => p.id !== 1)
                       .map((parentesco) => (
                         <MenuItem key={parentesco.id} value={parentesco.id}>
@@ -516,6 +467,7 @@ export default function PersonaFormDialog({
           </Box>
         )}
       </DialogContent>
+
       <DialogActions>
         <Button variant="outlined" onClick={onClose}>
           {isViewMode ? "Cerrar" : "Cancelar"}
