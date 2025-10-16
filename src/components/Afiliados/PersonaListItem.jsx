@@ -80,17 +80,17 @@ export default function PersonaListItem({
         <Box sx={{ display: "flex", gap: 1 }}>
           <IconButton
             size="small"
-            onClick={() => onView(persona, afiliado)}
+            onClick={() => onView()}
             color="info"
           >
             <VisibilityIcon />
           </IconButton>
-          <IconButton size="small" onClick={() => onEdit(persona, afiliado)}>
+          <IconButton size="small" onClick={() => onEdit()}>
             <EditIcon />
           </IconButton>
           <IconButton
             size="small"
-            onClick={() => onDelete(persona, afiliado)}
+            onClick={() => onDelete()}
             color="error"
           >
             <DeleteIcon />
