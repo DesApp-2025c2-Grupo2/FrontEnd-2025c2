@@ -637,6 +637,7 @@ export default function DialogPrestador({ abierto, valorInicial, onCerrar, onGua
                   <Autocomplete
                     size="small"
                     options={especialidadesDisponibles.filter(esp => 
+                      ((esp.activa ?? esp.activo) !== false) &&
                       !form.especialidades.some((e, i) => i !== index && e?.id === esp.id)
                     )}
                     getOptionLabel={(option) => option?.nombre || ''}

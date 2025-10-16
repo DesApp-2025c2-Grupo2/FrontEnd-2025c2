@@ -26,6 +26,7 @@ import TarjetaPrestadorSimple from '../components/TarjetaPrestadorSimple';
 import DialogPrestador from '../components/DialogPrestador';
 import DialogVerPrestador from '../components/DialogVerPrestador';
 import DialogHorariosPrestador from '../components/DialogHorariosPrestador';
+import * as agendasService from '../services/agendasService';
 import {
   selectPrestadoresFiltrados,
   selectPrestadoresLoading,
@@ -35,6 +36,7 @@ import {
   editarPrestador,
   toggleActivoPrestador
 } from '../store/prestadoresSlice';
+import { cargarEspecialidades } from '../store/especialidadesSlice';
 
 function Prestadores() {
   const dispatch = useDispatch();
@@ -46,6 +48,7 @@ function Prestadores() {
   const [dialogoEditar, setDialogoEditar] = useState(false);
   const [dialogoVer, setDialogoVer] = useState(false);
   const [dialogoHorarios, setDialogoHorarios] = useState(false);
+  const [prestadoresConAgenda, setPrestadoresConAgenda] = useState({}); // id -> prestador mergeado
   const [horariosContext, setHorariosContext] = useState({ lugarIndex: 0, horarioIndex: null });
   // Agenda creation was simplified and is not used directly from Prestadores
   const [confirmEliminarDireccion, setConfirmEliminarDireccion] = useState({ open: false, prestador: null, lugarIndex: null });
@@ -57,10 +60,49 @@ function Prestadores() {
   const loading = useSelector(selectPrestadoresLoading);
   const error = useSelector(selectPrestadoresError);
 
-  // Cargar prestadores al montar el componente
+  // Cargar prestadores y especialidades al montar el componente
   useEffect(() => {
     dispatch(cargarPrestadores());
+    dispatch(cargarEspecialidades());
   }, [dispatch]);
+
+  // Fusionar agendas para mostrar horarios en lugares (solo en memoria)
+  useEffect(() => {
+    let cancelado = false;
+    async function cargarAgendas() {
+      const actuales = { ...prestadoresConAgenda };
+      const promises = [];
+      prestadoresFiltrados.forEach((p) => {
+        if (!actuales[p.id]) {
+          promises.push(
+            agendasService.getByProfesional(p.id).then((agendas) => {
+              if (cancelado) return;
+              const agendaById = new Map((agendas || []).map((a) => [a.id, a]));
+              const agendaByDir = new Map((agendas || []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
+              const lugaresBase = Array.isArray(p.lugaresAtencion) ? JSON.parse(JSON.stringify(p.lugaresAtencion)) : [];
+              const lugaresMergeados = lugaresBase.map((l) => {
+                const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
+                if (a) {
+                  return { ...l, horarios: a.horarios || [] };
+                }
+                return l;
+              });
+              // No agregar lugares nuevos desde agenda: solo completar horarios en los existentes
+              actuales[p.id] = { ...p, lugaresAtencion: lugaresMergeados };
+            }).catch(() => {})
+          );
+        }
+      });
+      if (promises.length > 0) {
+        await Promise.all(promises);
+        if (!cancelado) setPrestadoresConAgenda(actuales);
+      }
+    }
+    if (prestadoresFiltrados && prestadoresFiltrados.length > 0) {
+      cargarAgendas();
+    }
+    return () => { cancelado = true; };
+  }, [prestadoresFiltrados, /* forzamos refresh cuando cambian */ setPrestadoresConAgenda]);
 
   // Abrir modal si viene ?nuevo=1
   useEffect(() => {
@@ -95,6 +137,7 @@ function Prestadores() {
     setHorariosContext({ lugarIndex, horarioIndex });
     setDialogoHorarios(true);
   };
+
 
   const handleEliminarHorario = async (prestador, lugarIndex, horarioIndex) => {
     try {
@@ -136,6 +179,8 @@ function Prestadores() {
   const handleGuardarNuevo = async (nuevoPrestador) => {
     try {
       await dispatch(crearPrestador(nuevoPrestador)).unwrap();
+      // Re-cargar lista desde backend para asegurar estado consistente
+      dispatch(cargarPrestadores());
       setDialogoAgregar(false);
       setSnackbar({
         open: true,
@@ -154,6 +199,8 @@ function Prestadores() {
   const handleGuardarEdicion = async (prestadorEditado) => {
     try {
       await dispatch(editarPrestador(prestadorEditado)).unwrap();
+      // Re-cargar lista desde backend tras editar
+      dispatch(cargarPrestadores());
       setDialogoEditar(false);
       setPrestadorSeleccionado(null);
       setSnackbar({
@@ -236,10 +283,12 @@ function Prestadores() {
             {typeof error === 'string' ? error : (error?.message || String(error))}
           </Alert>
         ) : prestadoresFiltrados.length > 0 ? (
-          prestadoresFiltrados.map((prestador) => (
+          prestadoresFiltrados.map((prestador) => {
+            const pMerge = prestadoresConAgenda[prestador.id] || prestador;
+            return (
             <TarjetaPrestadorSimple
-              key={prestador.id}
-              prestador={prestador}
+              key={pMerge.id}
+              prestador={pMerge}
               onVer={handleVer}
               onEditar={handleEditar}
               onToggleActivo={handleToggleActivo}
@@ -253,7 +302,8 @@ function Prestadores() {
               }}
               // Mostrar especialidad elegida por dirección
             />
-          ))
+            );
+          })
         ) : (
           <Box sx={{ textAlign: 'center', py: 8 }}>
             <PersonIcon sx={{ fontSize: 64, color: '#ccc', mb: 2 }} />
@@ -336,6 +386,7 @@ function Prestadores() {
           }}
         />
       )}
+
 
       {/* Crear/editar agenda se realiza desde la pantalla de agendas, no desde Prestadores */}
 
