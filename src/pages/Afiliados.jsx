@@ -1,9 +1,7 @@
-// src/pages/Afiliados.jsx
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSelector, useDispatch, shallowEqual } from "react-redux";
 import { Box, Typography, Fab, Snackbar, Alert } from "@mui/material";
 import { Add as AddIcon, Person as PersonIcon } from "@mui/icons-material";
-
 import AdvancedSearchBar from "../components/Afiliados/AdvancedSearchBar";
 import AfiliadoCard from "../components/Afiliados/AfiliadosCard";
 import AfiliadoFormDialog from "../components/Afiliados/AfiliadoFormDialog";
@@ -593,19 +591,11 @@ export default function Afiliados() {
       );
 
       if (selectedAfiliado && isEditing) {
-        const payload = buildAfiliadoPayload(selectedAfiliado);
         await dispatch(
           updateAfiliado({ id: selectedAfiliado.id, payload })
         ).unwrap();
         showSnackbar("Afiliado actualizado");
       } else {
-        const maxNumero = Math.max(
-          0,
-          ...afiliados.map((a) => Number(a.numeroAfiliado) || 0)
-        );
-        const numeroAfiliado = maxNumero + 1;
-        const payload = buildAfiliadoPayload(null);
-        payload.numeroAfiliado = numeroAfiliado;
         await dispatch(createAfiliado(payload)).unwrap();
         showSnackbar("Afiliado creado");
       }
