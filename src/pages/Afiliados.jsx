@@ -1,32 +1,9 @@
-<<<<<<< HEAD
 // src/pages/Afiliados.jsx
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSelector, useDispatch, shallowEqual } from "react-redux";
 import { Box, Typography, Fab, Snackbar, Alert } from "@mui/material";
 import { Add as AddIcon, Person as PersonIcon } from "@mui/icons-material";
 
-=======
-import { useState, useEffect } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import { Box, Typography, Fab, Snackbar, Alert } from "@mui/material";
-import { Add as AddIcon, Person as PersonIcon } from "@mui/icons-material";
-import {
-  setBajaAfiliado,
-  cancelBajaAfiliado,
-  programarAltaAfiliado,
-  cancelarAltaProgramada,
-  createAfiliadoCompleto,
-  updateAfiliadoCompleto,
-  reactivarAfiliado,
-  fetchAfiliados,
-} from "../store/afiliadosSlice";
-import {
-  addPersona,
-  updatePersona,
-  deletePersona,
-  setPersonasFromAfiliados,
-} from "../store/personasSlice";
->>>>>>> 87bc780cb0493b4c159170398b95ddf7b1927c74
 import AdvancedSearchBar from "../components/Afiliados/AdvancedSearchBar";
 import AfiliadoCard from "../components/Afiliados/AfiliadosCard";
 import AfiliadoFormDialog from "../components/Afiliados/AfiliadoFormDialog";
@@ -40,7 +17,10 @@ import {
   updateAfiliado,
 } from "../store/afiliadosSlice";
 
-import { selectSituaciones, cargarSituaciones } from "../store/situacionesTerapeuticasSlice";
+import {
+  selectSituaciones,
+  cargarSituaciones,
+} from "../store/situacionesTerapeuticasSlice";
 import { cargarPlanes, selectPlanes } from "../store/planesSlice";
 import { personasService } from "../services/personasService";
 
@@ -76,31 +56,18 @@ const tieneAltaProgramada = (alta) => {
   return startOfDay(new Date(alta)) > startOfDay(new Date());
 };
 
-<<<<<<< HEAD
 // helpers puros
 const getTitularDelAfiliado = (afiliado) => {
-=======
-const getTitularDelAfiliado = (afiliado, personas) => {
->>>>>>> 87bc780cb0493b4c159170398b95ddf7b1927c74
   if (!afiliado) return null;
   const titularId = afiliado.titularID ?? afiliado.titularId;
   if (!afiliado.integrantes) return null;
   return afiliado.integrantes.find((i) => String(i.id) === String(titularId));
 };
 
-<<<<<<< HEAD
 const getFamiliaresDelAfiliado = (afiliado) => {
   if (!afiliado || !afiliado.integrantes) return [];
   const titularId = afiliado.titularID ?? afiliado.titularId;
   return afiliado.integrantes.filter((i) => String(i.id) !== String(titularId));
-=======
-const getFamiliaresDelAfiliado = (afiliado, personas) => {
-  if (!afiliado) return [];
-  const titularId = afiliado.titularId ?? afiliado.titularID ?? afiliado.titular;
-  return personas.filter(
-    (p) => p.afiliadoId === afiliado.id && p.id !== titularId
-  );
->>>>>>> 87bc780cb0493b4c159170398b95ddf7b1927c74
 };
 
 const getPlanMedicoNombre = (planMedicoId, planesMedicos) => {
@@ -171,26 +138,7 @@ export default function Afiliados() {
     planMedicoId: "1",
     alta: hoyISO(),
   });
-
-<<<<<<< HEAD
   // fetch inicial
-=======
-  const [formFamiliar, setFormFamiliar] = useState({
-    nombre: "",
-    apellido: "",
-    tipoDocumento: "DNI",
-    numeroDocumento: "",
-    fechaNacimiento: "",
-    parentesco: 2,
-    alta: hoyISO(),
-  });
-
-  const [editTelefonos, setEditTelefonos] = useState([]);
-  const [editEmails, setEditEmails] = useState([]);
-  const [editDirecciones, setEditDirecciones] = useState([]);
-  const [editSituaciones, setEditSituaciones] = useState([]);
-
->>>>>>> 87bc780cb0493b4c159170398b95ddf7b1927c74
   useEffect(() => {
     dispatch(fetchAfiliados());
     dispatch(cargarPlanes());
@@ -198,38 +146,8 @@ export default function Afiliados() {
   }, [dispatch]);
 
   useEffect(() => {
-<<<<<<< HEAD
     setFilteredAfiliados(afiliados);
   }, [afiliados]);
-=======
-    if (afiliados && afiliados.length > 0) {
-      // Extraer todas las personas de los afiliados
-      const todasPersonas = [];
-      
-      afiliados.forEach(afiliado => {
-        // Si el backend devuelve el titular en la propiedad 'titular'
-        if (afiliado.titular) {
-          todasPersonas.push(afiliado.titular);
-        }
-        
-        // Si el backend devuelve los integrantes en un array
-        if (afiliado.integrantes && Array.isArray(afiliado.integrantes)) {
-          afiliado.integrantes.forEach(integrante => {
-            // Evitar duplicados
-            if (!todasPersonas.find(p => p.id === integrante.id)) {
-              todasPersonas.push(integrante);
-            }
-          });
-        }
-      });
-
-      console.log('Personas extraídas:', todasPersonas); // Debug
-      dispatch(setPersonasFromAfiliados(todasPersonas));
-    }
-  }, [afiliados, dispatch]);
-
-  useEffect(() => setFilteredAfiliados(afiliados), [afiliados]);
->>>>>>> 87bc780cb0493b4c159170398b95ddf7b1927c74
 
   const showSnackbar = (message, severity = "success") =>
     setSnackbar({ open: true, message, severity });
@@ -248,31 +166,12 @@ export default function Afiliados() {
       tipoDocumento: "DNI",
       numeroDocumento: "",
       fechaNacimiento: "",
-      planMedicoId: "1",
+      planMedicoId: "",
       alta: hoyISO(),
     });
     setIntegrantes([]);
     setOpenDialog(true);
-<<<<<<< HEAD
   }, []);
-=======
-  };
-
-  const handleEditAfiliado = (afiliado) => {
-    if (!afiliado) {
-      console.error("No se proporcionó un afiliado para editar");
-      return;
-    }
-
-    const titular = getTitularDelAfiliado(afiliado, personas);
-    if (!titular) {
-      console.error("No se encontró el titular del afiliado");
-      console.log("Afiliado:", afiliado); // Debug
-      console.log("Personas disponibles:", personas); // Debug
-      showSnackbar("No se encontró el titular del afiliado", "error");
-      return;
-    }
->>>>>>> 87bc780cb0493b4c159170398b95ddf7b1927c74
 
   const handleEditAfiliado = useCallback((afiliado) => {
     if (!afiliado) return showSnackbar("Afiliado inválido", "error");
@@ -291,7 +190,7 @@ export default function Afiliados() {
       numeroDocumento:
         titular?.documentacion?.numero ?? titular?.numeroDocumento ?? "",
       fechaNacimiento: titular?.fechaNacimiento ?? "",
-      planMedicoId: afiliado.planMedicoId ?? "1",
+      planMedicoId: afiliado.planMedicoId ?? 1,
       alta: afiliado.alta ?? hoyISO(),
       telefonos: titular?.telefonos?.map((t) => t.numero) ?? [],
       emails: titular?.emails?.map((e) => e.correo) ?? [],
@@ -333,7 +232,7 @@ export default function Afiliados() {
       numeroDocumento:
         titular?.documentacion?.numero ?? titular?.numeroDocumento ?? "",
       fechaNacimiento: titular?.fechaNacimiento ?? "",
-      planMedicoId: afiliado.planMedicoId ?? "1",
+      planMedicoId: afiliado.planMedicoId ?? 1,
       alta: afiliado.alta ?? hoyISO(),
       telefonos: titular?.telefonos?.map((t) => t.numero) ?? [],
       emails: titular?.emails?.map((e) => e.correo) ?? [],
@@ -358,7 +257,13 @@ export default function Afiliados() {
   // ---------- Familiares ----------
   const handleViewFamiliar = useCallback(async (afiliado, fam) => {
     try {
-      const familiarCompleto = await personasService.getPersona(fam.id); {console.log("fam",fam,fam.id)} {console.log("afiliado",afiliado, afiliado.id)}
+      const familiarCompleto = await personasService.getPersona(fam.id);
+      {
+        console.log("fam", fam, fam.id);
+      }
+      {
+        console.log("afiliado", afiliado, afiliado.id);
+      }
       setSelectedAfiliado(afiliado);
       setSelectedFamiliar(familiarCompleto); // solo vista
       setIsEditingFamiliar(false);
@@ -420,26 +325,35 @@ export default function Afiliados() {
     }
 
     try {
+      // Construimos el familiar
       const familiarPayload = {
+        id: formFamiliar.id || 0,
         numeroIntegrante: formFamiliar.numeroIntegrante,
         nombre: formFamiliar.nombre,
         apellido: formFamiliar.apellido,
         fechaNacimiento: formFamiliar.fechaNacimiento,
         parentesco: formFamiliar.parentesco,
-        afiliadoId: selectedAfiliado ? selectedAfiliado.id : undefined,
         alta: formFamiliar.alta,
         baja: formFamiliar.baja ?? null,
         documentacion:
-          formFamiliar.tipoDocumento || formFamiliar.documentacion
+          formFamiliar.tipoDocumento ||
+          formFamiliar.documentacion?.tipoDocumento ||
+          formFamiliar.numeroDocumento ||
+          formFamiliar.documentacion?.numero
             ? {
                 tipoDocumento:
-                  formFamiliar.tipoDocumento ??
-                  formFamiliar.documentacion?.tipoDocumento,
-                numero:
+                  parseInt(
+                    formFamiliar.tipoDocumento ??
+                      formFamiliar.documentacion?.tipoDocumento
+                  ) || 0,
+                numero: (
                   formFamiliar.numeroDocumento ??
-                  formFamiliar.documentacion?.numero,
+                  formFamiliar.documentacion?.numero ??
+                  ""
+                ).toString(),
               }
             : null,
+
         telefonos: (formFamiliar.telefonos || []).map((t) => ({
           numero: t.numero ?? t.Numero ?? t ?? "",
         })),
@@ -457,13 +371,37 @@ export default function Afiliados() {
           formFamiliar.situacionesTerapeuticasIds ?? [],
       };
 
-      if (isEditingFamiliar && formFamiliar.id) {
-        await personasService.updatePersona(formFamiliar.id, familiarPayload);
-        showSnackbar("Familiar actualizado correctamente");
-      } else {
-        await personasService.createPersona(familiarPayload);
-        showSnackbar("Familiar agregado correctamente");
+      // Obtener integrantes actuales del afiliado
+      const afiliadoActual = selectedAfiliado;
+
+      // Validar que el plan médico del afiliado exista
+      const planValido = planesMedicos.some(
+        (p) => String(p.id) === String(afiliadoActual.planMedicoId)
+      );
+      if (!planValido) {
+        console.error("❌ Plan médico inválido:", afiliadoActual.planMedicoId);
+        showSnackbar("El plan médico del afiliado no existe", "error");
+        return;
       }
+      // Nuevo array con el nuevo familiar agregado
+      const nuevosIntegrantes = [
+        ...(afiliadoActual.integrantes || []),
+        familiarPayload,
+      ];
+
+      const payload = {
+        ...afiliadoActual,
+        integrantes: nuevosIntegrantes,
+      };
+      console.log(
+        "🎯 [FINAL] Payload cambio integrantes a enviar:",
+        JSON.stringify(payload, null, 2)
+      );
+      await dispatch(
+        updateAfiliado({ id: afiliadoActual.id, payload })
+      ).unwrap();
+
+      showSnackbar("Familiar agregado correctamente");
 
       await dispatch(fetchAfiliados()).unwrap();
 
@@ -474,135 +412,163 @@ export default function Afiliados() {
       console.error("Error al guardar familiar:", error);
       showSnackbar("Error al guardar el familiar", "error");
     }
-  }, [formFamiliar, isEditingFamiliar, selectedAfiliado, dispatch]);
-
-  const handleDeleteFamiliar = useCallback(
-    async (afiliado, fam) => {
-      if (!fam.id) {
-        showSnackbar("No se puede eliminar un familiar sin ID", "error");
-        return;
-      }
-
-      if (window.confirm(`¿Eliminar a ${fam.nombre} ${fam.apellido}?`)) {
-        try {
-          await personasService.deletePersona(fam.id);
-          showSnackbar("Familiar eliminado correctamente");
-          await dispatch(fetchAfiliados()).unwrap();
-        } catch (error) {
-          console.error("Error al eliminar familiar:", error);
-          showSnackbar("Error al eliminar el familiar", "error");
-        }
-      }
-    },
-    [dispatch]
-  );
+  }, [formFamiliar, selectedAfiliado, dispatch]);
 
   // ---------- Construcción payload afiliado ----------
   const buildAfiliadoPayload = useCallback(
     (afiliadoToEdit = null) => {
-      const titularFromForm = {
-        id: afiliadoToEdit
-          ? getTitularDelAfiliado(afiliadoToEdit)?.id ?? undefined
-          : undefined,
+      console.log("🔧 [DEBUG] Construyendo payload...");
+      console.log("🔧 [DEBUG] formAfiliado:", formAfiliado);
+
+      // Asegurar que el tipo de documento sea numérico (1, 2, 3, etc.)
+      const tipoDocumentoNumerico =
+        formAfiliado.tipoDocumento && !isNaN(formAfiliado.tipoDocumento)
+          ? formAfiliado.tipoDocumento
+          : 1; // Default a DNI si no es numérico
+
+      // 1. Construir el TITULAR desde formAfiliado
+      const titularPayload = {
         numeroIntegrante: 1,
-        nombre: formAfiliado.nombre,
-        apellido: formAfiliado.apellido,
-        fechaNacimiento: formAfiliado.fechaNacimiento,
-        parentesco: 0, // ajusta según catálogo
-        afiliadoId: afiliadoToEdit ? afiliadoToEdit.id : undefined,
-        alta: formAfiliado.alta,
+        nombre: formAfiliado.nombre?.trim() || "",
+        apellido: formAfiliado.apellido?.trim() || "",
+        fechaNacimiento: formAfiliado.fechaNacimiento || hoyISO().toISOString(),
+        parentesco: 0, // 0 = Titular
+        alta: formAfiliado.alta || hoyISO().toISOString(),
         baja: null,
-        documentacion:
-          formAfiliado.tipoDocumento || formAfiliado.documentacion
-            ? {
-                tipoDocumento:
-                  formAfiliado.tipoDocumento ??
-                  formAfiliado.documentacion?.tipoDocumento,
-                numero:
-                  formAfiliado.numeroDocumento ??
-                  formAfiliado.documentacion?.numero,
-              }
-            : null,
-        telefonos: (formAfiliado.telefonos || []).map((t) => ({
-          numero: t.numero ?? t.Numero ?? t ?? "",
-        })),
-        emails: (formAfiliado.emails || []).map((e) => ({
-          correo: e.correo ?? e.Correo ?? e ?? "",
-        })),
-        direcciones: (formAfiliado.direcciones || []).map((d) => ({
-          calle: d.calle ?? d.Calle ?? "",
-          altura: d.altura ?? d.Altura ?? "",
-          piso: d.piso ?? d.Piso ?? "",
-          departamento: d.departamento ?? d.Departamento ?? "",
-          provinciaCiudad: d.provinciaCiudad ?? d.ProvinciaCiudad ?? "",
-        })),
-        situacionesTerapeuticasIds: (
-          formAfiliado.situacionesTerapeuticasIds ||
-          formAfiliado.situacionesTerapeuticas ||
-          []
-        ).map((s) => s.id ?? s),
+        documentacion: {
+          tipoDocumento: parseInt(tipoDocumentoNumerico),
+          numero: formAfiliado.numeroDocumento?.toString() || "",
+        },
+        telefonos: (formAfiliado.telefonos || [])
+          .filter((t) => t && t.trim())
+          .map((t) => ({
+            numero: typeof t === "string" ? t.trim() : (t.numero || "").trim(),
+          })),
+        emails: (formAfiliado.emails || [])
+          .filter((e) => e && e.trim())
+          .map((e) => ({
+            correo: typeof e === "string" ? e.trim() : (e.correo || "").trim(),
+          })),
+        direcciones: (formAfiliado.direcciones || [])
+          .filter((d) => d)
+          .map((d) => {
+            if (typeof d === "string") {
+              return {
+                calle: d,
+                altura: "",
+                piso: "",
+                departamento: "",
+                provinciaCiudad: "",
+              };
+            }
+            return {
+              calle: d.calle || "",
+              altura: d.altura || "",
+              piso: d.piso || "",
+              departamento: d.departamento || "",
+              provinciaCiudad: d.provinciaCiudad || "",
+            };
+          }),
+        situacionesTerapeuticasIds:
+          formAfiliado.situacionesTerapeuticasIds || [],
       };
 
-      const resto = integrantes.filter(
-        (i) =>
-          !(
-            i.numeroIntegrante === 1 ||
-            String(i.id) === String(titularFromForm.id)
-          )
+      console.log("🔧 [DEBUG] Titular payload:", titularPayload);
+
+      // 2. Construir otros integrantes (familiares)
+      const otrosIntegrantesPayload = (integrantes || [])
+        .filter((i) => i && i.numeroIntegrante !== 1) // Excluir titular
+        .map((i, index) => ({
+          numeroIntegrante: i.numeroIntegrante || index + 2,
+          nombre: i.nombre?.trim() || "",
+          apellido: i.apellido?.trim() || "",
+          fechaNacimiento: i.fechaNacimiento || hoyISO(),
+          parentesco: i.parentesco || 2, // 2 = Cónyuge por defecto
+          alta: i.alta || hoyISO(),
+          baja: i.baja || null,
+          documentacion:
+            i.tipoDocumento || i.numeroDocumento
+              ? {
+                  tipoDocumento:
+                    i.tipoDocumento && !isNaN(i.tipoDocumento)
+                      ? i.tipoDocumento
+                      : 1,
+                  numero: i.numeroDocumento?.toString() || "",
+                }
+              : null,
+          telefonos: (i.telefonos || [])
+            .filter((t) => t && t.trim())
+            .map((t) => ({
+              numero:
+                typeof t === "string" ? t.trim() : (t.numero || "").trim(),
+            })),
+          emails: (i.emails || [])
+            .filter((e) => e && e.trim())
+            .map((e) => ({
+              correo:
+                typeof e === "string" ? e.trim() : (e.correo || "").trim(),
+            })),
+          direcciones: (i.direcciones || [])
+            .filter((d) => d)
+            .map((d) => {
+              if (typeof d === "string") {
+                return {
+                  calle: d,
+                  altura: "",
+                  piso: "",
+                  departamento: "",
+                  provinciaCiudad: "",
+                };
+              }
+              return {
+                calle: d.calle || "",
+                altura: d.altura || "",
+                piso: d.piso || "",
+                departamento: d.departamento || "",
+                provinciaCiudad: d.provinciaCiudad || "",
+              };
+            }),
+          situacionesTerapeuticasIds: i.situacionesTerapeuticasIds || [],
+        }));
+
+      console.log(
+        "🔧 [DEBUG] Otros integrantes payload:",
+        otrosIntegrantesPayload
       );
 
-      const integrantsPayload = [titularFromForm, ...resto].map((i) => ({
-        id: i.id && String(i.id).startsWith("new-") ? undefined : i.id,
-        numeroIntegrante: i.numeroIntegrante,
-        nombre: i.nombre,
-        apellido: i.apellido,
-        fechaNacimiento: i.fechaNacimiento,
-        parentesco: i.parentesco ?? 0,
-        afiliadoId: afiliadoToEdit ? afiliadoToEdit.id : undefined,
-        alta: i.alta ?? hoyISO(),
-        baja: i.baja ?? null,
-        documentacion: i.documentacion
-          ? {
-              tipoDocumento: i.documentacion.tipoDocumento,
-              numero: i.documentacion.numero,
-            }
-          : i.tipoDocumento || i.numeroDocumento
-          ? {
-              tipoDocumento: i.tipoDocumento,
-              numero: i.numeroDocumento,
-            }
-          : null,
-        telefonos: (i.telefonos || []).map((t) => ({
-          numero: t.numero ?? t.Numero ?? t ?? "",
-        })),
-        emails: (i.emails || []).map((e) => ({
-          correo: e.correo ?? e.Correo ?? e ?? "",
-        })),
-        direcciones: (i.direcciones || []).map((d) => ({
-          calle: d.calle ?? d.Calle ?? "",
-          altura: d.altura ?? d.Altura ?? "",
-          piso: d.piso ?? d.Piso ?? "",
-          departamento: d.departamento ?? d.Departamento ?? "",
-          provinciaCiudad: d.provinciaCiudad ?? d.ProvinciaCiudad ?? "",
-        })),
-        situacionesTerapeuticasIds: (
-          i.situacionesTerapeuticasIds ||
-          i.situacionesTerapeuticas ||
-          []
-        ).map((s) => s.id ?? s),
-      }));
-
-      return {
+      // 3. Payload final - Asegurar que numeroAfiliado esté presente
+      const finalPayload = {
         numeroAfiliado: afiliadoToEdit
           ? afiliadoToEdit.numeroAfiliado
           : undefined,
-        planMedicoId: formAfiliado.planMedicoId,
-        alta: formAfiliado.alta,
+        planMedicoId: parseInt(formAfiliado.planMedicoId) || 1,
+        alta: formAfiliado.alta || hoyISO(),
         baja: null,
-        integrantes: integrantsPayload,
+        integrantes: [titularPayload, ...otrosIntegrantesPayload],
       };
+
+      // Para creación nueva, asegurar que numeroAfiliado tenga valor
+      if (!afiliadoToEdit && !finalPayload.numeroAfiliado) {
+        const maxNumero = Math.max(
+          0,
+          ...afiliados.map((a) => Number(a.numeroAfiliado) || 0)
+        );
+        finalPayload.numeroAfiliado = maxNumero + 1;
+      }
+
+      console.log(
+        "🔧 [DEBUG] Payload final antes de enviar:",
+        JSON.stringify(finalPayload, null, 2)
+      );
+      console.log(
+        "🔧 [DEBUG] Cantidad de integrantes:",
+        finalPayload.integrantes.length
+      );
+      console.log("🔧 [DEBUG] numeroAfiliado:", finalPayload.numeroAfiliado);
+
+      return finalPayload;
     },
-    [formAfiliado, integrantes]
+    [formAfiliado, integrantes, afiliados]
   );
 
   // ---------- Guardar afiliado ----------
@@ -619,17 +585,20 @@ export default function Afiliados() {
     }
 
     try {
+      const payload = buildAfiliadoPayload(selectedAfiliado);
+
+      console.log(
+        "🎯 [FINAL] Payload a enviar:",
+        JSON.stringify(payload, null, 2)
+      );
+
       if (selectedAfiliado && isEditing) {
-<<<<<<< HEAD
         const payload = buildAfiliadoPayload(selectedAfiliado);
-=======
->>>>>>> 87bc780cb0493b4c159170398b95ddf7b1927c74
         await dispatch(
           updateAfiliado({ id: selectedAfiliado.id, payload })
         ).unwrap();
         showSnackbar("Afiliado actualizado");
       } else {
-<<<<<<< HEAD
         const maxNumero = Math.max(
           0,
           ...afiliados.map((a) => Number(a.numeroAfiliado) || 0)
@@ -638,23 +607,17 @@ export default function Afiliados() {
         const payload = buildAfiliadoPayload(null);
         payload.numeroAfiliado = numeroAfiliado;
         await dispatch(createAfiliado(payload)).unwrap();
-=======
-        await dispatch(
-          createAfiliadoCompleto({
-            formAfiliado,
-            editTelefonos,
-            editEmails,
-            editDirecciones,
-            editSituaciones,
-          })
-        ).unwrap();
->>>>>>> 87bc780cb0493b4c159170398b95ddf7b1927c74
         showSnackbar("Afiliado creado");
       }
+
       await dispatch(fetchAfiliados()).unwrap();
     } catch (err) {
-      console.error(err);
-      showSnackbar("Error al guardar en backend", "error");
+      console.error("❌ Error al guardar afiliado:", err);
+      console.error("❌ Error details:", err.response?.data);
+      showSnackbar(
+        "Error al guardar en backend: " + (err.message || "Error desconocido"),
+        "error"
+      );
     } finally {
       setOpenDialog(false);
       setSelectedAfiliado(null);
@@ -664,7 +627,6 @@ export default function Afiliados() {
     formAfiliado,
     selectedAfiliado,
     isEditing,
-    afiliados,
     buildAfiliadoPayload,
     dispatch,
   ]);
@@ -700,8 +662,6 @@ export default function Afiliados() {
     },
     [dispatch]
   );
-
-<<<<<<< HEAD
   const handleReactivarInmediatamente = useCallback(
     async (afiliado) => {
       try {
@@ -720,14 +680,6 @@ export default function Afiliados() {
     },
     [dispatch]
   );
-=======
-  const handleReactivarInmediatamente = (afiliado) => {
-    dispatch(reactivarAfiliado(afiliado.id));
-    const titular = getTitularDelAfiliado(afiliado, personas);
-    if (titular) dispatch(updatePersona({ ...titular, alta: hoyISO() }));
-    showSnackbar("Afiliado reactivado inmediatamente");
-  };
->>>>>>> 87bc780cb0493b4c159170398b95ddf7b1927c74
 
   const handleSetBajaAfiliado = useCallback(
     async (afiliado, fechaBaja) => {
@@ -798,21 +750,9 @@ export default function Afiliados() {
 
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {filteredAfiliados.map((afiliado) => {
-<<<<<<< HEAD
           const titular = getTitularDelAfiliado(afiliado);
           const familiares = getFamiliaresDelAfiliado(afiliado);
           if (!titular) return null;
-=======
-          const titular = getTitularDelAfiliado(afiliado, personas);
-          const familiares = getFamiliaresDelAfiliado(afiliado, personas);
-          
-          // Debug: ver qué está pasando
-          if (!titular) {
-            console.warn(`No se encontró titular para afiliado ${afiliado.id}`, afiliado);
-            return null;
-          }
-          
->>>>>>> 87bc780cb0493b4c159170398b95ddf7b1927c74
           return (
             <AfiliadoCard
               key={afiliado.id}
@@ -839,7 +779,7 @@ export default function Afiliados() {
               onAddFamiliar={() => handleAddFamiliar(afiliado)}
               onViewFamiliar={(fam) => handleViewFamiliar(afiliado, fam)}
               onEditFamiliar={(fam) => handleEditFamiliar(afiliado, fam)}
-              onDeleteFamiliar={(fam) => handleDeleteFamiliar(afiliado, fam)}
+              //onDeleteFamiliar={(fam) => handleDeleteFamiliar(afiliado, fam)}
               getParentescoColor={getParentescoColor}
               getPlanColor={getPlanColor}
               parentescos={parentescos}

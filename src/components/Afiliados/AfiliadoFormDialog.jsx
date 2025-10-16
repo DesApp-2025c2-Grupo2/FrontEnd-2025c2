@@ -99,7 +99,14 @@ export default function AfiliadoFormDialog({
     onEditEmailsChange((editEmails || []).filter((_, i) => i !== index));
   const handleAddDireccion = () => {
     if (!newDireccion.trim()) return;
-    onEditDireccionesChange([...(editDirecciones || []), newDireccion.trim()]);
+    const direccionObj = {
+      calle: newDireccion.trim(),
+      altura: "0", // valor por defecto no nulo
+      piso: "",
+      departamento: "",
+      provinciaCiudad: "Bs As",
+    };
+    onEditDireccionesChange([...(editDirecciones || []), direccionObj]);
     setNewDireccion("");
   };
   const handleRemoveDireccion = (index) =>
@@ -347,6 +354,8 @@ export default function AfiliadoFormDialog({
                     <MenuItem value="">Seleccione</MenuItem>
                     {Object.entries(tiposDocumento).map(([key, value]) => (
                       <MenuItem key={key} value={key}>
+                        {" "}
+                        {/* ← Usar key (numérico) no value */}
                         {value}
                       </MenuItem>
                     ))}
@@ -376,7 +385,9 @@ export default function AfiliadoFormDialog({
                   InputLabelProps={{ shrink: true }}
                   value={
                     formData.fechaNacimiento
-                      ? new Date(formData.fechaNacimiento).toISOString().split("T")[0]
+                      ? new Date(formData.fechaNacimiento)
+                          .toISOString()
+                          .split("T")[0]
                       : hoyISO()
                   }
                   onChange={(e) =>

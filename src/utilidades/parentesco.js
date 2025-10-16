@@ -1,8 +1,8 @@
 export const Parentesco = {
-  Titular: 1,
-  Conyuge: 2,
-  Hijo_a: 3,
-  FamiliarACargo: 4,
+  Titular: 0,
+  Conyuge: 1,
+  Hijo_a: 2,
+  FamiliarACargo: 3,
 };
 
 export const parentescos = [

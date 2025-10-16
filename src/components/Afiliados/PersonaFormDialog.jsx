@@ -119,38 +119,108 @@ export default function PersonaFormDialog({
       setNewTelefono("");
       setNewEmail("");
       setNewDireccion("");
-
-      // Inicializar datos del formulario cuando se abre en modo edición
-      if (selectedFamiliar && isEditing) {
-        const initialData = getInitialFormData();
-        Object.entries(initialData).forEach(([key, value]) => {
-          if (value !== undefined) {
-            onFormChange(key, value);
-          }
-        });
-
-        // Inicializar contactos usando los helpers
-        if (selectedFamiliar.telefonos) {
-          const telefonosNormalizados =
-            selectedFamiliar.telefonos.map(telefonoToString);
-          onEditTelefonosChange(telefonosNormalizados);
-        }
-
-        if (selectedFamiliar.emails) {
-          const emailsNormalizados = selectedFamiliar.emails.map(emailToString);
-          onEditEmailsChange(emailsNormalizados);
-        }
-
-        if (selectedFamiliar.direcciones) {
-          // Para direcciones mantenemos los objetos completos
-          onEditDireccionesChange(selectedFamiliar.direcciones);
-        }
-
-        if (selectedFamiliar.situacionesTerapeuticas) {
-          onEditSituacionesChange(selectedFamiliar.situacionesTerapeuticas);
-        }
-      }
     }
+
+    // Normalizar siempre que haya selectedFamiliar
+    if (!selectedFamiliar) return;
+
+    // Si venís en edición, inicializa los campos del formulario
+    if (isEditing) {
+      const initialData = getInitialFormData();
+      Object.entries(initialData).forEach(([key, value]) => {
+        if (value !== undefined) onFormChange(key, value);
+      });
+    }
+
+    // Helper defensivo para extraer número de un teléfono (objeto o string)
+    const extractTelefono = (t) => {
+      if (!t && t !== 0) return "";
+      if (typeof t === "string") return t;
+      if (typeof t === "number") return String(t);
+      return t.numero ?? t.Numero ?? t.telefono ?? t.Telefono ?? "";
+    };
+
+    // Helper defensivo para extraer correo de un email (objeto o string)
+    const extractEmail = (e) => {
+      if (!e && e !== 0) return "";
+      if (typeof e === "string") return e;
+      if (typeof e === "number") return String(e);
+      return e.correo ?? e.Correo ?? e.email ?? e.Email ?? "";
+    };
+
+    // Normalizar telefonos -> strings (para mostrar en el editor / vista)
+    if (
+      Array.isArray(selectedFamiliar.telefonos) ||
+      Array.isArray(selectedFamiliar.Telefonos)
+    ) {
+      const raw = Array.isArray(selectedFamiliar.telefonos)
+        ? selectedFamiliar.telefonos
+        : selectedFamiliar.Telefonos;
+      const telefonosNormalizados = raw.map((t) =>
+        (extractTelefono(t) || "").trim()
+      );
+      onEditTelefonosChange(telefonosNormalizados);
+    } else {
+      onEditTelefonosChange([]);
+    }
+
+    // Normalizar emails -> strings
+    if (
+      Array.isArray(selectedFamiliar.emails) ||
+      Array.isArray(selectedFamiliar.Emails)
+    ) {
+      const raw = Array.isArray(selectedFamiliar.emails)
+        ? selectedFamiliar.emails
+        : selectedFamiliar.Emails;
+      const emailsNormalizados = raw.map((e) => (extractEmail(e) || "").trim());
+      onEditEmailsChange(emailsNormalizados);
+    } else {
+      onEditEmailsChange([]);
+    }
+
+    // Direcciones: normalizar objetos con keys comunes o aceptar strings
+    const rawDirecciones =
+      selectedFamiliar.direcciones ?? selectedFamiliar.Direcciones ?? [];
+    if (Array.isArray(rawDirecciones)) {
+      const direccionesNormalizadas = rawDirecciones
+        .map((d) => {
+          if (!d) return null;
+          if (typeof d === "string") {
+            return {
+              calle: d,
+              altura: "",
+              piso: "",
+              departamento: "",
+              provinciaCiudad: "",
+            };
+          }
+          return {
+            calle: d.calle ?? d.Calle ?? d.street ?? "",
+            altura: d.altura ?? d.Altura ?? d.number ?? "",
+            piso: d.piso ?? d.Piso ?? d.floor ?? "",
+            departamento:
+              d.departamento ?? d.Departamento ?? d.depto ?? d.apartment ?? "",
+            provinciaCiudad:
+              d.provinciaCiudad ?? d.ProvinciaCiudad ?? d.city ?? "",
+          };
+        })
+        .filter(Boolean);
+      onEditDireccionesChange(direccionesNormalizadas);
+    } else {
+      onEditDireccionesChange([]);
+    }
+
+    // Situaciones: puede venir como ids, objetos o strings
+    const situacionesRaw =
+      selectedFamiliar.situacionesTerapeuticas ??
+      selectedFamiliar.situacionesTerapeuticasIds ??
+      selectedFamiliar.SituacionesTerapeuticas ??
+      selectedFamiliar.SituacionesTerapeuticasIds ??
+      [];
+    const situacionesNormalizadas = Array.isArray(situacionesRaw)
+      ? situacionesRaw
+      : [situacionesRaw];
+    onEditSituacionesChange(situacionesNormalizadas);
   }, [open, selectedFamiliar, isEditing]);
 
   const handleAddTelefono = () => {
@@ -178,10 +248,10 @@ export default function PersonaFormDialog({
       typeof newDireccion === "string"
         ? {
             calle: newDireccion.trim(),
-            altura: "",
+            altura: "0",
             piso: "",
             departamento: "",
-            provinciaCiudad: "",
+            provinciaCiudad: "Bs As",
           }
         : newDireccion;
     onEditDireccionesChange([...(editDirecciones || []), parsed]);
