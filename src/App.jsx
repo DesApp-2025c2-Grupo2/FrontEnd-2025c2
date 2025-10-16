@@ -6,7 +6,6 @@ import Prestadores from "./pages/Prestadores.jsx";
 import Especialidades from "./pages/Especialidades.jsx";
 import PlanesMedicos from "./pages/PlanesMedicos.jsx";
 import Layout from "./layouts/Layout.jsx";
-import Turnos from "./pages/Turnos.jsx";
 import ConsultasReportes from "./pages/ConsultasReportes.jsx";
 import SituacionesTerapeuticas from "./pages/SituacionesTerapeuticas.jsx";
 
@@ -19,7 +18,6 @@ const router = createBrowserRouter([
       { path: "afiliados", element: <Afiliados /> },
       { path: "prestadores", element: <Prestadores /> },
       { path: "especialidades", element: <Especialidades /> },
-      { path: "turnos", element: <Turnos /> },
       { path: "consultas-reportes", element: <ConsultasReportes /> },
       { path: "situaciones", element: <SituacionesTerapeuticas /> },
       { path: "planes", element: <PlanesMedicos /> },
