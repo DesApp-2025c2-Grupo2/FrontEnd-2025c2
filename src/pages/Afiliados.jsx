@@ -1,4 +1,3 @@
-// components/pages/Afiliados.jsx
 import { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { Box, Typography, Fab, Snackbar, Alert } from "@mui/material";
@@ -8,10 +7,7 @@ import {
   cancelBajaAfiliado,
   programarAltaAfiliado,
   cancelarAltaProgramada,
-  createAfiliadoCompleto,
-  updateAfiliadoCompleto,
   reactivarAfiliado,
-  fetchAfiliados,
 } from "../store/afiliadosSlice";
 import {
   addPersona,
@@ -24,6 +20,7 @@ import AfiliadoFormDialog from "../components/Afiliados/AfiliadoFormDialog";
 import PersonaFormDialog from "../components/Afiliados/PersonaFormDialog";
 import BajaDialog from "../components/Afiliados/BajaDialog";
 import AltaDialog from "../components/Afiliados/AltaDialog";
+import { AfiliadosService } from "../services/afiliadosService";
 import { selectSituaciones } from "../store/situacionesTerapeuticasSlice";
 import { selectPlanes } from "../store/planesSlice";
 
@@ -57,29 +54,22 @@ const tieneAltaProgramada = (alta) => {
   return startOfDay(new Date(alta)) > startOfDay(new Date());
 };
 
-// MEJORADA: admite titularId o titularID y defensa si no hay afiliado
+// MEJORADA: Agregar validación para afiliado null
 const getTitularDelAfiliado = (afiliado, personas) => {
-  if (!afiliado) return null;
-  const titularId =
-    afiliado.titularId ?? afiliado.titularID ?? afiliado.titular;
-  if (!titularId) return null;
-  return personas.find((p) => p.id === titularId);
+  if (!afiliado || !afiliado.titularId) return null;
+  return personas.find((p) => p.id === afiliado.titularId);
 };
 
-// MEJORADA: admite ambas variantes del campo titular y defensa
+// MEJORADA: Agregar validación para afiliado null
 const getFamiliaresDelAfiliado = (afiliado, personas) => {
   if (!afiliado) return [];
-  const titularId =
-    afiliado.titularId ?? afiliado.titularID ?? afiliado.titular;
   return personas.filter(
-    (p) => p.afiliadoId === afiliado.id && p.id !== titularId
+    (p) => p.afiliadoId === afiliado.id && p.id !== afiliado.titularId
   );
 };
 
 const getPlanMedicoNombre = (planMedicoId, planesMedicos) => {
-  const plan = (planesMedicos || []).find(
-    (p) => String(p.id) === String(planMedicoId)
-  );
+  const plan = planesMedicos.find((p) => String(p.id) === String(planMedicoId));
   return plan ? plan.nombre : "Desconocido";
 };
 
@@ -115,7 +105,7 @@ export default function Afiliados() {
     tipoDocumento: "DNI",
     numeroDocumento: "",
     fechaNacimiento: "",
-    planMedicoId: "1",
+    planMedicoId: "1", // Cambiado a string para consistencia
     alta: hoyISO(),
   });
 
@@ -136,10 +126,6 @@ export default function Afiliados() {
 
   useEffect(() => setFilteredAfiliados(afiliados), [afiliados]);
 
-  useEffect(() => {
-    dispatch(fetchAfiliados());
-  }, [dispatch]);
-
   const showSnackbar = (message, severity = "success") =>
     setSnackbar({ open: true, message, severity });
 
@@ -153,7 +139,7 @@ export default function Afiliados() {
       tipoDocumento: "DNI",
       numeroDocumento: "",
       fechaNacimiento: "",
-      planMedicoId: "1",
+      planMedicoId: "1", // Cambiado a string
       alta: hoyISO(),
     });
     setEditTelefonos([]);
@@ -163,6 +149,7 @@ export default function Afiliados() {
     setOpenDialog(true);
   };
 
+  // MEJORADA: Agregar validación para afiliado null
   const handleEditAfiliado = (afiliado) => {
     if (!afiliado) {
       console.error("No se proporcionó un afiliado para editar");
@@ -186,9 +173,9 @@ export default function Afiliados() {
       planMedicoId: afiliado.planMedicoId,
       alta: afiliado.alta,
     });
-    setEditTelefonos([...(titular.telefonos || [])]);
-    setEditEmails([...(titular.emails || [])]);
-    setEditDirecciones([...(titular.direcciones || [])]);
+    setEditTelefonos([...titular.telefonos]);
+    setEditEmails([...titular.emails]);
+    setEditDirecciones([...titular.direcciones]);
     setEditSituaciones([...(titular.situacionesTerapeuticas || [])]);
     setOpenDialog(true);
   };
@@ -201,7 +188,7 @@ export default function Afiliados() {
     setOpenDialog(true);
   };
 
-  const handleSaveAfiliado = async () => {
+  const handleSaveAfiliado = () => {
     if (
       !formAfiliado.nombre ||
       !formAfiliado.apellido ||
@@ -213,40 +200,34 @@ export default function Afiliados() {
       return;
     }
 
-    try {
-      if (selectedAfiliado && isEditing) {
-        // usar thunk para actualizar afiliado completo
-        await dispatch(
-          updateAfiliadoCompleto({
-            selectedAfiliado,
-            formAfiliado,
-            editTelefonos,
-            editEmails,
-            editDirecciones,
-            editSituaciones,
-          })
-        ).unwrap();
-        showSnackbar("Afiliado actualizado");
-      } else {
-        // usar thunk para crear afiliado completo
-        await dispatch(
-          createAfiliadoCompleto({
-            formAfiliado,
-            editTelefonos,
-            editEmails,
-            editDirecciones,
-            editSituaciones,
-          })
-        ).unwrap();
-        showSnackbar("Afiliado creado");
-      }
-    } catch (error) {
-      console.error("Error guardando afiliado:", error);
-      showSnackbar(String(error) || "Error al guardar afiliado", "error");
-    } finally {
-      setOpenDialog(false);
-      setSelectedAfiliado(null);
+    if (selectedAfiliado && isEditing) {
+      // delegar a service
+      AfiliadosService.updateAfiliadoExisting(
+        dispatch,
+        selectedAfiliado,
+        formAfiliado,
+        editTelefonos,
+        editEmails,
+        editDirecciones,
+        editSituaciones,
+        personas
+      );
+      showSnackbar("Afiliado actualizado");
+    } else {
+      AfiliadosService.createAfiliado(
+        dispatch,
+        formAfiliado,
+        editTelefonos,
+        editEmails,
+        editDirecciones,
+        editSituaciones,
+        afiliados
+      );
+      showSnackbar("Afiliado creado");
     }
+
+    setOpenDialog(false);
+    setSelectedAfiliado(null);
   };
 
   // Altas programadas / reactivación
@@ -316,9 +297,9 @@ export default function Afiliados() {
       parentesco: familiar.parentesco,
       alta: familiar.alta,
     });
-    setEditTelefonos([...(familiar.telefonos || [])]);
-    setEditEmails([...(familiar.emails || [])]);
-    setEditDirecciones([...(familiar.direcciones || [])]);
+    setEditTelefonos([...familiar.telefonos]);
+    setEditEmails([...familiar.emails]);
+    setEditDirecciones([...familiar.direcciones]);
     setEditSituaciones([...(familiar.situacionesTerapeuticas || [])]);
     setOpenFamiliarDialog(true);
   };
@@ -504,6 +485,7 @@ export default function Afiliados() {
         <AddIcon />
       </Fab>
 
+      {/* CORREGIDO: onEdit ahora usa arrow function */}
       <AfiliadoFormDialog
         open={openDialog}
         selectedAfiliado={selectedAfiliado}
