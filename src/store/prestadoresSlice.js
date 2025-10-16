@@ -12,8 +12,8 @@ export const cargarPrestadores = createAsyncThunk(
   'prestadores/cargar',
   async (_, { rejectWithValue, getState }) => {
     try {
-      // Inicializar seed si hace falta y devolver datos
-      const data = await prestadoresService.ensureSeed();
+      // Consumir backend con normalización
+      const data = await prestadoresService.getAll();
       return data;
     } catch (error) {
       return rejectWithValue(error.message || 'Error al cargar prestadores');
@@ -100,7 +100,12 @@ const slice = createSlice({
       })
       .addCase(crearPrestador.fulfilled, (state, action) => {
         state.loading = false;
-        state.items.push(action.payload);
+        // Cuando el servicio devuelve lista completa tras crear
+        if (Array.isArray(action.payload)) {
+          state.items = action.payload;
+        } else if (action.payload) {
+          state.items.push(action.payload);
+        }
       })
       .addCase(crearPrestador.rejected, (state, action) => {
         state.loading = false;
@@ -114,9 +119,13 @@ const slice = createSlice({
       })
       .addCase(editarPrestador.fulfilled, (state, action) => {
         state.loading = false;
-        const idx = state.items.findIndex(p => p.id === action.payload.id);
-        if (idx !== -1) {
-          state.items[idx] = action.payload;
+        if (Array.isArray(action.payload)) {
+          state.items = action.payload;
+        } else if (action.payload && action.payload.id) {
+          const idx = state.items.findIndex(p => p.id === action.payload.id);
+          if (idx !== -1) {
+            state.items[idx] = action.payload;
+          }
         }
       })
       .addCase(editarPrestador.rejected, (state, action) => {
@@ -173,8 +182,9 @@ export const selectPrestadoresActivos = (state) => {
 
 // Selector para filtrar prestadores
 export const selectPrestadoresFiltrados = (searchTerm) => (state) => {
-  const prestadores = selectPrestadores(state);
-  let resultado = prestadores;
+  // Dejar prestadores como están (sin resolver especialidades con catálogo)
+  const prestadoresActivos = selectPrestadores(state).filter(p => p.activo);
+  let resultado = prestadoresActivos;
   
   if (!searchTerm || searchTerm.trim() === '') {
     return resultado;

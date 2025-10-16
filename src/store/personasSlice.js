@@ -1,222 +1,150 @@
-import { createSlice } from "@reduxjs/toolkit";
+// src/store/personasSlice.js
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { personasService } from "../services/personasService";
 
-const initialState = {
-  personas: [
-    {
-      id: "1",
-      numeroIntegrante: 1,
-      nombre: "Pedro",
-      apellido: "Gómez",
-      tipoDocumento: "DNI",
-      numeroDocumento: "12345678",
-      fechaNacimiento: "1980-05-15",
-      parentesco: 1, // 1: Titular
-      afiliadoId: "1",
-      alta: "2024-01-15",
-      baja: null,
-      telefonos: ["11-1234-5678", "11-9876-5432", "15-5555-1234"],
-      emails: ["pedro.gomez@email.com", "pedro.trabajo@empresa.com"],
-      direcciones: ["Av. Corrientes 1234, CABA", "San Martín 890, Vicente López"],
-      situacionesTerapeuticas: [],
-    },
-    {
-      id: "2",
-      numeroIntegrante: 2,
-      nombre: "María",
-      apellido: "Gómez",
-      tipoDocumento: "DNI",
-      numeroDocumento: "23345678",
-      fechaNacimiento: "1985-08-20",
-      parentesco: 2,
-      afiliadoId: "1",
-      alta: "2024-01-15",
-      baja: null,
-      telefonos: ["11-8765-4321", "15-2222-3333"],
-      emails: ["maria.gomez@email.com"],
-      direcciones: ["Av. Corrientes 1234, CABA"],
-      situacionesTerapeuticas: ["Embarazo"],
-    },
-    {
-      id: "3",
-      numeroIntegrante: 3,
-      nombre: "Lucas",
-      apellido: "Gómez",
-      tipoDocumento: "DNI",
-      numeroDocumento: "48654321",
-      fechaNacimiento: "2010-03-12",
-      parentesco: 3,
-      afiliadoId: "1",
-      alta: "2024-01-15",
-      baja: null,
-      telefonos: ["11-1234-5678"],
-      emails: [],
-      direcciones: ["Av. Corrientes 1234, CABA"],
-      situacionesTerapeuticas: [],
-    },
-    {
-      id: "4",
-      numeroIntegrante: 1,
-      nombre: "Ana",
-      apellido: "López",
-      tipoDocumento: "DNI",
-      numeroDocumento: "35687457",
-      fechaNacimiento: "1975-12-10",
-      parentesco: 1,
-      afiliadoId: "2",
-      alta: "2024-02-01",
-      baja: null,
-      telefonos: ["11-2233-4455", "11-7777-8888"],
-      emails: ["ana.lopez@email.com"],
-      direcciones: ["Belgrano 567, CABA"],
-      situacionesTerapeuticas: ["Diabetes"],
-    },
-    {
-      id: "5",
-      numeroIntegrante: 2,
-      nombre: "Carlos",
-      apellido: "López",
-      tipoDocumento: "DNI",
-      numeroDocumento: "26589451",
-      fechaNacimiento: "2015-06-25",
-      parentesco: 3,
-      afiliadoId: "2",
-      alta: "2024-02-01",
-      baja: null,
-      telefonos: ["11-2233-4455"],
-      emails: [],
-      direcciones: ["Belgrano 567, CABA"],
-      situacionesTerapeuticas: [],
-    },
-    {
-      id: "6",
-      numeroIntegrante: 1,
-      nombre: "Roberto",
-      apellido: "Fernández",
-      tipoDocumento: "DNI",
-      numeroDocumento: "26987453",
-      fechaNacimiento: "1982-09-18",
-      parentesco: 1,
-      afiliadoId: "3",
-      alta: "2024-01-25",
-      baja: null,
-      telefonos: ["11-5566-7788"],
-      emails: ["roberto.fernandez@email.com"],
-      direcciones: ["Mitre 789, Avellaneda"],
-      situacionesTerapeuticas: [],
-    },
-  ],
-  parentescos: [
-    { id: 1, nombre: "Titular" },
-    { id: 2, nombre: "Cónyuge" },
-    { id: 3, nombre: "Hijo" },
-    { id: 4, nombre: "FamiliarACargo" },
-  ],
-  tiposDocumento: [
-    { id: "DNI", nombre: "DNI" },
-    { id: "LC", nombre: "LC" },
-    { id: "LE", nombre: "LE" },
-    { id: "Pasaporte", nombre: "Pasaporte" },
-  ],
-};
+// Async thunks
+export const fetchPersona = createAsyncThunk(
+  "personas/fetchPersona",
+  async (personaId, { rejectWithValue }) => {
+    try {
+      return await personasService.getPersona(personaId);
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+export const createPersona = createAsyncThunk(
+  "personas/createPersona",
+  async (personaData, { rejectWithValue }) => {
+    try {
+      return await personasService.createPersona(personaData);
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+export const updatePersona = createAsyncThunk(
+  "personas/updatePersona",
+  async ({ id, personaData }, { rejectWithValue }) => {
+    try {
+      return await personasService.updatePersona(id, personaData);
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+export const deletePersona = createAsyncThunk(
+  "personas/deletePersona",
+  async (personaId, { rejectWithValue }) => {
+    try {
+      await personasService.deletePersona(personaId);
+      return personaId;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
 
 const personasSlice = createSlice({
   name: "personas",
-  initialState,
+  initialState: {
+    currentPersona: null,
+    loading: false,
+    error: null,
+    operationSuccess: false,
+  },
   reducers: {
-    addPersona: (state, action) => {
-      state.personas.push(action.payload);
+    clearCurrentPersona: (state) => {
+      state.currentPersona = null;
     },
-    updatePersona: (state, action) => {
-      const index = state.personas.findIndex((p) => p.id === action.payload.id);
-      if (index !== -1) {
-        state.personas[index] = { ...state.personas[index], ...action.payload };
-      }
+    clearError: (state) => {
+      state.error = null;
     },
-    deletePersona: (state, action) => {
-      state.personas = state.personas.filter((p) => p.id !== action.payload);
+    clearOperationSuccess: (state) => {
+      state.operationSuccess = false;
     },
-    setBajaPersona: (state, action) => {
-      const { personaId, fechaBaja } = action.payload;
-      const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) persona.baja = fechaBaja;
-    },
-    cancelBajaPersona: (state, action) => {
-      const persona = state.personas.find((p) => p.id === action.payload);
-      if (persona) persona.baja = null;
-    },
-    addTelefonoToPersona: (state, action) => {
-      const { personaId, telefono } = action.payload;
-      const persona = state.personas.find((p) => p.id === personaId);
-      if (persona && !persona.telefonos.includes(telefono)) persona.telefonos.push(telefono);
-    },
-    removeTelefonoFromPersona: (state, action) => {
-      const { personaId, telefonoIndex } = action.payload;
-      const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) persona.telefonos = persona.telefonos.filter((_, i) => i !== telefonoIndex);
-    },
-    addEmailToPersona: (state, action) => {
-      const { personaId, email } = action.payload;
-      const persona = state.personas.find((p) => p.id === personaId);
-      if (persona && !persona.emails.includes(email)) persona.emails.push(email);
-    },
-    removeEmailFromPersona: (state, action) => {
-      const { personaId, emailIndex } = action.payload;
-      const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) persona.emails = persona.emails.filter((_, i) => i !== emailIndex);
-    },
-    addDireccionToPersona: (state, action) => {
-      const { personaId, direccion } = action.payload;
-      const persona = state.personas.find((p) => p.id === personaId);
-      if (persona && !persona.direcciones.includes(direccion)) persona.direcciones.push(direccion);
-    },
-    removeDireccionFromPersona: (state, action) => {
-      const { personaId, direccionIndex } = action.payload;
-      const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) persona.direcciones = persona.direcciones.filter((_, i) => i !== direccionIndex);
-    },
-    addSituacionTerapeuticaToPersona: (state, action) => {
-      const { personaId, situacion } = action.payload;
-      const persona = state.personas.find((p) => p.id === personaId);
-      if (persona && !persona.situacionesTerapeuticas.includes(situacion)) persona.situacionesTerapeuticas.push(situacion);
-    },
-    removeSituacionTerapeuticaFromPersona: (state, action) => {
-      const { personaId, situacionIndex } = action.payload;
-      const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) persona.situacionesTerapeuticas = persona.situacionesTerapeuticas.filter((_, i) => i !== situacionIndex);
-    },
-    updateAfiliadoIdPersona: (state, action) => {
-      const { personaId, afiliadoId } = action.payload;
-      const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) persona.afiliadoId = afiliadoId;
-    },
-    updateAltaPersona: (state, action) => {
-      const { personaId, fechaAlta } = action.payload;
-      const persona = state.personas.find((p) => p.id === personaId);
-      if (persona) persona.alta = fechaAlta;
-    },
+  },
+  extraReducers: (builder) => {
+    builder
+      // Fetch Persona
+      .addCase(fetchPersona.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPersona.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentPersona = action.payload;
+        state.error = null;
+      })
+      .addCase(fetchPersona.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        state.currentPersona = null;
+      })
+      // Create Persona
+      .addCase(createPersona.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.operationSuccess = false;
+      })
+      .addCase(createPersona.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentPersona = action.payload;
+        state.operationSuccess = true;
+        state.error = null;
+      })
+      .addCase(createPersona.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        state.operationSuccess = false;
+      })
+      // Update Persona
+      .addCase(updatePersona.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.operationSuccess = false;
+      })
+      .addCase(updatePersona.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentPersona = action.payload;
+        state.operationSuccess = true;
+        state.error = null;
+      })
+      .addCase(updatePersona.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        state.operationSuccess = false;
+      })
+      // Delete Persona
+      .addCase(deletePersona.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.operationSuccess = false;
+      })
+      .addCase(deletePersona.fulfilled, (state) => {
+        state.loading = false;
+        state.currentPersona = null;
+        state.operationSuccess = true;
+        state.error = null;
+      })
+      .addCase(deletePersona.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        state.operationSuccess = false;
+      });
   },
 });
 
-export const {
-  addPersona,
-  updatePersona,
-  deletePersona,
-  setBajaPersona,
-  cancelBajaPersona,
-  addTelefonoToPersona,
-  removeTelefonoFromPersona,
-  addEmailToPersona,
-  removeEmailFromPersona,
-  addDireccionToPersona,
-  removeDireccionFromPersona,
-  addSituacionTerapeuticaToPersona,
-  removeSituacionTerapeuticaFromPersona,
-  updateAfiliadoIdPersona,
-  updateAltaPersona,
-} = personasSlice.actions;
+export const { clearCurrentPersona, clearError, clearOperationSuccess } =
+  personasSlice.actions;
 
-export const selectPersonas = (state) => state.personas.personas;
-export const selectParentescos = (state) => state.personas.parentescos;
-export const selectTiposDocumento = (state) => state.personas.tiposDocumento;
+export const selectCurrentPersona = (state) => state.personas.currentPersona;
+export const selectPersonasLoading = (state) => state.personas.loading;
+export const selectPersonasError = (state) => state.personas.error;
+export const selectPersonasOperationSuccess = (state) =>
+  state.personas.operationSuccess;
 
 export default personasSlice.reducer;

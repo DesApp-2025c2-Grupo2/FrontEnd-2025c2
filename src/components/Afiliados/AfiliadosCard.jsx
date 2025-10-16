@@ -23,29 +23,44 @@ const padNumeroAfiliado = (n) => String(Number(n) || 0).padStart(7, "0");
 const padIntegrante = (n) => String(Number(n) || 0).padStart(2, "0");
 
 export default function AfiliadosCard({
-  afiliado,
-  titular,
-  familiares,
-  planMedico,
-  estaActivo,
-  tieneBajaProgramada,
-  tieneAltaProgramada,
-  onView,
-  onEdit,
-  onSetBaja,
-  onSetAlta,
-  onAddFamiliar,
-  onEditFamiliar,
-  onViewFamiliar,
-  onDeleteFamiliar,
-  getParentescoColor,
-  getPlanColor,
-  parentescos,
+  afiliado = {},
+  titular = null,
+  familiares = [],
+  planMedico = "Desconocido",
+  estaActivo = true,
+  tieneBajaProgramada = false,
+  tieneAltaProgramada = false,
+  onView = () => {},
+  onEdit = () => {},
+  onSetBaja = () => {},
+  onSetAlta = () => {},
+  onAddFamiliar = () => {},
+  onEditFamiliar = () => {},
+  onViewFamiliar = () => {},
+  onDeleteFamiliar = () => {},
+  getParentescoColor = () => "#757575",
+  getPlanColor = () => "#757575",
+  parentescos = [],
 }) {
-  const getParentescoNombre = (parentescoId) => {
-    const parentesco = parentescos.find((p) => p.id === parentescoId);
-    return parentesco ? parentesco.nombre : "Desconocido";
+  const titularesafe = titular || {
+    nombre: "Sin titular",
+    apellido: "",
+    parentesco: 1,
+    numeroIntegrante: 1,
+    situacionesTerapeuticas: [],
   };
+  const fams = Array.isArray(familiares) ? familiares : [];
+
+  const getParentescoNombre = (parentescoId) => {
+    const p = parentescos.find((x) => x.id === parentescoId);
+    return p ? p.nombre : "Desconocido";
+  };
+
+  const situacionesList = Array.isArray(titularesafe.situacionesTerapeuticas)
+    ? titularesafe.situacionesTerapeuticas.map((s) =>
+        typeof s === "string" ? s : s?.nombre ?? String(s)
+      )
+    : [];
 
   return (
     <Card
@@ -74,8 +89,9 @@ export default function AfiliadosCard({
         >
           <Box sx={{ display: "flex", alignItems: "center", gap: 2, mb: 1 }}>
             <Typography variant="h6" sx={{ fontWeight: "bold" }}>
-              {titular.apellido}, {titular.nombre}
+              {titularesafe.apellido}, {titularesafe.nombre}
             </Typography>
+
             <Chip
               label={planMedico}
               size="small"
@@ -85,6 +101,7 @@ export default function AfiliadosCard({
                 fontWeight: "bold",
               }}
             />
+
             {tieneBajaProgramada && (
               <Chip
                 icon={<ScheduleIcon />}
@@ -124,26 +141,25 @@ export default function AfiliadosCard({
             <Typography variant="body2" color="textSecondary">
               <strong>Afiliado Nº:</strong>{" "}
               {padNumeroAfiliado(afiliado.numeroAfiliado)}-
-              {padIntegrante(titular.numeroIntegrante)}
+              {padIntegrante(titularesafe.numeroIntegrante)}
             </Typography>
+
             <Typography variant="body2" color="textSecondary">
               <strong>Alta:</strong>{" "}
               {afiliado.alta
-                ? new Date(afiliado.alta).toLocaleDateString("es-AR", {
-                    timeZone: "UTC",
-                  })
+                ? new Date(afiliado.alta).toLocaleDateString("es-AR")
                 : ""}
             </Typography>
+
             {afiliado.baja && (
               <Typography variant="body2" color="textSecondary">
                 <strong>Baja:</strong>{" "}
-                {new Date(afiliado.baja).toLocaleDateString("es-AR", {
-                  timeZone: "UTC",
-                })}
+                {new Date(afiliado.baja).toLocaleDateString("es-AR")}
               </Typography>
             )}
+
             <Typography variant="body2" color="textSecondary">
-              <strong>Integrantes:</strong> {familiares.length + 1}
+              <strong>Integrantes:</strong> {fams.length + 1}
             </Typography>
           </Box>
 
@@ -156,15 +172,15 @@ export default function AfiliadosCard({
             }}
           >
             <Chip
-              label={getParentescoNombre(titular.parentesco)}
+              label={getParentescoNombre(titularesafe.parentesco)}
               size="small"
               sx={{
-                backgroundColor: getParentescoColor(titular.parentesco),
+                backgroundColor: getParentescoColor(titularesafe.parentesco),
                 color: "white",
                 fontWeight: "bold",
               }}
             />
-            {titular.situacionesTerapeuticas?.map((situacion, index) => (
+            {situacionesList.map((situacion, index) => (
               <Chip
                 key={index}
                 label={situacion}
@@ -203,7 +219,6 @@ export default function AfiliadosCard({
             Editar
           </Button>
 
-          {/* Botón condicional para Alta/Baja */}
           {!estaActivo || tieneBajaProgramada || tieneAltaProgramada ? (
             <Button
               size="small"
@@ -230,27 +245,28 @@ export default function AfiliadosCard({
         </Box>
       </Box>
 
-      {familiares.length > 0 && (
+      {fams.length > 0 && (
         <Accordion sx={{ mt: 2 }}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Typography variant="subtitle2">
-              Ver Integrantes del Grupo Familiar ({familiares.length})
+              Ver Integrantes del Grupo Familiar ({fams.length})
             </Typography>
           </AccordionSummary>
           <AccordionDetails>
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {familiares.map((familiar) => (
+              {fams.map((familiar) => (
                 <PersonaListItem
                   key={familiar.id}
                   persona={familiar}
                   afiliado={afiliado}
-                  onEdit={onEditFamiliar}
-                  onView={onViewFamiliar}
-                  onDelete={onDeleteFamiliar}
+                  onEdit={() => onEditFamiliar(familiar)}
+                  onView={() => onViewFamiliar(familiar)}
+                  onDelete={() => onDeleteFamiliar(familiar)}
                   getParentescoColor={getParentescoColor}
                   getParentescoNombre={getParentescoNombre}
                 />
               ))}
+
               <Button
                 startIcon={<PersonAddIcon />}
                 onClick={() => onAddFamiliar(afiliado)}
@@ -265,7 +281,7 @@ export default function AfiliadosCard({
         </Accordion>
       )}
 
-      {familiares.length === 0 && (
+      {fams.length === 0 && (
         <Box sx={{ mt: 2 }}>
           <Button
             startIcon={<PersonAddIcon />}
