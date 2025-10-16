@@ -33,7 +33,6 @@ const menuItems = [
     path: "/especialidades",
     icon: <LocalHospitalIcon />,
   },
-  { text: "Turnos", path: "/turnos", icon: <AccessTimeIcon /> },
   {
     text: "Consultas y Reportes",
     path: "/consultas-reportes",
