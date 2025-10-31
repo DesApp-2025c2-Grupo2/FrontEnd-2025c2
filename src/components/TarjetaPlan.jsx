@@ -3,7 +3,12 @@ import { Button, Chip, Card, CardContent, Stack, Typography } from '@mui/materia
 import EditIcon from '@mui/icons-material/Edit';
 import BotonAlternarEstado from './BotonAlternarEstado.jsx';
 
-const currency = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 2 });
+function formatCurrency(value) {
+  return new Intl.NumberFormat('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
+}
 
 export default function TarjetaPlan({ plan, onEditar, onAlternarActivo, onEliminar }) {
   return (
@@ -13,14 +18,13 @@ export default function TarjetaPlan({ plan, onEditar, onAlternarActivo, onElimin
           <Stack spacing={1} flex={1}>
             <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
               <Typography variant="h6" sx={{ fontWeight: 700, color: '#1f2937' }}>{plan.nombre}</Typography>
-              <Chip label={`Código: ${plan.codigo}`} size="small" variant="outlined" sx={{ borderRadius: 999 }} />
               <Chip label={plan.activo ? 'Activo' : 'Inactivo'} size="small" color={plan.activo ? 'success' : 'default'} sx={{ borderRadius: 999 }} />
             </Stack>
             {plan.descripcion ? (
               <Typography variant="body2" sx={{ color: '#6b7280' }}>{plan.descripcion}</Typography>
             ) : null}
             <Typography variant="h6" sx={{ color: '#059669', fontWeight: 800, mt: 0.5 }}>
-              {currency.format(Number(plan.precio || 0))}
+              {`${formatCurrency(plan.costoMensual)}${plan.moneda ? ` ${String(plan.moneda).toUpperCase()}` : ''}`}
             </Typography>
           </Stack>
           <Stack spacing={0.5} alignItems="flex-end" sx={{ minWidth: 170 }}>

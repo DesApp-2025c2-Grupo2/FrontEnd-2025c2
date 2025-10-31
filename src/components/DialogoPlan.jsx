@@ -19,20 +19,20 @@ export default function DialogoPlan({
   onGuardar,
 }) {
   const [form, setForm] = useState({
-    codigo: "",
     nombre: "",
     descripcion: "",
-    precio: 0,
+    costoMensual: 0,
+    moneda: 'ARS',
     activo: true,
   });
 
   useEffect(() => {
     if (abierto) {
       setForm({
-        codigo: valorInicial?.codigo ?? "",
         nombre: valorInicial?.nombre ?? "",
         descripcion: valorInicial?.descripcion ?? "",
-        precio: valorInicial?.precio ?? 0,
+        costoMensual: valorInicial?.costoMensual ?? 0,
+        moneda: valorInicial?.moneda ?? 'ARS',
         activo: valorInicial?.activo ?? true,
         id: valorInicial?.id,
       });
@@ -47,39 +47,25 @@ export default function DialogoPlan({
   const planes = useSelector(selectPlanes);
   const errores = useMemo(() => {
     const errs = {};
-    const codigoStr = String(form.codigo).trim().toLowerCase();
     const nombreStr = String(form.nombre).trim().toLowerCase();
-    if (!codigoStr) errs.codigo = "Código requerido";
     if (!nombreStr) errs.nombre = "Nombre requerido";
-    const duplicado = planes?.some(
-      (p) =>
-        p.id !== form.id &&
-        (String(p.codigo).trim().toLowerCase() === codigoStr ||
-          String(p.nombre).trim().toLowerCase() === nombreStr)
-    );
-    if (duplicado) {
-      errs.codigo = errs.codigo || "Código o nombre ya existentes";
-      errs.nombre = errs.nombre || "Código o nombre ya existentes";
-    }
+    const duplicado = planes?.some((p) => p.id !== form.id && String(p.nombre).trim().toLowerCase() === nombreStr);
+    if (duplicado) errs.nombre = "Nombre ya existente";
     return errs;
   }, [planes, form]);
 
   const guardar = () => {
     if (Object.keys(errores).length) return;
-    onGuardar?.({ ...form, precio: Number(form.precio) });
+    onGuardar?.({ ...form, costoMensual: Number(form.costoMensual) });
   };
 
   return (
     <Dialog open={abierto} onClose={onCerrar} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ fontWeight: 800, color: "#111827" }}>
+      <DialogTitle>
         {form.id ? "Editar plan" : "Agregar plan"}
       </DialogTitle>
       <DialogContent
         dividers
-        sx={{
-          "& .MuiFormControlLabel-label": { fontWeight: 700, color: "#111827" },
-          "& .MuiInputBase-input": { color: "#111827", fontWeight: 600 },
-        }}
       >
         <div
           style={{
@@ -90,25 +76,12 @@ export default function DialogoPlan({
           }}
         >
           <TextField
-            label="Código"
-            value={form.codigo}
-            onChange={cambiar("codigo")}
-            type="number"
-            fullWidth
-            error={!!errores.codigo}
-            helperText={errores.codigo}
-            InputLabelProps={{ sx: { fontWeight: 700, color: "#111827" } }}
-            inputProps={{ sx: { color: "#111827", fontWeight: 600 } }}
-          />
-          <TextField
             label="Nombre"
             value={form.nombre}
             onChange={cambiar("nombre")}
             fullWidth
             error={!!errores.nombre}
             helperText={errores.nombre}
-            InputLabelProps={{ sx: { fontWeight: 700, color: "#111827" } }}
-            inputProps={{ sx: { color: "#111827", fontWeight: 600 } }}
           />
           <TextField
             label="Descripción"
@@ -117,21 +90,23 @@ export default function DialogoPlan({
             fullWidth
             multiline
             rows={2}
-            InputLabelProps={{ sx: { fontWeight: 700, color: "#111827" } }}
-            inputProps={{ sx: { color: "#111827", fontWeight: 600 } }}
           />
           <TextField
-            label="Precio"
-            value={form.precio}
-            onChange={cambiar("precio")}
+            label="Costo mensual"
+            value={form.costoMensual}
+            onChange={cambiar("costoMensual")}
             type="number"
             fullWidth
-            InputLabelProps={{ sx: { fontWeight: 700, color: "#111827" } }}
-            inputProps={{ sx: { color: "#111827", fontWeight: 600 } }}
+          />
+          <TextField
+            label="Moneda"
+            value={form.moneda}
+            onChange={cambiar("moneda")}
+            fullWidth
           />
           <FormControlLabel
             control={
-              <Switch checked={!!form.activo} onChange={cambiar("activo")} />
+              <Switch checked={!!form.activo} color="secondary" onChange={cambiar("activo")} />
             }
             label="Activo"
           />
@@ -142,7 +117,6 @@ export default function DialogoPlan({
           color="secondary"
           variant="outlined"
           onClick={onCerrar}
-          sx={{ fontWeight: 700 }}
         >
           Cancelar
         </Button>
@@ -151,7 +125,6 @@ export default function DialogoPlan({
           color="secondary"
           onClick={guardar}
           disabled={Object.keys(errores).length > 0}
-          sx={{ fontWeight: 700 }}
         >
           Guardar
         </Button>

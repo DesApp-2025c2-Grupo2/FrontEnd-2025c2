@@ -10,15 +10,23 @@ import {
   Fab,
   CircularProgress,
   Alert,
-  Snackbar
+  Snackbar,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  Person as PersonIcon
 } from '@mui/icons-material';
 import TarjetaPrestadorSimple from '../components/TarjetaPrestadorSimple';
 import DialogPrestador from '../components/DialogPrestador';
 import DialogVerPrestador from '../components/DialogVerPrestador';
+import DialogHorariosPrestador from '../components/DialogHorariosPrestador';
+import * as agendasService from '../services/agendasService';
 import {
   selectPrestadoresFiltrados,
   selectPrestadoresLoading,
@@ -28,6 +36,7 @@ import {
   editarPrestador,
   toggleActivoPrestador
 } from '../store/prestadoresSlice';
+import { cargarEspecialidades } from '../store/especialidadesSlice';
 
 function Prestadores() {
   const dispatch = useDispatch();
@@ -38,6 +47,11 @@ function Prestadores() {
   const [dialogoAgregar, setDialogoAgregar] = useState(false);
   const [dialogoEditar, setDialogoEditar] = useState(false);
   const [dialogoVer, setDialogoVer] = useState(false);
+  const [dialogoHorarios, setDialogoHorarios] = useState(false);
+  const [prestadoresConAgenda, setPrestadoresConAgenda] = useState({}); // id -> prestador mergeado
+  const [horariosContext, setHorariosContext] = useState({ lugarIndex: 0, horarioIndex: null });
+  // Agenda creation was simplified and is not used directly from Prestadores
+  const [confirmEliminarDireccion, setConfirmEliminarDireccion] = useState({ open: false, prestador: null, lugarIndex: null });
   const [prestadorSeleccionado, setPrestadorSeleccionado] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
@@ -46,10 +60,49 @@ function Prestadores() {
   const loading = useSelector(selectPrestadoresLoading);
   const error = useSelector(selectPrestadoresError);
 
-  // Cargar prestadores al montar el componente
+  // Cargar prestadores y especialidades al montar el componente
   useEffect(() => {
     dispatch(cargarPrestadores());
+    dispatch(cargarEspecialidades());
   }, [dispatch]);
+
+  // Fusionar agendas para mostrar horarios en lugares (solo en memoria)
+  useEffect(() => {
+    let cancelado = false;
+    async function cargarAgendas() {
+      const actuales = { ...prestadoresConAgenda };
+      const promises = [];
+      prestadoresFiltrados.forEach((p) => {
+        if (!actuales[p.id]) {
+          promises.push(
+            agendasService.getByProfesional(p.id).then((agendas) => {
+              if (cancelado) return;
+              const agendaById = new Map((agendas || []).map((a) => [a.id, a]));
+              const agendaByDir = new Map((agendas || []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
+              const lugaresBase = Array.isArray(p.lugaresAtencion) ? JSON.parse(JSON.stringify(p.lugaresAtencion)) : [];
+              const lugaresMergeados = lugaresBase.map((l) => {
+                const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
+                if (a) {
+                  return { ...l, horarios: a.horarios || [] };
+                }
+                return l;
+              });
+              // No agregar lugares nuevos desde agenda: solo completar horarios en los existentes
+              actuales[p.id] = { ...p, lugaresAtencion: lugaresMergeados };
+            }).catch(() => {})
+          );
+        }
+      });
+      if (promises.length > 0) {
+        await Promise.all(promises);
+        if (!cancelado) setPrestadoresConAgenda(actuales);
+      }
+    }
+    if (prestadoresFiltrados && prestadoresFiltrados.length > 0) {
+      cargarAgendas();
+    }
+    return () => { cancelado = true; };
+  }, [prestadoresFiltrados, /* forzamos refresh cuando cambian */ setPrestadoresConAgenda]);
 
   // Abrir modal si viene ?nuevo=1
   useEffect(() => {
@@ -73,6 +126,33 @@ function Prestadores() {
     setDialogoEditar(true);
   };
 
+  const handleAgregarHorario = (prestador) => {
+    setPrestadorSeleccionado(prestador);
+    setHorariosContext({ lugarIndex: 0, horarioIndex: null });
+    setDialogoHorarios(true);
+  };
+
+  const handleEditarHorario = (prestador, lugarIndex, horarioIndex) => {
+    setPrestadorSeleccionado(prestador);
+    setHorariosContext({ lugarIndex, horarioIndex });
+    setDialogoHorarios(true);
+  };
+
+
+  const handleEliminarHorario = async (prestador, lugarIndex, horarioIndex) => {
+    try {
+      const copia = JSON.parse(JSON.stringify(prestador));
+      if (!copia.lugaresAtencion || !copia.lugaresAtencion[lugarIndex]) return;
+      const lugar = copia.lugaresAtencion[lugarIndex];
+      if (!Array.isArray(lugar.horarios)) return;
+      lugar.horarios = lugar.horarios.filter((_, idx) => idx !== horarioIndex);
+      await dispatch(editarPrestador(copia)).unwrap();
+      setSnackbar({ open: true, message: 'Horario eliminado', severity: 'success' });
+    } catch (error) {
+      setSnackbar({ open: true, message: 'No se pudo eliminar el horario', severity: 'error' });
+    }
+  };
+
   const handleToggleActivo = async (prestador) => {
     try {
       await dispatch(toggleActivoPrestador(prestador.id)).unwrap();
@@ -84,7 +164,7 @@ function Prestadores() {
     } catch (error) {
       setSnackbar({
         open: true,
-        message: error || 'Error al cambiar estado del prestador',
+        message: typeof error === 'string' ? error : (error?.message || 'Error al cambiar estado del prestador'),
         severity: 'error'
       });
     }
@@ -99,6 +179,8 @@ function Prestadores() {
   const handleGuardarNuevo = async (nuevoPrestador) => {
     try {
       await dispatch(crearPrestador(nuevoPrestador)).unwrap();
+      // Re-cargar lista desde backend para asegurar estado consistente
+      dispatch(cargarPrestadores());
       setDialogoAgregar(false);
       setSnackbar({
         open: true,
@@ -108,7 +190,7 @@ function Prestadores() {
     } catch (error) {
       setSnackbar({
         open: true,
-        message: error || 'Error al crear el prestador',
+        message: typeof error === 'string' ? error : (error?.message || 'Error al crear el prestador'),
         severity: 'error'
       });
     }
@@ -117,6 +199,8 @@ function Prestadores() {
   const handleGuardarEdicion = async (prestadorEditado) => {
     try {
       await dispatch(editarPrestador(prestadorEditado)).unwrap();
+      // Re-cargar lista desde backend tras editar
+      dispatch(cargarPrestadores());
       setDialogoEditar(false);
       setPrestadorSeleccionado(null);
       setSnackbar({
@@ -127,7 +211,7 @@ function Prestadores() {
     } catch (error) {
       setSnackbar({
         open: true,
-        message: error || 'Error al actualizar el prestador',
+        message: typeof error === 'string' ? error : (error?.message || 'Error al actualizar el prestador'),
         severity: 'error'
       });
     }
@@ -145,7 +229,7 @@ function Prestadores() {
         component="h1" 
         gutterBottom 
         sx={{ 
-          color: 'text.primary', 
+          color: '#1976d2',
           mb: { xs: 0.5, sm: 1 }, 
           fontWeight: 'bold',
           fontSize: { xs: '1.5rem', sm: '2.125rem' }
@@ -189,28 +273,41 @@ function Prestadores() {
       />
 
       {/* Lista de prestadores */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <CircularProgress />
           </Box>
         ) : error ? (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {error}
+            {typeof error === 'string' ? error : (error?.message || String(error))}
           </Alert>
         ) : prestadoresFiltrados.length > 0 ? (
-          prestadoresFiltrados.map((prestador) => (
+          prestadoresFiltrados.map((prestador) => {
+            const pMerge = prestadoresConAgenda[prestador.id] || prestador;
+            return (
             <TarjetaPrestadorSimple
-              key={prestador.id}
-              prestador={prestador}
+              key={pMerge.id}
+              prestador={pMerge}
               onVer={handleVer}
               onEditar={handleEditar}
               onToggleActivo={handleToggleActivo}
+              onGestionarHorarios={(p, lugarIndex) => {
+                setPrestadorSeleccionado(p);
+                setHorariosContext({ lugarIndex, horarioIndex: null });
+                setDialogoHorarios(true);
+              }}
+              onEliminarDireccion={async (p, lugarIndex) => {
+                setConfirmEliminarDireccion({ open: true, prestador: p, lugarIndex });
+              }}
+              // Mostrar especialidad elegida por dirección
             />
-          ))
+            );
+          })
         ) : (
-          <Box sx={{ textAlign: 'center', py: 4 }}>
-            <Typography variant="body1" color="text.secondary">
+          <Box sx={{ textAlign: 'center', py: 8 }}>
+            <PersonIcon sx={{ fontSize: 64, color: '#ccc', mb: 2 }} />
+            <Typography variant="h6" color="textSecondary">
               No se encontraron prestadores
             </Typography>
           </Box>
@@ -226,8 +323,6 @@ function Prestadores() {
           position: 'fixed',
           bottom: { xs: 16, sm: 24 },
           right: { xs: 16, sm: 24 },
-          backgroundColor: '#2196f3',
-          '&:hover': { backgroundColor: '#1976d2' },
           width: { xs: 48, sm: 56 },
           height: { xs: 48, sm: 56 }
         }}
@@ -241,6 +336,7 @@ function Prestadores() {
         valorInicial={null}
         onCerrar={() => setDialogoAgregar(false)}
         onGuardar={handleGuardarNuevo}
+        soloDirecciones={true}
       />
 
       {/* Diálogo Editar Prestador */}
@@ -252,6 +348,7 @@ function Prestadores() {
           setPrestadorSeleccionado(null);
         }}
         onGuardar={handleGuardarEdicion}
+        soloDirecciones={true}
       />
 
       {/* Diálogo Ver Detalles */}
@@ -263,6 +360,60 @@ function Prestadores() {
           setPrestadorSeleccionado(null);
         }}
       />
+
+      {/* Gestión de horarios por dirección (CRUD de disponibilidad + duración) */}
+      {dialogoHorarios && prestadorSeleccionado && (
+        <DialogHorariosPrestador
+          abierto={dialogoHorarios}
+          prestador={prestadorSeleccionado}
+          initialLugarIndex={horariosContext.lugarIndex}
+          initialHorarioIndex={horariosContext.horarioIndex}
+          lockLugar={true}
+          onCerrar={() => {
+            setDialogoHorarios(false);
+            setPrestadorSeleccionado(null);
+            setHorariosContext({ lugarIndex: 0, horarioIndex: null });
+          }}
+          onGuardar={async (prestadorActualizado) => {
+            try {
+              await dispatch(editarPrestador(prestadorActualizado)).unwrap();
+              setDialogoHorarios(false);
+              setPrestadorSeleccionado(null);
+              setSnackbar({ open: true, message: 'Horarios actualizados', severity: 'success' });
+            } catch (error) {
+              setSnackbar({ open: true, message: (typeof error === 'string' ? error : (error?.message || 'No se pudieron actualizar los horarios')), severity: 'error' });
+            }
+          }}
+        />
+      )}
+
+
+      {/* Crear/editar agenda se realiza desde la pantalla de agendas, no desde Prestadores */}
+
+      {/* Confirmación eliminar dirección */}
+      <Dialog open={confirmEliminarDireccion.open} onClose={() => setConfirmEliminarDireccion({ open: false, prestador: null, lugarIndex: null })}>
+        <DialogTitle>Eliminar dirección</DialogTitle>
+        <DialogContent>
+          <Typography>¿Seguro que deseas eliminar esta dirección y sus horarios?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button type="button" onClick={() => setConfirmEliminarDireccion({ open: false, prestador: null, lugarIndex: null })}>Cancelar</Button>
+          <Button type="button" color="error" onClick={async () => {
+            const { prestador, lugarIndex } = confirmEliminarDireccion;
+            if (!prestador || lugarIndex == null) return;
+            try {
+              const copia = JSON.parse(JSON.stringify(prestador));
+              copia.lugaresAtencion = (copia.lugaresAtencion || []).filter((_, i) => i !== lugarIndex);
+              await dispatch(editarPrestador(copia)).unwrap();
+              setSnackbar({ open: true, message: 'Dirección eliminada', severity: 'success' });
+            } catch (error) {
+              setSnackbar({ open: true, message: (typeof error === 'string' ? error : (error?.message || 'No se pudo eliminar la dirección')), severity: 'error' });
+            } finally {
+              setConfirmEliminarDireccion({ open: false, prestador: null, lugarIndex: null });
+            }
+          }}>Eliminar</Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Snackbar para notificaciones */}
       <Snackbar
