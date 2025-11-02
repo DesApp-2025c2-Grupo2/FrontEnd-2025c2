@@ -16,11 +16,16 @@ import {
   Typography,
   Alert
 } from '@mui/material';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import dayjs from 'dayjs';
 
 export default function ModalParametrosReporte({
   open,
   tipoReporte,
   especialidades = [],
+  afiliados = [],
   onClose,
   onConfirm
 }) {
@@ -35,8 +40,8 @@ export default function ModalParametrosReporte({
         case 'alta-afiliados-periodo':
         case 'alta-prestadores-periodo':
           setParametros({
-            fechaDesde: '',
-            fechaHasta: ''
+            fechaDesde: null,
+            fechaHasta: null
           });
           break;
         case 'prestadores-especialidad-cp':
@@ -46,6 +51,10 @@ export default function ModalParametrosReporte({
           });
           break;
         case 'situaciones-terapeuticas-afiliado':
+          setParametros({
+            afiliadoId: ''
+          });
+          break;
         case 'prestadores-sin-agendas':
           setParametros({});
           break;
@@ -60,14 +69,14 @@ export default function ModalParametrosReporte({
     const nuevosErrores = {};
 
     if (tipoReporte === 'alta-afiliados-periodo' || tipoReporte === 'alta-prestadores-periodo') {
-      if (!parametros.fechaDesde || parametros.fechaDesde.trim() === '') {
+      if (!parametros.fechaDesde || !dayjs(parametros.fechaDesde).isValid()) {
         nuevosErrores.fechaDesde = 'La fecha desde es obligatoria';
       }
-      if (!parametros.fechaHasta || parametros.fechaHasta.trim() === '') {
+      if (!parametros.fechaHasta || !dayjs(parametros.fechaHasta).isValid()) {
         nuevosErrores.fechaHasta = 'La fecha hasta es obligatoria';
       }
-      if (parametros.fechaDesde && parametros.fechaHasta && parametros.fechaDesde.trim() !== '' && parametros.fechaHasta.trim() !== '') {
-        if (new Date(parametros.fechaDesde) > new Date(parametros.fechaHasta)) {
+      if (parametros.fechaDesde && parametros.fechaHasta && dayjs(parametros.fechaDesde).isValid() && dayjs(parametros.fechaHasta).isValid()) {
+        if (dayjs(parametros.fechaDesde).isAfter(dayjs(parametros.fechaHasta))) {
           nuevosErrores.fechaHasta = 'La fecha hasta debe ser posterior a la fecha desde';
         }
       }
@@ -79,6 +88,12 @@ export default function ModalParametrosReporte({
         if (!/^\d+$/.test(cp)) {
           nuevosErrores.codigoPostal = 'El código postal debe ser numérico';
         }
+      }
+    }
+
+    if (tipoReporte === 'situaciones-terapeuticas-afiliado') {
+      if (!parametros.afiliadoId || parametros.afiliadoId === '') {
+        nuevosErrores.afiliadoId = 'Debe seleccionar un afiliado';
       }
     }
 
@@ -94,13 +109,12 @@ export default function ModalParametrosReporte({
     // Preparar parámetros para enviar
     const parametrosFinales = { ...parametros };
 
-    // Las fechas ya vienen en formato ISO string (YYYY-MM-DD) desde el input type="date"
-    // Solo asegurarnos de que están limpias
-    if (parametrosFinales.fechaDesde) {
-      parametrosFinales.fechaDesde = parametrosFinales.fechaDesde.trim();
+    // Convertir fechas de dayjs a formato ISO string (YYYY-MM-DD)
+    if (parametrosFinales.fechaDesde && dayjs(parametrosFinales.fechaDesde).isValid()) {
+      parametrosFinales.fechaDesde = dayjs(parametrosFinales.fechaDesde).format('YYYY-MM-DD');
     }
-    if (parametrosFinales.fechaHasta) {
-      parametrosFinales.fechaHasta = parametrosFinales.fechaHasta.trim();
+    if (parametrosFinales.fechaHasta && dayjs(parametrosFinales.fechaHasta).isValid()) {
+      parametrosFinales.fechaHasta = dayjs(parametrosFinales.fechaHasta).format('YYYY-MM-DD');
     }
 
     // Convertir código postal a array si existe (el servicio espera codigosPostales como array)
@@ -139,21 +153,23 @@ export default function ModalParametrosReporte({
   const tieneParametros = () => {
     return tipoReporte === 'alta-afiliados-periodo' ||
            tipoReporte === 'alta-prestadores-periodo' ||
-           tipoReporte === 'prestadores-especialidad-cp';
+           tipoReporte === 'prestadores-especialidad-cp' ||
+           tipoReporte === 'situaciones-terapeuticas-afiliado';
   };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{
-        sx: {
-          borderRadius: 2
-        }
-      }}
-    >
+    <LocalizationProvider dateAdapter={AdapterDayjs}>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2
+          }
+        }}
+      >
       <DialogTitle sx={{ pb: 1 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, color: '#1f2937' }}>
           {getTitulo()}
@@ -173,52 +189,97 @@ export default function ModalParametrosReporte({
             {/* Parámetros para reportes por período */}
             {(tipoReporte === 'alta-afiliados-periodo' || tipoReporte === 'alta-prestadores-periodo') && (
               <>
-                <TextField
+                <DatePicker
                   label="Fecha Desde"
-                  type="date"
-                  value={parametros.fechaDesde || ''}
-                  onChange={(e) => {
-                    setParametros({ ...parametros, fechaDesde: e.target.value });
+                  value={parametros.fechaDesde ? dayjs(parametros.fechaDesde) : null}
+                  onChange={(newValue) => {
+                    setParametros({ ...parametros, fechaDesde: newValue });
                     if (errors.fechaDesde) {
                       setErrors({ ...errors, fechaDesde: '' });
                     }
                   }}
-                  fullWidth
-                  error={!!errors.fechaDesde}
-                  helperText={errors.fechaDesde}
-                  InputLabelProps={{
-                    shrink: true
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: '#fafafa'
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      error: !!errors.fechaDesde,
+                      helperText: errors.fechaDesde,
+                      sx: {
+                        '& .MuiOutlinedInput-root': {
+                          backgroundColor: '#fafafa'
+                        }
+                      }
                     }
                   }}
                 />
 
-                <TextField
+                <DatePicker
                   label="Fecha Hasta"
-                  type="date"
-                  value={parametros.fechaHasta || ''}
-                  onChange={(e) => {
-                    setParametros({ ...parametros, fechaHasta: e.target.value });
+                  value={parametros.fechaHasta ? dayjs(parametros.fechaHasta) : null}
+                  onChange={(newValue) => {
+                    setParametros({ ...parametros, fechaHasta: newValue });
                     if (errors.fechaHasta) {
                       setErrors({ ...errors, fechaHasta: '' });
                     }
                   }}
-                  fullWidth
-                  error={!!errors.fechaHasta}
-                  helperText={errors.fechaHasta}
-                  InputLabelProps={{
-                    shrink: true
+                  slotProps={{
+                    textField: {
+                      fullWidth: true,
+                      error: !!errors.fechaHasta,
+                      helperText: errors.fechaHasta,
+                      sx: {
+                        '& .MuiOutlinedInput-root': {
+                          backgroundColor: '#fafafa'
+                        }
+                      }
+                    }
                   }}
+                  />
+                </>
+              )}
+
+            {/* Parámetros para situaciones terapéuticas por afiliado */}
+            {tipoReporte === 'situaciones-terapeuticas-afiliado' && (
+              <FormControl fullWidth>
+                <InputLabel id="afiliado-label">
+                  Afiliado
+                </InputLabel>
+                <Select
+                  labelId="afiliado-label"
+                  value={parametros.afiliadoId || ''}
+                  onChange={(e) => {
+                    setParametros({ ...parametros, afiliadoId: e.target.value });
+                    if (errors.afiliadoId) {
+                      setErrors({ ...errors, afiliadoId: '' });
+                    }
+                  }}
+                  label="Afiliado"
+                  error={!!errors.afiliadoId}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       backgroundColor: '#fafafa'
                     }
                   }}
-                />
-              </>
+                >
+                  {afiliados.map((afiliado) => {
+                    const titular = afiliado.integrantes?.find(i => 
+                      String(i.id) === String(afiliado.titularID || afiliado.titularId)
+                    );
+                    const nombreCompleto = titular 
+                      ? `${titular.nombre || ''} ${titular.apellido || ''}`.trim() 
+                      : `Afiliado ${afiliado.numeroAfiliado || afiliado.id}`;
+                    return (
+                      <MenuItem key={afiliado.id} value={afiliado.id}>
+                        {nombreCompleto} - {afiliado.numeroAfiliado || `ID: ${afiliado.id}`}
+                      </MenuItem>
+                    );
+                  })}
+                </Select>
+                {errors.afiliadoId && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
+                    {errors.afiliadoId}
+                  </Typography>
+                )}
+              </FormControl>
             )}
 
               {/* Parámetros para prestadores por especialidad y CP */}
@@ -329,5 +390,6 @@ export default function ModalParametrosReporte({
           </Button>
         </DialogActions>
       </Dialog>
+    </LocalizationProvider>
   );
 }

@@ -21,6 +21,7 @@ export default function SelectorReporte({
   tiposReportes = [],
   reporteSeleccionado,
   especialidades = [],
+  afiliados = [],
   onSeleccionarReporte,
   onGenerarReporte,
   onExportarReporte,
@@ -192,6 +193,7 @@ export default function SelectorReporte({
         open={modalAbierto}
         tipoReporte={reporteSeleccionado}
         especialidades={especialidades}
+        afiliados={afiliados}
         onClose={() => setModalAbierto(false)}
         onConfirm={handleConfirmarParametros}
       />
