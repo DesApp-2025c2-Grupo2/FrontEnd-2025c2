@@ -23,6 +23,7 @@ import {
 } from '../store/reportesSlice';
 import { selectEspecialidades } from '../store/especialidadesSlice';
 import { cargarEspecialidades } from '../store/especialidadesSlice';
+import { fetchAfiliados } from '../store/afiliadosSlice';
 import SelectorReporte from '../components/Reportes/SelectorReporte';
 import HistorialReportes from '../components/Reportes/HistorialReportes';
 
@@ -38,6 +39,7 @@ function ConsultasReportes() {
   const generandoReporte = useSelector(selectGenerandoReporte);
   const exportandoReporte = useSelector(selectExportandoReporte);
   const especialidades = useSelector(selectEspecialidades);
+  const afiliados = useSelector((state) => state.afiliados.lista) || [];
   
   // Estado local
   const [reporteExportando, setReporteExportando] = useState(null);
@@ -58,6 +60,7 @@ function ConsultasReportes() {
     
     dispatch(cargarHistorialReportes());
     dispatch(cargarEspecialidades());
+    dispatch(fetchAfiliados());
   }, [dispatch]);
 
   // Manejar errores
@@ -131,6 +134,7 @@ function ConsultasReportes() {
         tiposReportes={tiposReportes}
         reporteSeleccionado={reporteSeleccionado}
         especialidades={especialidades}
+        afiliados={afiliados}
         onSeleccionarReporte={handleSeleccionarReporte}
         onGenerarReporte={handleGenerarReporte}
         onExportarReporte={handleExportarReporte}
