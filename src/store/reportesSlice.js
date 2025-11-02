@@ -27,11 +27,6 @@ export const TIPOS_REPORTES = [
     id: 'prestadores-sin-agendas',
     nombre: 'Prestadores sin Agendas',
     descripcion: 'Listado de prestadores que no tienen agendas configuradas'
-  },
-  {
-    id: 'horarios-sin-turnos',
-    nombre: 'Horarios sin Turnos Definidos',
-    descripcion: 'Horarios configurados que no tienen turnos asignados'
   }
 ];
 
@@ -194,7 +189,9 @@ const reportesSlice = createSlice({
       })
       .addCase(cargarHistorialReportes.fulfilled, (state, action) => {
         state.loading = false;
-        state.historialReportes = action.payload;
+        // Asegurar que sea un array y filtrar reportes eliminados
+        const payload = Array.isArray(action.payload) ? action.payload : [];
+        state.historialReportes = payload.filter(r => r.tipoReporte !== 'horarios-sin-turnos');
       })
       .addCase(cargarHistorialReportes.rejected, (state, action) => {
         state.loading = false;
