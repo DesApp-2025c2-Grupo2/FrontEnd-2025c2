@@ -80,4 +80,43 @@ export const AfiliadosService = {
         : a.Integrantes ?? [],
     };
   },
+
+  // Buscar afiliado por ID o número de afiliado
+  buscar: async (query) => {
+    if (!query || query.trim() === '') return [];
+    
+    const queryTrimmed = query.trim();
+    
+    try {
+      // Intentar buscar por ID
+      if (/^\d+$/.test(queryTrimmed)) {
+        try {
+          const res = await WebAPI.Instance().get(`${ENDPOINT}/${queryTrimmed}`);
+          const a = res.data;
+          if (a) {
+            return [{
+              id: a.id,
+              numeroAfiliado: a.numeroAfiliado ?? a.NumeroAfiliado ?? "",
+              titularID: a.titularID ?? a.titularId ?? null,
+              planMedicoId: a.planMedicoId ?? a.PlanMedicoId ?? null,
+              alta: a.alta ?? a.Alta ?? null,
+              baja: a.baja ?? a.Baja ?? null,
+              integrantes: Array.isArray(a.integrantes)
+                ? a.integrantes
+                : a.Integrantes ?? [],
+            }];
+          }
+        } catch (err) {
+          // Si no se encuentra por ID, continuar con búsqueda local
+        }
+      }
+      
+      // Si no se encuentra en el backend, retornar array vacío
+      // El componente buscará en los datos locales
+      return [];
+    } catch (error) {
+      console.error('Error buscando afiliado en backend:', error);
+      return [];
+    }
+  },
 };
