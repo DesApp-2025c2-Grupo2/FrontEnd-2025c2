@@ -14,12 +14,15 @@ import {
   Chip,
   OutlinedInput,
   Typography,
-  Alert
+  Alert,
+  Autocomplete,
+  CircularProgress
 } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs from 'dayjs';
+import { AfiliadosService } from '../../services/afiliadosService';
 
 export default function ModalParametrosReporte({
   open,
@@ -31,6 +34,8 @@ export default function ModalParametrosReporte({
 }) {
   const [parametros, setParametros] = useState({});
   const [errors, setErrors] = useState({});
+  const [buscandoAfiliado, setBuscandoAfiliado] = useState(false);
+  const [opcionesAfiliado, setOpcionesAfiliado] = useState([]);
 
   // Resetear parámetros cuando cambia el tipo de reporte o se abre/cierra
   useEffect(() => {
@@ -52,8 +57,11 @@ export default function ModalParametrosReporte({
           break;
         case 'situaciones-terapeuticas-afiliado':
           setParametros({
-            afiliadoId: ''
+            afiliadoId: '',
+            numeroAfiliado: '',
+            afiliadoSeleccionado: null
           });
+          setOpcionesAfiliado([]);
           break;
         case 'prestadores-sin-agendas':
           setParametros({});
@@ -88,12 +96,6 @@ export default function ModalParametrosReporte({
         if (!/^\d+$/.test(cp)) {
           nuevosErrores.codigoPostal = 'El código postal debe ser numérico';
         }
-      }
-    }
-
-    if (tipoReporte === 'situaciones-terapeuticas-afiliado') {
-      if (!parametros.afiliadoId || parametros.afiliadoId === '') {
-        nuevosErrores.afiliadoId = 'Debe seleccionar un afiliado';
       }
     }
 
@@ -134,6 +136,21 @@ export default function ModalParametrosReporte({
         });
       }
       // Si es array vacío, se mantiene vacío (puede ser "ninguna especialidad")
+    }
+
+    // Para situaciones terapéuticas: enviar afiliadoId o numeroAfiliado según lo que se haya seleccionado
+    if (tipoReporte === 'situaciones-terapeuticas-afiliado') {
+      if (parametrosFinales.afiliadoSeleccionado) {
+        const af = parametrosFinales.afiliadoSeleccionado;
+        parametrosFinales.afiliadoId = af.id;
+        parametrosFinales.numeroAfiliado = af.numeroAfiliado || '';
+        delete parametrosFinales.afiliadoSeleccionado;
+      } else {
+        // Si no se seleccionó nada, eliminar ambos (opcional)
+        delete parametrosFinales.afiliadoId;
+        delete parametrosFinales.numeroAfiliado;
+        delete parametrosFinales.afiliadoSeleccionado;
+      }
     }
 
     onConfirm(parametrosFinales);
@@ -239,47 +256,104 @@ export default function ModalParametrosReporte({
 
             {/* Parámetros para situaciones terapéuticas por afiliado */}
             {tipoReporte === 'situaciones-terapeuticas-afiliado' && (
-              <FormControl fullWidth>
-                <InputLabel id="afiliado-label">
-                  Afiliado
-                </InputLabel>
-                <Select
-                  labelId="afiliado-label"
-                  value={parametros.afiliadoId || ''}
-                  onChange={(e) => {
-                    setParametros({ ...parametros, afiliadoId: e.target.value });
-                    if (errors.afiliadoId) {
-                      setErrors({ ...errors, afiliadoId: '' });
+              <Autocomplete
+                options={opcionesAfiliado}
+                value={parametros.afiliadoSeleccionado || null}
+                onChange={(event, newValue) => {
+                  setParametros({ 
+                    ...parametros, 
+                    afiliadoSeleccionado: newValue
+                  });
+                  if (errors.afiliadoId) {
+                    setErrors({ ...errors, afiliadoId: '' });
+                  }
+                }}
+                onInputChange={async (event, newInputValue) => {
+                  if (!newInputValue || newInputValue.trim() === '') {
+                    setOpcionesAfiliado([]);
+                    setParametros({ 
+                      ...parametros, 
+                      afiliadoSeleccionado: null
+                    });
+                    return;
+                  }
+
+                  const query = newInputValue.trim();
+                  
+                  // Solo buscar si es numérico (ID o número de afiliado)
+                  if (!/^\d+$/.test(query)) {
+                    setOpcionesAfiliado([]);
+                    return;
+                  }
+
+                  setBuscandoAfiliado(true);
+                  
+                  try {
+                    // Primero intentar buscar en el backend
+                    const resultadosBackend = await AfiliadosService.buscar(query);
+                    
+                    if (resultadosBackend && resultadosBackend.length > 0) {
+                      setOpcionesAfiliado(resultadosBackend);
+                    } else {
+                      // Si no se encuentra en el backend, buscar en datos locales
+                      const resultadosLocales = afiliados.filter(a => {
+                        const idMatch = String(a.id) === query;
+                        const numMatch = a.numeroAfiliado && String(a.numeroAfiliado) === query;
+                        return idMatch || numMatch;
+                      });
+                      setOpcionesAfiliado(resultadosLocales);
                     }
-                  }}
-                  label="Afiliado"
-                  error={!!errors.afiliadoId}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: '#fafafa'
-                    }
-                  }}
-                >
-                  {afiliados.map((afiliado) => {
-                    const titular = afiliado.integrantes?.find(i => 
-                      String(i.id) === String(afiliado.titularID || afiliado.titularId)
-                    );
-                    const nombreCompleto = titular 
-                      ? `${titular.nombre || ''} ${titular.apellido || ''}`.trim() 
-                      : `Afiliado ${afiliado.numeroAfiliado || afiliado.id}`;
-                    return (
-                      <MenuItem key={afiliado.id} value={afiliado.id}>
-                        {nombreCompleto} - {afiliado.numeroAfiliado || `ID: ${afiliado.id}`}
-                      </MenuItem>
-                    );
-                  })}
-                </Select>
-                {errors.afiliadoId && (
-                  <Typography variant="caption" color="error" sx={{ mt: 0.5, ml: 1.75 }}>
-                    {errors.afiliadoId}
-                  </Typography>
+                  } catch (error) {
+                    console.error('Error buscando afiliado:', error);
+                    // En caso de error, buscar en datos locales
+                    const resultadosLocales = afiliados.filter(a => {
+                      const idMatch = String(a.id) === query;
+                      const numMatch = a.numeroAfiliado && String(a.numeroAfiliado) === query;
+                      return idMatch || numMatch;
+                    });
+                    setOpcionesAfiliado(resultadosLocales);
+                  } finally {
+                    setBuscandoAfiliado(false);
+                  }
+                }}
+                getOptionLabel={(option) => {
+                  if (!option) return '';
+                  const titular = option.integrantes?.find(i => 
+                    String(i.id) === String(option.titularID || option.titularId)
+                  );
+                  const nombreCompleto = titular 
+                    ? `${titular.nombre || ''} ${titular.apellido || ''}`.trim() 
+                    : `Afiliado ${option.numeroAfiliado || option.id}`;
+                  return `${nombreCompleto} - ${option.numeroAfiliado || `ID: ${option.id}`}`;
+                }}
+                isOptionEqualToValue={(option, value) => 
+                  option?.id === value?.id
+                }
+                loading={buscandoAfiliado}
+                noOptionsText="No se encontró ningún afiliado. Ingrese un ID o número de afiliado válido"
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Buscar Afiliado por ID o Número (opcional)"
+                    helperText="Ingrese el ID o número de afiliado para buscar. Si no se especifica, se mostrarán todos los afiliados"
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: '#fafafa'
+                      }
+                    }}
+                    InputProps={{
+                      ...params.InputProps,
+                      endAdornment: (
+                        <>
+                          {buscandoAfiliado ? <CircularProgress color="inherit" size={20} /> : null}
+                          {params.InputProps.endAdornment}
+                        </>
+                      ),
+                    }}
+                  />
                 )}
-              </FormControl>
+                freeSolo={false}
+              />
             )}
 
               {/* Parámetros para prestadores por especialidad y CP */}

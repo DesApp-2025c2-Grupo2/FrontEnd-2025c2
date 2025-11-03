@@ -3,42 +3,111 @@ import WebAPI from './config/WebAPI';
 const ENDPOINT = '/Reportes';
 
 // ============================================================================
+// MAPEO DE TIPOS DE REPORTE (Frontend string -> Backend int)
+// ============================================================================
+
+const TIPO_REPORTE_MAP = {
+  'alta-afiliados-periodo': 1,
+  'alta-prestadores-periodo': 2,
+  'prestadores-especialidad-cp': 3,
+  'situaciones-terapeuticas-afiliado': 4,
+  'prestadores-sin-agendas': 5
+};
+
+const TIPO_REPORTE_REVERSE_MAP = {
+  1: 'alta-afiliados-periodo',
+  2: 'alta-prestadores-periodo',
+  3: 'prestadores-especialidad-cp',
+  4: 'situaciones-terapeuticas-afiliado',
+  5: 'prestadores-sin-agendas'
+};
+
+// ============================================================================
 // FUNCIONES DE NORMALIZACIÓN (Backend -> Frontend)
 // ============================================================================
 
 /**
  * Normaliza un reporte desde el formato del backend al formato del frontend
+ * Backend devuelve: { HexaID, TipoReporte (string), Parametros (string JSON), FechaGeneracion }
  * @param {Object} reporteBackend - Reporte en formato del backend
  * @returns {Object} Reporte normalizado para el frontend
  */
 function normalizeReporte(reporteBackend) {
   if (!reporteBackend) return null;
 
+  const hexaId = reporteBackend.hexaID ?? reporteBackend.HexaID ?? reporteBackend.id ?? reporteBackend.Id ?? null;
+  const tipoReporteBackend = reporteBackend.tipoReporte ?? reporteBackend.TipoReporte ?? '';
+  const parametrosStr = reporteBackend.parametros ?? reporteBackend.Parametros ?? '{}';
+  
+  // Convertir TipoReporte de string a id del frontend
+  let tipoReporte = '';
+  if (typeof tipoReporteBackend === 'number') {
+    tipoReporte = TIPO_REPORTE_REVERSE_MAP[tipoReporteBackend] || '';
+  } else {
+    tipoReporte = tipoReporteBackend;
+  }
+
+  // Parsear Parametros si viene como string JSON
+  let parametros = {};
+  try {
+    if (typeof parametrosStr === 'string') {
+      parametros = JSON.parse(parametrosStr);
+    } else {
+      parametros = parametrosStr;
+    }
+  } catch (e) {
+    console.warn('Error parseando parámetros del reporte:', e);
+    parametros = {};
+  }
+
   return {
-    id: reporteBackend.id ?? reporteBackend.Id ?? null,
-    tipoReporte: reporteBackend.tipoReporte ?? reporteBackend.TipoReporte ?? '',
+    id: hexaId,
+    tipoReporte: tipoReporte,
     nombre: reporteBackend.nombre ?? reporteBackend.Nombre ?? 'Reporte',
     fechaGeneracion: reporteBackend.fechaGeneracion ?? reporteBackend.FechaGeneracion ?? null,
     fechaExportacion: reporteBackend.fechaExportacion ?? reporteBackend.FechaExportacion ?? null,
-    parametros: reporteBackend.parametros ?? reporteBackend.Parametros ?? {},
+    parametros: parametros,
     estado: reporteBackend.estado ?? reporteBackend.Estado ?? 'generado',
     formatoExportacion: reporteBackend.formatoExportacion ?? reporteBackend.FormatoExportacion ?? null
   };
 }
 
 /**
- * Normaliza el payload para enviar al backend
- * Los parámetros se envían tal cual al backend para que ejecute la consulta SQL filtrada
+ * Normaliza el payload para enviar al backend según ReporteRequest
+ * Backend espera: { TipoReporte (int), FechaDesde (DateTime?), FechaHasta (DateTime?), AfiliadoId (int?) }
+ * Solo se envían los campos que corresponden según el tipo de reporte
  * 
  * @param {Object} datosFrontend - Datos en formato del frontend
- * @returns {Object} Payload para el backend
+ * @param {string} datosFrontend.tipoReporte - ID del tipo de reporte (string)
+ * @param {Object} datosFrontend.parametros - Parámetros del reporte
+ * @returns {Object} Payload para el backend (ReporteRequest) - solo campos relevantes
  */
 function toBackendPayload(datosFrontend) {
-  return {
-    tipoReporte: datosFrontend.tipoReporte,
-    parametros: datosFrontend.parametros || {}, // Se envían al backend para filtrar la consulta SQL
-    fechaGeneracion: datosFrontend.fechaGeneracion || new Date().toISOString() // Opcional, backend puede generarla
+  const tipoReporteInt = TIPO_REPORTE_MAP[datosFrontend.tipoReporte] || 0;
+  const parametros = datosFrontend.parametros || {};
+
+  const payload = {
+    TipoReporte: tipoReporteInt
   };
+
+  // Solo agregar FechaDesde y FechaHasta si existen (para reportes por período)
+  if (parametros.fechaDesde) {
+    payload.FechaDesde = parametros.fechaDesde;
+  }
+
+  if (parametros.fechaHasta) {
+    payload.FechaHasta = parametros.fechaHasta;
+  }
+
+  // Solo agregar AfiliadoId si existe (para reporte de situaciones terapéuticas)
+  if (parametros.afiliadoId) {
+    const afiliadoIdInt = parseInt(parametros.afiliadoId, 10);
+    if (!isNaN(afiliadoIdInt)) {
+      payload.AfiliadoId = afiliadoIdInt;
+    }
+  }
+
+  return payload;
 }
 
 // ============================================================================
@@ -73,20 +142,19 @@ function delay(ms = 1000) {
 // ============================================================================
 
 /**
- * Obtener historial de reportes desde la base de datos
- * Endpoint esperado: GET /Reportes/historial
+ * Obtener todos los reportes generados alguna vez
+ * Endpoint: GET /Reportes/all
  * 
  * FLUJO:
  * - El backend consulta la BD y devuelve todos los reportes guardados
- * - Cada reporte incluye: id, tipoReporte, nombre, fechaGeneracion, fechaExportacion,
- *   parametros (los que se usaron para generar), estado, formatoExportacion
+ * - Cada reporte incluye: HexaID, TipoReporte (string), Parametros (string JSON), FechaGeneracion
  * - Los reportes deben estar ordenados por fechaGeneracion DESC (más reciente primero)
  * 
  * @returns {Promise<Array>} Array de reportes normalizados ordenados por fecha (más reciente primero)
  */
 export async function getHistorialReportes() {
   try {
-    const res = await WebAPI.Instance().get(`${ENDPOINT}/historial`);
+    const res = await WebAPI.Instance().get(`${ENDPOINT}/all`);
     const data = Array.isArray(res?.data) ? res.data : [];
     return data.map(normalizeReporte).filter(r => r && r.tipoReporte !== 'horarios-sin-turnos');
   } catch (error) {
@@ -103,31 +171,29 @@ export async function getHistorialReportes() {
 
 /**
  * Generar un nuevo reporte
- * Endpoint esperado: POST /Reportes/generar
+ * Endpoint: POST /Reportes/generate
  * 
  * FLUJO:
- * 1. Frontend envía tipoReporte + parámetros al backend
+ * 1. Frontend envía ReporteRequest al backend: { TipoReporte (int), FechaDesde?, FechaHasta?, AfiliadoId? }
  * 2. Backend recibe los parámetros y ejecuta la consulta SQL con esos filtros
  * 3. Backend genera los datos del reporte según los parámetros recibidos
- * 4. Backend GUARDA en BD: tipoReporte, parámetros, fechaGeneracion, estado='generado'
- * 5. Backend devuelve el reporte guardado con su ID generado
+ * 4. Backend GUARDA en BD: TipoReporte, Parametros (JSON string), FechaGeneracion
+ * 5. Backend devuelve el reporte guardado con su HexaID generado
  * 
- * Body esperado: { tipoReporte: string, parametros: object }
+ * Body: ReporteRequest { TipoReporte: int, FechaDesde?: DateTime, FechaHasta?: DateTime, AfiliadoId?: int }
  * 
  * @param {Object} datos - Datos del reporte a generar
- * @param {string} datos.tipoReporte - ID del tipo de reporte
+ * @param {string} datos.tipoReporte - ID del tipo de reporte (string del frontend)
  * @param {Object} datos.parametros - Parámetros para filtrar la consulta SQL en el backend
- * @param {string} datos.fechaGeneracion - Fecha de generación (ISO string) - opcional, backend puede generarla
  * @returns {Promise<Object>} Reporte generado y guardado en BD, normalizado
  */
 export async function generarReporte(datos) {
   try {
     const payload = toBackendPayload({
       tipoReporte: datos.tipoReporte,
-      parametros: datos.parametros || {},
-      fechaGeneracion: datos.fechaGeneracion || new Date().toISOString()
+      parametros: datos.parametros || {}
     });
-    const res = await WebAPI.Instance().post(`${ENDPOINT}/generar`, payload);
+    const res = await WebAPI.Instance().post(`${ENDPOINT}/generate`, payload);
     return normalizeReporte(res.data);
   } catch (error) {
     // Fallback a mock en caso de error
@@ -165,7 +231,32 @@ export async function generarReporte(datos) {
 }
 
 /**
+ * Obtener un reporte específico del historial
+ * Endpoint: GET /Reportes/retrieve/{id}
+ * 
+ * @param {number} id - HexaID del reporte a obtener
+ * @returns {Promise<Object>} Reporte normalizado
+ */
+export async function obtenerReporte(id) {
+  try {
+    const res = await WebAPI.Instance().get(`${ENDPOINT}/retrieve/${id}`);
+    return normalizeReporte(res.data);
+  } catch (error) {
+    console.error('Error al obtener reporte:', error);
+    // Fallback a mock en caso de error
+    await delay(300);
+    const historial = readAllMock();
+    const reporte = historial.find(r => r.id === id);
+    if (reporte) {
+      return reporte;
+    }
+    throw new Error('Reporte no encontrado');
+  }
+}
+
+/**
  * Exportar un reporte (PDF, Excel, etc.)
+ * Nota: Esta función puede no estar disponible en el backend actual
  * Endpoint esperado: POST /Reportes/exportar
  * Body esperado: { reporteId: number, formato: string }
  * 
