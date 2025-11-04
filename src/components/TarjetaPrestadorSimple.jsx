@@ -7,6 +7,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector } from 'react-redux';
 import { selectPrestadores } from '../store/prestadoresSlice';
+import { selectEspecialidades } from '../store/especialidadesSlice';
 
 export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo, onGestionarHorarios, onEliminarDireccion }) {
   const todosPrestadores = useSelector(selectPrestadores);
@@ -28,6 +29,19 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
   };
 
   const diasSemanaOrden = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  const catalogoEspecialidades = useSelector(selectEspecialidades);
+  const especialidadIdToNombre = React.useMemo(() => {
+    const map = new Map();
+    // Preferir catálogo global si existe
+    (catalogoEspecialidades || []).forEach((e) => {
+      if (e && typeof e.id === 'number') map.set(e.id, e.nombre);
+    });
+    // Completar con las del prestador por si hay extras
+    (prestador.especialidades || []).forEach((e) => {
+      if (e && typeof e.id === 'number' && !map.has(e.id)) map.set(e.id, e.nombre);
+    });
+    return map;
+  }, [catalogoEspecialidades, prestador.especialidades]);
 
   return (
     <Card
@@ -200,15 +214,17 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                           const dias = Array.isArray(h.dias) && h.dias.length > 0 ? h.dias : [];
                           const inicio = h.horaInicio || h.desde || '';
                           const fin = h.horaFin || h.hasta || '';
+                          const espId = (typeof h.especialidadId === 'number') ? h.especialidadId : null;
                           dias.forEach((dia) => {
                             if (!dayToRanges[dia]) dayToRanges[dia] = [];
-                            dayToRanges[dia].push({ rango: `${inicio} - ${fin}`, dur: h.duracionMinutos });
+                            dayToRanges[dia].push({ rango: `${inicio} - ${fin}`, dur: h.duracionMinutos, espId });
                           });
                         });
                         return diasSemanaOrden
                           .filter((dia) => (dayToRanges[dia] || []).length > 0)
                           .map((dia, idxCard) => {
                             const rangos = dayToRanges[dia];
+                            const uniqueEspIds = Array.from(new Set(rangos.map(r => r.espId).filter((id) => typeof id === 'number')));
                             return (
                               <Card key={idxCard} variant="outlined" sx={{ p: 1.25, borderColor: '#e0e0e0', backgroundColor: '#f8f9fa', minWidth: 180 }}>
                                 <Chip
@@ -216,13 +232,18 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                                   size="small"
                                   sx={{ backgroundColor: '#2196f3', color: 'white', fontWeight: 'bold', mb: 0.75 }}
                                 />
+                                {uniqueEspIds.length > 0 && (
+                                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 0.5 }}>
+                                    {uniqueEspIds.map((id) => (
+                                      <Chip key={id} label={especialidadIdToNombre.get(id) || `Esp. ${id}`} size="small" sx={{ backgroundColor: '#e3f2fd', color: '#1976d2', fontWeight: 600 }} />
+                                    ))}
+                                  </Box>
+                                )}
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
                                   {rangos.map((item, i) => (
                                     <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                       <ScheduleIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2' }}>
-                                        {item.rango}
-                                      </Typography>
+                                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2' }}>{item.rango}</Typography>
                                       {typeof item.dur === 'number' && item.dur > 0 && (
                                         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
                                           • {item.dur} min

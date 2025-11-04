@@ -34,7 +34,8 @@ import {
   cargarPrestadores,
   crearPrestador,
   editarPrestador,
-  toggleActivoPrestador
+  toggleActivoPrestador,
+  actualizarHorariosPrestador
 } from '../store/prestadoresSlice';
 import { cargarEspecialidades } from '../store/especialidadesSlice';
 
@@ -73,25 +74,30 @@ function Prestadores() {
       const actuales = { ...prestadoresConAgenda };
       const promises = [];
       prestadoresFiltrados.forEach((p) => {
-        if (!actuales[p.id]) {
-          promises.push(
-            agendasService.getByProfesional(p.id).then((agendas) => {
-              if (cancelado) return;
-              const agendaById = new Map((agendas || []).map((a) => [a.id, a]));
-              const agendaByDir = new Map((agendas || []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
-              const lugaresBase = Array.isArray(p.lugaresAtencion) ? JSON.parse(JSON.stringify(p.lugaresAtencion)) : [];
-              const lugaresMergeados = lugaresBase.map((l) => {
-                const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
-                if (a) {
-                  return { ...l, horarios: a.horarios || [] };
-                }
-                return l;
-              });
-              // No agregar lugares nuevos desde agenda: solo completar horarios en los existentes
-              actuales[p.id] = { ...p, lugaresAtencion: lugaresMergeados };
-            }).catch(() => {})
-          );
+        // Mantener horarios existentes en cache pero refrescar datos base (nombre, tipo, etc.)
+        const existente = actuales[p.id];
+        if (existente) {
+          const lugares = Array.isArray(existente.lugaresAtencion) ? existente.lugaresAtencion : p.lugaresAtencion;
+          actuales[p.id] = { ...p, lugaresAtencion: lugares };
+          return;
         }
+        // Si no hay cache, cargar agendas y mergear
+        promises.push(
+          agendasService.getByProfesional(p.id).then((agendas) => {
+            if (cancelado) return;
+            const agendaById = new Map((agendas || []).map((a) => [a.id, a]));
+            const agendaByDir = new Map((agendas || []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
+            const lugaresBase = Array.isArray(p.lugaresAtencion) ? JSON.parse(JSON.stringify(p.lugaresAtencion)) : [];
+            const lugaresMergeados = lugaresBase.map((l) => {
+              const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
+              if (a) {
+                return { ...l, horarios: a.horarios || [] };
+              }
+              return l;
+            });
+            actuales[p.id] = { ...p, lugaresAtencion: lugaresMergeados };
+          }).catch(() => {})
+        );
       });
       if (promises.length > 0) {
         await Promise.all(promises);
@@ -198,9 +204,14 @@ function Prestadores() {
 
   const handleGuardarEdicion = async (prestadorEditado) => {
     try {
-      await dispatch(editarPrestador(prestadorEditado)).unwrap();
-      // Re-cargar lista desde backend tras editar
-      dispatch(cargarPrestadores());
+      const actualizado = await dispatch(editarPrestador(prestadorEditado)).unwrap();
+      // Refrescar cache local inmediatamente
+      setPrestadoresConAgenda((prev) => {
+        if (!actualizado || !actualizado.id) return prev;
+        const existente = prev[actualizado.id];
+        const lugares = existente?.lugaresAtencion ?? actualizado.lugaresAtencion;
+        return { ...prev, [actualizado.id]: { ...actualizado, lugaresAtencion: lugares } };
+      });
       setDialogoEditar(false);
       setPrestadorSeleccionado(null);
       setSnackbar({
@@ -376,7 +387,16 @@ function Prestadores() {
           }}
           onGuardar={async (prestadorActualizado) => {
             try {
-              await dispatch(editarPrestador(prestadorActualizado)).unwrap();
+              const id = prestadorSeleccionado?.id || prestadorActualizado?.id;
+              const lugaresAtencion = prestadorActualizado?.lugaresAtencion || [];
+              if (!id) throw new Error('ID de prestador no disponible');
+              await dispatch(actualizarHorariosPrestador({ id, lugaresAtencion })).unwrap();
+              // Refrescar cache local para que se vea sin recargar
+              setPrestadoresConAgenda((prev) => {
+                const base = prev[id] || prestadorSeleccionado || prestadorActualizado || {};
+                const actualizado = { ...base, id, lugaresAtencion: JSON.parse(JSON.stringify(lugaresAtencion)) };
+                return { ...prev, [id]: actualizado };
+              });
               setDialogoHorarios(false);
               setPrestadorSeleccionado(null);
               setSnackbar({ open: true, message: 'Horarios actualizados', severity: 'success' });

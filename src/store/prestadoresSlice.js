@@ -45,6 +45,18 @@ export const editarPrestador = createAsyncThunk(
   }
 );
 
+export const actualizarHorariosPrestador = createAsyncThunk(
+  'prestadores/actualizarHorarios',
+  async ({ id, lugaresAtencion }, { rejectWithValue }) => {
+    try {
+      const result = await prestadoresService.updateHorarios(id, lugaresAtencion);
+      return { id, lugaresAtencion: Array.isArray(result?.lugaresAtencion) ? result.lugaresAtencion : lugaresAtencion };
+    } catch (error) {
+      return rejectWithValue(error.message || 'Error al actualizar horarios');
+    }
+  }
+);
+
 export const eliminarPrestador = createAsyncThunk(
   'prestadores/eliminar',
   async (id, { rejectWithValue }) => {
@@ -133,6 +145,21 @@ const slice = createSlice({
         state.error = action.payload || 'No se pudo actualizar el prestador';
       })
       
+      // Actualizar horarios
+      .addCase(actualizarHorariosPrestador.pending, (state) => {
+        state.error = null;
+      })
+      .addCase(actualizarHorariosPrestador.fulfilled, (state, action) => {
+        const { id, lugaresAtencion } = action.payload || {};
+        const idx = state.items.findIndex(p => p.id === id);
+        if (idx !== -1 && Array.isArray(lugaresAtencion)) {
+          state.items[idx].lugaresAtencion = lugaresAtencion;
+        }
+      })
+      .addCase(actualizarHorariosPrestador.rejected, (state, action) => {
+        state.error = action.payload || 'No se pudieron actualizar los horarios';
+      })
+      
       // Eliminar prestador
       .addCase(eliminarPrestador.pending, (state) => {
         state.loading = true;
@@ -198,6 +225,16 @@ export const selectPrestadoresFiltrados = (searchTerm) => (state) => {
   
   resultado = resultado.filter(prestador => {
     // Búsqueda general
+    const espNombrePorId = new Map((prestador.especialidades || []).map(e => [e.id, (e.nombre || '').toLowerCase()]));
+    const matchEspecialidadEnHorarios = Array.isArray(prestador.lugaresAtencion) && prestador.lugaresAtencion.some(l =>
+      Array.isArray(l.horarios) && l.horarios.some(h => {
+        if (h && typeof h.especialidadId === 'number') {
+          const nom = espNombrePorId.get(h.especialidadId);
+          return typeof nom === 'string' && nom.includes(searchLower);
+        }
+        return false;
+      })
+    );
     const matchGeneral = 
       prestador.nombreCompleto.toLowerCase().includes(searchLower) ||
       prestador.cuilCuit.toLowerCase().includes(searchLower) ||
@@ -206,6 +243,7 @@ export const selectPrestadoresFiltrados = (searchTerm) => (state) => {
       (Array.isArray(prestador.lugaresAtencion) && prestador.lugaresAtencion.some(l =>
         typeof l.especialidadSeleccionada === 'string' && l.especialidadSeleccionada.toLowerCase().includes(searchLower)
       )) ||
+      matchEspecialidadEnHorarios ||
       // Resolver nombre de centro por ID para búsqueda
       (() => {
         if (!prestador.integraCentroMedicoId) return false;

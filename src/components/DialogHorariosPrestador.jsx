@@ -33,7 +33,9 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
   const [selectedHorarioIndex, setSelectedHorarioIndex] = useState(null);
   const [local, setLocal] = useState(null);
   const lugares = useMemo(() => prestador?.lugaresAtencion || [], [prestador]);
-  const especialidadesPrestador = useMemo(() => (prestador?.especialidades || []).map(e => e?.nombre).filter(Boolean), [prestador]);
+  const especialidadesPrestador = useMemo(() => (
+    Array.isArray(prestador?.especialidades) ? prestador.especialidades.filter(e => e && typeof e.id === 'number') : []
+  ), [prestador]);
 
   useEffect(() => {
     if (abierto && prestador) {
@@ -60,7 +62,7 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
     const copia = JSON.parse(JSON.stringify(local));
     const l = copia.lugaresAtencion[lugarIndex];
     l.horarios = l.horarios || [];
-    l.horarios.push({ dias: [], horaInicio: '', horaFin: '', duracionMinutos: 30 });
+    l.horarios.push({ dias: [], horaInicio: '', horaFin: '', duracionMinutos: 30, especialidadId: null });
     setLocal(copia);
   };
 
@@ -132,8 +134,8 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
                   value={lugarActual.especialidadSeleccionada || ''}
                   onChange={(e) => handleEspecialidadLugar(e.target.value)}
                 >
-                  {especialidadesPrestador.map((nombre) => (
-                    <MenuItem key={nombre} value={nombre}>{nombre}</MenuItem>
+                  {especialidadesPrestador.map((esp) => (
+                    <MenuItem key={esp.id} value={esp.nombre}>{esp.nombre}</MenuItem>
                   ))}
                 </Select>
               </FormControl>
@@ -196,6 +198,18 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
                           <MenuItem value={30}>30</MenuItem>
                           <MenuItem value={45}>45</MenuItem>
                           <MenuItem value={60}>60</MenuItem>
+                        </Select>
+                      </FormControl>
+                      <FormControl size="small" sx={{ minWidth: 180 }}>
+                        <InputLabel>Especialidad</InputLabel>
+                        <Select
+                          label="Especialidad"
+                          value={h.especialidadId ?? ''}
+                          onChange={(e) => actualizarHorario(hIdx, 'especialidadId', e.target.value === '' ? null : Number(e.target.value))}
+                        >
+                          {especialidadesPrestador.map((esp) => (
+                            <MenuItem key={esp.id} value={esp.id}>{esp.nombre}</MenuItem>
+                          ))}
                         </Select>
                       </FormControl>
                       <IconButton color="error" onClick={() => eliminarHorario(hIdx)} aria-label="Eliminar horario">

@@ -477,6 +477,9 @@ export default function DialogPrestador({
             horaInicio: h.horaInicio,
             horaFin: h.horaFin,
             duracionMinutos: Number(h.duracionMinutos || 30),
+            especialidadId: (h.especialidadId !== undefined && h.especialidadId !== null)
+              ? Number(h.especialidadId)
+              : null,
           }));
         return {
           id: l.id,
