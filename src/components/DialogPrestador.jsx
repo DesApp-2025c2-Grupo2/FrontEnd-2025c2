@@ -14,7 +14,6 @@ import {
   Box,
   Typography,
   IconButton,
-  Chip,
   Stack,
   Divider,
   Grid,
@@ -37,6 +36,7 @@ import {
 } from "@mui/icons-material";
 import { selectEspecialidades } from "../store/especialidadesSlice";
 import { selectPrestadores } from "../store/prestadoresSlice";
+import ContactInfoEditor from "./ContactInfoEditor";
 
 const diasSemana = [
   "Lunes",
@@ -170,6 +170,10 @@ export default function DialogPrestador({
   const [conflictosEntreLugares, setConflictosEntreLugares] = useState([]);
   const [intentoGuardar, setIntentoGuardar] = useState(false);
 
+  // Estados para ContactInfoEditor
+  const [newTelefono, setNewTelefono] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+
   const especialidadesDisponibles = useSelector(selectEspecialidades);
   const todosPrestadores = useSelector(selectPrestadores);
 
@@ -198,6 +202,8 @@ export default function DialogPrestador({
       setConflictosHorarios({});
       setConflictosEntreLugares([]);
       setIntentoGuardar(false);
+      setNewTelefono("");
+      setNewEmail("");
     }
   }, [abierto, valorInicial]);
 
@@ -249,12 +255,14 @@ export default function DialogPrestador({
     }));
   };
 
-  // ===== TELÉFONOS =====
+  // ===== TELÉFONOS con ContactInfoEditor =====
   const agregarTelefono = () => {
+    if (!newTelefono.trim()) return;
     setForm((prev) => ({
       ...prev,
-      telefonos: [...prev.telefonos, { numero: "" }],
+      telefonos: [...prev.telefonos, { numero: newTelefono.trim() }],
     }));
+    setNewTelefono("");
   };
 
   const eliminarTelefono = (index) => {
@@ -264,36 +272,20 @@ export default function DialogPrestador({
     }));
   };
 
-  const actualizarTelefono = (index, campo, valor) => {
-    setForm((prev) => ({
-      ...prev,
-      telefonos: prev.telefonos.map((tel, i) =>
-        i === index ? { ...tel, [campo]: valor } : tel
-      ),
-    }));
-  };
-
-  // ===== EMAILS =====
+  // ===== EMAILS con ContactInfoEditor =====
   const agregarEmail = () => {
+    if (!newEmail.trim()) return;
     setForm((prev) => ({
       ...prev,
-      emails: [...prev.emails, { email: "" }],
+      emails: [...prev.emails, { email: newEmail.trim() }],
     }));
+    setNewEmail("");
   };
 
   const eliminarEmail = (index) => {
     setForm((prev) => ({
       ...prev,
       emails: prev.emails.filter((_, i) => i !== index),
-    }));
-  };
-
-  const actualizarEmail = (index, campo, valor) => {
-    setForm((prev) => ({
-      ...prev,
-      emails: prev.emails.map((email, i) =>
-        i === index ? { ...email, [campo]: valor } : email
-      ),
     }));
   };
 
@@ -525,13 +517,6 @@ export default function DialogPrestador({
 
         <DialogContent
           dividers
-          sx={{
-            "& .MuiFormControlLabel-label": {
-              fontWeight: 700,
-              color: "#111827",
-            },
-            "& .MuiInputBase-input": { color: "#111827", fontWeight: 600 },
-          }}
         >
           {/* Alerta general de conflictos dentro de lugares */}
           {Object.keys(conflictosHorarios).length > 0 && (
@@ -574,9 +559,7 @@ export default function DialogPrestador({
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 1 }}>
             {/* DATOS BÁSICOS */}
             <Box>
-              <Typography variant="h6">
-                Datos Básicos
-              </Typography>
+              <Typography variant="h6">Datos Básicos</Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <TextField
@@ -632,9 +615,7 @@ export default function DialogPrestador({
 
                 {form.tipo === "Profesional Independiente" && (
                   <Grid item xs={12}>
-                    <Box
-
-                    >
+                    <Box>
                       <Stack
                         direction={{ xs: "column", sm: "row" }}
                         spacing={2}
@@ -710,10 +691,8 @@ export default function DialogPrestador({
                 }}
               >
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <MedicalServicesIcon color="primary" />
-                  <Typography variant="h6">
-                    Especialidades
-                  </Typography>
+                  <MedicalServicesIcon color="secondary" />
+                  <Typography variant="h6">Especialidades</Typography>
                 </Stack>
                 <Button
                   variant="outlined"
@@ -798,115 +777,38 @@ export default function DialogPrestador({
 
             <Divider />
 
-            {/* TELÉFONOS */}
+            {/* TELÉFONOS con ContactInfoEditor */}
             <Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <PhoneIcon color="primary" />
-                  <Typography variant="h6">
-                    Teléfonos
-                  </Typography>
-                </Stack>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  size="medium"
-                  startIcon={<AddIcon />}
-                  onClick={agregarTelefono}
-                >
-                  Agregar Teléfono
-                </Button>
-              </Box>
-
-              {form.telefonos.map((tel, index) => (
-                <Grid container spacing={2} key={index} sx={{ mb: 1 }}>
-                  <Grid item xs={12} sm={10}>
-                    <TextField
-                      label="Número"
-                      value={tel.numero}
-                      onChange={(e) =>
-                        actualizarTelefono(index, "numero", e.target.value)
-                      }
-                      fullWidth
-                      size="small"
-                      placeholder="011-4567-8901"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={2}>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => eliminarTelefono(index)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Grid>
-                </Grid>
-              ))}
+              <ContactInfoEditor
+                icon={<PhoneIcon color="secondary" />}
+                title="Teléfonos"
+                items={form.telefonos}
+                keyProp="numero"
+                newValue={newTelefono}
+                placeholder="Número de teléfono (ej: 011-4567-8901)"
+                inputType="tel"
+                onNewValueChange={setNewTelefono}
+                onAdd={agregarTelefono}
+                onRemove={eliminarTelefono}
+              />
             </Box>
 
             <Divider />
 
-            {/* EMAILS */}
+            {/* EMAILS con ContactInfoEditor */}
             <Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <EmailIcon color="primary" />
-                  <Typography variant="h6">
-                    Emails
-                  </Typography>
-                </Stack>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  size="medium"
-                  startIcon={<AddIcon />}
-                  onClick={agregarEmail}
-                >
-                  Agregar Email
-                </Button>
-              </Box>
-
-              {form.emails.map((email, index) => (
-                <Grid container spacing={2} key={index} sx={{ mb: 1 }}>
-                  <Grid item xs={12} sm={10}>
-                    <TextField
-                      label="Email"
-                      value={email.email}
-                      onChange={(e) =>
-                        actualizarEmail(index, "email", e.target.value)
-                      }
-                      fullWidth
-                      size="small"
-                      placeholder="email@ejemplo.com"
-                      type="email"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={2}>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => eliminarEmail(index)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Grid>
-                </Grid>
-              ))}
+              <ContactInfoEditor
+                icon={<EmailIcon color="secondary" />}
+                title="Emails"
+                items={form.emails}
+                keyProp="email"
+                newValue={newEmail}
+                placeholder="Correo electrónico"
+                inputType="email"
+                onNewValueChange={setNewEmail}
+                onAdd={agregarEmail}
+                onRemove={eliminarEmail}
+              />
             </Box>
 
             <Divider />
@@ -922,10 +824,8 @@ export default function DialogPrestador({
                 }}
               >
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <LocationOnIcon color="primary" />
-                  <Typography variant="h6">
-                    Lugares de Atención
-                  </Typography>
+                  <LocationOnIcon color="secondary" />
+                  <Typography variant="h6">Lugares de Atención</Typography>
                 </Stack>
                 <Button
                   variant="outlined"
@@ -1006,18 +906,10 @@ export default function DialogPrestador({
         </DialogContent>
 
         <DialogActions>
-          <Button
-            color="secondary"
-            variant="outlined"
-            onClick={onCerrar}
-          >
+          <Button color="secondary" variant="outlined" onClick={onCerrar}>
             CANCELAR
           </Button>
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={guardar}
-          >
+          <Button variant="contained" color="secondary" onClick={guardar}>
             {form.id ? "GUARDAR CAMBIOS" : "CREAR PRESTADOR"}
           </Button>
         </DialogActions>
