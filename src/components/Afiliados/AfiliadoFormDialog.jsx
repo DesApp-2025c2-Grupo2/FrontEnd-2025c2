@@ -483,19 +483,19 @@ export default function AfiliadoFormDialog({
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12}>
                 <SituacionesSelector
-                  items={editSituaciones || []}
-                  opciones={situacionesCatalogo}
-                  onAdd={(nombre) =>
-                    onEditSituacionesChange([
-                      ...(editSituaciones || []),
-                      nombre,
-                    ])
-                  }
-                  onRemove={(idx) =>
-                    onEditSituacionesChange(
-                      (editSituaciones || []).filter((_, i) => i !== idx)
-                    )
-                  }
+                    items={editSituaciones || []}
+                    opciones={situacionesCatalogo}
+                    onAdd={(sit) => onEditSituacionesChange([...(editSituaciones || []), sit])}
+                    onRemove={(idx) =>
+                      onEditSituacionesChange(
+                        (editSituaciones || []).filter((_, i) => i !== idx)
+                      )
+                    }
+                    onUpdate={(idx, updated) => {
+                      const nuevas = [...(editSituaciones || [])];
+                      nuevas[idx] = updated;
+                      onEditSituacionesChange(nuevas);
+                    }}
                 />
               </Grid>
             </Grid>

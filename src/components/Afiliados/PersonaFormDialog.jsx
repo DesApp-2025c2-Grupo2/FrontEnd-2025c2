@@ -271,6 +271,12 @@ export default function PersonaFormDialog({
   const handleTipoDocumentoChange = (e) =>
     handleFormChange("tipoDocumento", e.target.value);
 
+  const handleUpdateSituacion = (idx, nuevaSituacion) => {
+    const nuevas = [...(editSituaciones || [])];
+    nuevas[idx] = nuevaSituacion;
+    onEditSituacionesChange(nuevas);
+  };
+
   // Validación mínima local
   const validateBeforeSave = () => {
     if (!formData.nombre || !formData.apellido) {
@@ -662,10 +668,10 @@ export default function PersonaFormDialog({
                 <SituacionesSelector
                   items={editSituaciones || []}
                   opciones={situacionesCatalogo}
-                  onAdd={(nombre) =>
+                  onAdd={(nueva) =>
                     onEditSituacionesChange([
                       ...(editSituaciones || []),
-                      nombre,
+                      nueva,
                     ])
                   }
                   onRemove={(idx) =>
@@ -673,6 +679,7 @@ export default function PersonaFormDialog({
                       (editSituaciones || []).filter((_, i) => i !== idx)
                     )
                   }
+                  onUpdate={handleUpdateSituacion}
                 />
               </Grid>
             </Grid>
