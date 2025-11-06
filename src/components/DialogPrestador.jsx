@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useSelector } from "react-redux";
 import {
   Dialog,
@@ -47,6 +47,14 @@ const diasSemana = [
   "Sábado",
   "Domingo",
 ];
+
+// Dirección válida: al menos una letra (permite números), no vacío
+const isValidDireccion = (s) => {
+  const t = String(s || "").trim();
+  if (t.length < 4) return false;
+  if (!/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(t)) return false; // evita solo números
+  return true;
+};
 
 // Función para verificar si dos rangos horarios se solapan
 const horariosSeSuperponen = (horario1, horario2) => {
@@ -163,6 +171,7 @@ export default function DialogPrestador({
     emails: [],
     lugaresAtencion: [],
     integraCentroMedicoId: null,
+    centroMedicoNombre: "",
     vinculaCentro: false,
   });
 
@@ -171,11 +180,29 @@ export default function DialogPrestador({
   const [intentoGuardar, setIntentoGuardar] = useState(false);
 
   const especialidadesDisponibles = useSelector(selectEspecialidades);
+  const especialidadesActivas = (especialidadesDisponibles || []).filter(e => e && e.activa !== false);
   const todosPrestadores = useSelector(selectPrestadores);
 
   const centrosMedicos = (todosPrestadores || []).filter(
-    (p) => p.tipo === "Centro Médico"
+    (p) => p?.rol === 2 || p?.tipo === "Centro Médico"
   );
+
+  // Si el prestador viene con nombre de centro pero sin ID, intentar resolver solo una vez
+  const autoCentroAplicado = useRef(false);
+  useEffect(() => {
+    if (!abierto) return;
+    if (autoCentroAplicado.current) return;
+    if (!valorInicial) return;
+    if (valorInicial?.tipo !== 'Profesional Independiente') return;
+    if (valorInicial?.integraCentroMedicoId) return;
+    const nombre = valorInicial?.centroMedicoNombre || valorInicial?.centroMedico;
+    if (!nombre) return;
+    const match = centrosMedicos.find(c => c?.nombreCompleto === nombre);
+    if (match && match.id) {
+      setForm((prev) => ({ ...prev, integraCentroMedicoId: match.id, centroMedicoNombre: match.nombreCompleto, vinculaCentro: true }));
+      autoCentroAplicado.current = true;
+    }
+  }, [abierto, valorInicial, centrosMedicos]);
 
   // Inicializar formulario
   useEffect(() => {
@@ -190,9 +217,11 @@ export default function DialogPrestador({
         lugaresAtencion: valorInicial?.lugaresAtencion ?? [],
         id: valorInicial?.id,
         integraCentroMedicoId: valorInicial?.integraCentroMedicoId ?? null,
+        centroMedicoNombre: valorInicial?.centroMedicoNombre || valorInicial?.centroMedico || "",
+        // Consideramos vinculado si viene ID o nombre desde el backend
         vinculaCentro: !!(
           valorInicial?.tipo === "Profesional Independiente" &&
-          valorInicial?.integraCentroMedicoId
+          (valorInicial?.integraCentroMedicoId || valorInicial?.centroMedico || valorInicial?.centroMedicoNombre)
         ),
       });
       setConflictosHorarios({});
@@ -399,6 +428,11 @@ export default function DialogPrestador({
 
     if (form.lugaresAtencion.length === 0) {
       errores.lugaresAtencion = "Debe agregar al menos un lugar de atención";
+    } else {
+      const invalidas = (form.lugaresAtencion || []).map(l => isValidDireccion(l.direccion));
+      if (invalidas.some(v => v === false)) {
+        errores.direccionesInvalidas = true;
+      }
     }
 
     // Validar conflictos de horarios dentro de cada lugar
@@ -416,7 +450,7 @@ export default function DialogPrestador({
     if (
       form.tipo === "Profesional Independiente" &&
       form.vinculaCentro &&
-      !form.integraCentroMedicoId
+      !(form.integraCentroMedicoId || (String(form.centroMedicoNombre || "").trim() !== ""))
     ) {
       errores.integraCentroMedico = "Debe seleccionar un centro médico";
     }
@@ -446,7 +480,7 @@ export default function DialogPrestador({
             "\n\nDebe resolver estos conflictos antes de continuar."
         );
       } else {
-        alert("Por favor complete todos los campos requeridos");
+        alert("Por favor complete todos los campos requeridos (revise direcciones válidas)");
       }
       return;
     }
@@ -477,6 +511,9 @@ export default function DialogPrestador({
             horaInicio: h.horaInicio,
             horaFin: h.horaFin,
             duracionMinutos: Number(h.duracionMinutos || 30),
+            especialidadId: (h.especialidadId !== undefined && h.especialidadId !== null)
+              ? Number(h.especialidadId)
+              : null,
           }));
         return {
           id: l.id,
@@ -484,14 +521,19 @@ export default function DialogPrestador({
           horarios: horariosLimpios,
         };
       })
-      .filter(
-        (l) => l.direccion !== "" || (l.horarios && l.horarios.length > 0)
-      );
+      .filter((l) => isValidDireccion(l.direccion));
 
     const integraCentroMedicoNormalizado =
       form.tipo === "Profesional Independiente" && form.vinculaCentro
         ? form.integraCentroMedicoId || null
         : null;
+    const centroNombre = (() => {
+      if (integraCentroMedicoNormalizado) {
+        const c = centrosMedicos.find(cm => cm.id === integraCentroMedicoNormalizado);
+        return c ? c.nombreCompleto : (form.centroMedicoNombre || '');
+      }
+      return form.vinculaCentro ? (form.centroMedicoNombre || '') : '';
+    })();
 
     const payload = {
       id: form.id,
@@ -499,6 +541,7 @@ export default function DialogPrestador({
       nombreCompleto: (form.nombreCompleto || "").trim(),
       tipo: form.tipo,
       integraCentroMedicoId: integraCentroMedicoNormalizado,
+      centroMedico: centroNombre || undefined,
       especialidades: especialidadesLimpias,
       telefonos: telefonosLimpios,
       emails: emailsLimpios,
@@ -645,43 +688,54 @@ export default function DialogPrestador({
                             <Switch
                               checked={form.vinculaCentro}
                               color="secondary"
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                const checked = e.target.checked;
                                 setForm((prev) => ({
                                   ...prev,
-                                  vinculaCentro: e.target.checked,
-                                }))
-                              }
+                                  vinculaCentro: checked,
+                                  integraCentroMedicoId: checked ? prev.integraCentroMedicoId : null,
+                                  centroMedicoNombre: checked ? prev.centroMedicoNombre : "",
+                                }));
+                              }}
                             />
                           }
                           label={<Typography>Integra centro médico</Typography>}
                         />
 
                         {form.vinculaCentro && (
-                          <FormControl size="small" sx={{ minWidth: 260 }}>
-                            <InputLabel>Centro Médico</InputLabel>
-                            <Select
-                              value={form.integraCentroMedicoId || ""}
-                              label="Centro Médico"
-                              onChange={(e) =>
-                                setForm((prev) => ({
-                                  ...prev,
-                                  integraCentroMedicoId: e.target.value,
-                                }))
-                              }
-                            >
-                              {centrosMedicos.length === 0 ? (
-                                <MenuItem value="" disabled>
-                                  No hay centros disponibles
-                                </MenuItem>
-                              ) : (
-                                centrosMedicos.map((c) => (
-                                  <MenuItem key={c.id} value={c.id}>
-                                    {c.nombreCompleto}
-                                  </MenuItem>
-                                ))
-                              )}
-                            </Select>
-                          </FormControl>
+                          <Box sx={{ minWidth: 260 }}>
+                            {(() => {
+                              const valorCentro = form.integraCentroMedicoId
+                                ? centrosMedicos.find(c => c.id === form.integraCentroMedicoId) || null
+                                : (form.centroMedicoNombre ? { id: null, nombreCompleto: form.centroMedicoNombre } : null);
+                              return (
+                                <Autocomplete
+                                  size="small"
+                                  options={centrosMedicos}
+                                  getOptionLabel={(option) => option?.nombreCompleto || ""}
+                                  isOptionEqualToValue={(o, v) => o?.id === v?.id}
+                                  value={valorCentro}
+                                  disableClearable
+                                  onChange={(e, newValue) => {
+                                    setForm((prev) => ({
+                                      ...prev,
+                                      integraCentroMedicoId: newValue?.id || null,
+                                      centroMedicoNombre: newValue?.nombreCompleto || "",
+                                    }));
+                                  }}
+                                  renderInput={(params) => (
+                                    <TextField
+                                      {...params}
+                                      label="Centro Médico"
+                                      placeholder="Seleccionar centro"
+                                      inputProps={{ ...params.inputProps, readOnly: true }}
+                                    />
+                                  )}
+                                  noOptionsText="No hay centros disponibles"
+                                />
+                              );
+                            })()}
+                          </Box>
                         )}
                       </Stack>
                       {intentoGuardar &&
@@ -739,7 +793,7 @@ export default function DialogPrestador({
                   <Box sx={{ flex: 1 }}>
                     <Autocomplete
                       size="small"
-                      options={especialidadesDisponibles.filter(
+                      options={especialidadesActivas.filter(
                         (esp) =>
                           !form.especialidades.some(
                             (e, i) => i !== index && e?.id === esp.id
@@ -984,6 +1038,8 @@ export default function DialogPrestador({
                           }
                           fullWidth
                           placeholder="Avenida Vergara 1908, CABA"
+                          error={intentoGuardar && !isValidDireccion(lugar.direccion)}
+                          helperText={intentoGuardar && !isValidDireccion(lugar.direccion) ? "Ingrese una dirección válida (calle y número/barrio)" : ""}
                         />
                       </Grid>
                     </Grid>

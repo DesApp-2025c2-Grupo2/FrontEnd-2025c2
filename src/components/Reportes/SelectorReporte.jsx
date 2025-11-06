@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -15,10 +15,13 @@ import {
   PlayArrow as PlayArrowIcon,
   Download as DownloadIcon
 } from '@mui/icons-material';
+import ModalParametrosReporte from './ModalParametrosReporte';
 
 export default function SelectorReporte({
   tiposReportes = [],
   reporteSeleccionado,
+  especialidades = [],
+  afiliados = [],
   onSeleccionarReporte,
   onGenerarReporte,
   onExportarReporte,
@@ -26,13 +29,31 @@ export default function SelectorReporte({
   exportandoReporte = false,
   error = null
 }) {
+  const [modalAbierto, setModalAbierto] = useState(false);
+
+  // Filtrar explícitamente el reporte eliminado para asegurarse de que nunca aparezca
+  const tiposReportesFiltrados = tiposReportes.filter(t => t.id !== 'horarios-sin-turnos');
+
+  // Si el reporte seleccionado es el eliminado, limpiarlo
+  useEffect(() => {
+    if (reporteSeleccionado === 'horarios-sin-turnos') {
+      onSeleccionarReporte('');
+    }
+  }, [reporteSeleccionado, onSeleccionarReporte]);
+
   const handleGenerar = () => {
     if (reporteSeleccionado) {
-      onGenerarReporte({
-        tipoReporte: reporteSeleccionado,
-        parametros: {} // Por ahora sin parámetros específicos
-      });
+      // Abrir modal para parámetros
+      setModalAbierto(true);
     }
+  };
+
+  const handleConfirmarParametros = (parametros) => {
+    setModalAbierto(false);
+    onGenerarReporte({
+      tipoReporte: reporteSeleccionado,
+      parametros: parametros || {}
+    });
   };
 
   const handleExportar = () => {
@@ -44,7 +65,7 @@ export default function SelectorReporte({
     }
   };
 
-  const tipoSeleccionado = tiposReportes.find(t => t.id === reporteSeleccionado);
+  const tipoSeleccionado = tiposReportesFiltrados.find(t => t.id === reporteSeleccionado);
 
   return (
     <Box sx={{ mb: 4 }}>
@@ -84,7 +105,7 @@ export default function SelectorReporte({
               }
             }}
           >
-            {tiposReportes.map((tipo) => (
+            {tiposReportesFiltrados.map((tipo) => (
               <MenuItem key={tipo.id} value={tipo.id}>
                 <Box>
                   <Typography variant="body1" sx={{ fontWeight: 600 }}>
@@ -167,6 +188,15 @@ export default function SelectorReporte({
           </Typography>
         </Box>
       )}
+
+      <ModalParametrosReporte
+        open={modalAbierto}
+        tipoReporte={reporteSeleccionado}
+        especialidades={especialidades}
+        afiliados={afiliados}
+        onClose={() => setModalAbierto(false)}
+        onConfirm={handleConfirmarParametros}
+      />
     </Box>
   );
 }

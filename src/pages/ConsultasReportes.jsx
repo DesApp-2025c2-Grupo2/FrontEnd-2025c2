@@ -21,6 +21,9 @@ import {
   selectGenerandoReporte,
   selectExportandoReporte
 } from '../store/reportesSlice';
+import { selectEspecialidades } from '../store/especialidadesSlice';
+import { cargarEspecialidades } from '../store/especialidadesSlice';
+import { fetchAfiliados } from '../store/afiliadosSlice';
 import SelectorReporte from '../components/Reportes/SelectorReporte';
 import HistorialReportes from '../components/Reportes/HistorialReportes';
 
@@ -35,6 +38,8 @@ function ConsultasReportes() {
   const error = useSelector(selectError);
   const generandoReporte = useSelector(selectGenerandoReporte);
   const exportandoReporte = useSelector(selectExportandoReporte);
+  const especialidades = useSelector(selectEspecialidades);
+  const afiliados = useSelector((state) => state.afiliados.lista) || [];
   
   // Estado local
   const [reporteExportando, setReporteExportando] = useState(null);
@@ -43,7 +48,19 @@ function ConsultasReportes() {
 
   // Cargar datos iniciales
   useEffect(() => {
+    // Limpiar sessionStorage antiguo si existe
+    try {
+      const oldStorage = sessionStorage.getItem('mock_reportes_v1');
+      if (oldStorage) {
+        sessionStorage.removeItem('mock_reportes_v1');
+      }
+    } catch (e) {
+      // Ignorar errores de sessionStorage
+    }
+    
     dispatch(cargarHistorialReportes());
+    dispatch(cargarEspecialidades());
+    dispatch(fetchAfiliados());
   }, [dispatch]);
 
   // Manejar errores
@@ -116,6 +133,8 @@ function ConsultasReportes() {
       <SelectorReporte
         tiposReportes={tiposReportes}
         reporteSeleccionado={reporteSeleccionado}
+        especialidades={especialidades}
+        afiliados={afiliados}
         onSeleccionarReporte={handleSeleccionarReporte}
         onGenerarReporte={handleGenerarReporte}
         onExportarReporte={handleExportarReporte}

@@ -105,7 +105,6 @@ export const AfiliadosService = {
         : a.Integrantes ?? [],
     };
   },
-
   // En el método toggleStatus, asegurar que las fechas tengan hora
   toggleStatus: async (afiliadoID, activo, fecha) => {
     // Si la fecha viene sin hora, agregar hora específica
