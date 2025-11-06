@@ -44,20 +44,16 @@ export default function DialogSituacion({ abierto, valorInicial, onCerrar, onGua
       <DialogTitle sx={{ fontWeight: 800, color: '#111827' }}>{form.id ? 'Editar situación' : 'Agregar situación'}</DialogTitle>
       <DialogContent
         dividers
-        sx={{
-          '& .MuiFormControlLabel-label': { fontWeight: 700, color: '#111827' },
-          '& .MuiInputBase-input': { color: '#111827', fontWeight: 600 },
-        }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
-          <TextField label="Nombre" value={form.nombre} onChange={cambiar('nombre')} fullWidth error={!!errores.nombre} helperText={errores.nombre} InputLabelProps={{ sx: { fontWeight: 700, color: '#111827' } }} inputProps={{ sx: { color: '#111827', fontWeight: 600 } }} />
-          <TextField label="Descripción" value={form.descripcion} onChange={cambiar('descripcion')} fullWidth multiline rows={3} InputLabelProps={{ sx: { fontWeight: 700, color: '#111827' } }} inputProps={{ sx: { color: '#111827', fontWeight: 600 } }} />
-          <FormControlLabel control={<Switch checked={!!form.activa} onChange={cambiar('activa')} />} label="Activa" />
+          <TextField label="Nombre" value={form.nombre} onChange={cambiar('nombre')} fullWidth error={!!errores.nombre} helperText={errores.nombre} />
+          <TextField label="Descripción" value={form.descripcion} onChange={cambiar('descripcion')} fullWidth multiline rows={3} />
+          <FormControlLabel control={<Switch checked={!!form.activa} onChange={cambiar('activa')} color='secondary'/>} label="Activa" />
         </div>
       </DialogContent>
       <DialogActions>
-        <Button color='secondary' variant='outlined' onClick={onCerrar} sx={{ fontWeight: 700 }}>Cancelar</Button>
-        <Button variant="contained" color="secondary" onClick={guardar} disabled={Object.keys(errores).length > 0} sx={{ fontWeight: 700 }}>Guardar</Button>
+        <Button color='secondary' variant='outlined' onClick={onCerrar}>Cancelar</Button>
+        <Button variant="contained" color="secondary" onClick={guardar} disabled={Object.keys(errores).length > 0}>Guardar</Button>
       </DialogActions>
     </Dialog>
   );

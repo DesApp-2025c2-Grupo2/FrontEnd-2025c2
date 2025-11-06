@@ -21,7 +21,7 @@ import {
   Email as EmailIcon,
   Home as HomeIcon,
 } from "@mui/icons-material";
-import ContactInfoEditor from "./ContactInfoEditor";
+import ContactInfoEditor from "../ContactInfoEditor";
 import SituacionesSelector from "./SituacionesSelector";
 import DireccionesEditor from "./DireccionesEditor";
 import { tiposDocumento } from "../../utilidades/tipoDocumento";
