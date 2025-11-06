@@ -24,13 +24,8 @@ import { cargarPlanes, selectPlanes } from "../store/planesSlice";
 import { personasService } from "../services/personasService";
 
 import { parentescos } from "../utilidades/parentesco";
-import { updatePersona } from "../store/personasSlice";
+import { updatePersona, createMember } from "../store/personasSlice";
 
-const startOfDay = (d) => {
-  const dt = new Date(d);
-  dt.setHours(0, 0, 0, 0);
-  return dt;
-};
 const hoyISO = () => new Date().toISOString().split("T")[0];
 
 // Reemplazar la función actual por esta versión que compara fecha y hora completa
@@ -297,11 +292,12 @@ export default function Afiliados() {
     }
   }, []);
 
+  // Para edición de familiares existentes
   const handleEditFamiliar = useCallback(async (afiliado, fam) => {
     try {
       const familiarCompleto = await personasService.getPersona(fam.id);
       setSelectedAfiliado(afiliado);
-      setFormFamiliar(familiarCompleto); // edición
+      setFormFamiliar(familiarCompleto);
       setSelectedFamiliar(familiarCompleto);
       setIsEditingFamiliar(true);
       setOpenFamiliarDialog(true);
@@ -360,104 +356,101 @@ export default function Afiliados() {
         return obj;
       };
 
-      // Construimos el familiar
-      const familiarPayload = {
-        id: formFamiliar.id || 0,
+      // Construimos el payload base común
+      const payloadBase = {
         numeroIntegrante: formFamiliar.numeroIntegrante,
-        nombre: formFamiliar.nombre,
-        apellido: formFamiliar.apellido,
+        nombre: formFamiliar.nombre.trim(),
+        apellido: formFamiliar.apellido.trim(),
         fechaNacimiento: formFamiliar.fechaNacimiento
           ? new Date(formFamiliar.fechaNacimiento).toISOString()
           : new Date().toISOString(),
-        parentesco: formFamiliar.parentesco,
+        parentesco: parseInt(formFamiliar.parentesco) || 2,
+        afiliadoId: selectedAfiliado.id,
         alta: formFamiliar.alta
           ? new Date(formFamiliar.alta).toISOString()
           : new Date().toISOString(),
         baja: formFamiliar.baja
           ? new Date(formFamiliar.baja).toISOString()
           : null,
-        documentacion:
-          formFamiliar.tipoDocumento ||
-          formFamiliar.documentacion?.tipoDocumento ||
-          formFamiliar.numeroDocumento ||
-          formFamiliar.documentacion?.numero
-            ? {
-                tipoDocumento:
-                  parseInt(
-                    formFamiliar.tipoDocumento ??
-                      formFamiliar.documentacion?.tipoDocumento
-                  ) || 0,
-                numero: (
-                  formFamiliar.numeroDocumento ??
-                  formFamiliar.documentacion?.numero ??
-                  ""
-                ).toString(),
-              }
-            : null,
-
-        telefonos: (formFamiliar.telefonos || []).map((t) => ({
-          numero: t.numero ?? t.Numero ?? t ?? "",
+        documentacion: {
+          id: formFamiliar.documentacion?.id || 0,
+          tipoDocumento: parseInt(formFamiliar.tipoDocumento) || 1,
+          numero: (formFamiliar.numeroDocumento || "").toString(),
+        },
+        telefonos: (formFamiliar.telefonos || []).map((t, index) => ({
+          id: t.id || 0,
+          numero: typeof t === "string" ? t.trim() : (t.numero || "").trim(),
         })),
-        emails: (formFamiliar.emails || []).map((e) => ({
-          correo: e.correo ?? e.Correo ?? e ?? "",
+        emails: (formFamiliar.emails || []).map((e, index) => ({
+          id: e.id || 0,
+          correo: typeof e === "string" ? e.trim() : (e.correo || "").trim(),
         })),
-        direcciones: (formFamiliar.direcciones || []).map((d) => ({
-          calle: d.calle ?? d.Calle ?? "",
-          altura: d.altura ?? d.Altura ?? "",
-          piso: d.piso ?? d.Piso ?? "",
-          departamento: d.departamento ?? d.Departamento ?? "",
-          provinciaCiudad: d.provinciaCiudad ?? d.ProvinciaCiudad ?? "",
+        direcciones: (formFamiliar.direcciones || []).map((d, index) => ({
+          id: d.id || 0,
+          calle: d.calle || "",
+          altura: d.altura || "",
+          piso: d.piso || "",
+          departamento: d.departamento || "",
+          provinciaCiudad: d.provinciaCiudad || "",
         })),
-        // CAMBIO: Convertir array de situaciones a objeto clave-valor
         situacionesTerapeuticas: convertirSituacionesAObjeto(
-          formFamiliar.situacionesTerapeuticasIds ?? []
+          formFamiliar.situacionesTerapeuticasIds || []
         ),
       };
 
-      // Obtener integrantes actuales del afiliado
-      const afiliadoActual = selectedAfiliado;
+      let result;
 
-      // Validar que el plan médico del afiliado exista
-      const planValido = planesMedicos.some(
-        (p) => String(p.id) === String(afiliadoActual.planMedicoId)
-      );
-      if (!planValido) {
-        console.error("❌ Plan médico inválido:", afiliadoActual.planMedicoId);
-        showSnackbar("El plan médico del afiliado no existe", "error");
-        return;
+      if (isEditingFamiliar && formFamiliar.id) {
+        // 🟢 EDITAR familiar existente - Usar PUT /Personas/update
+        const updatePayload = {
+          ...payloadBase,
+          id: formFamiliar.id, // ID existente del familiar
+        };
+
+        console.log(
+          "🎯 [EDIT FAMILIAR] Payload a enviar:",
+          JSON.stringify(updatePayload, null, 2)
+        );
+
+        result = await dispatch(updatePersona(updatePayload)).unwrap();
+        showSnackbar("Familiar actualizado correctamente");
+      } else {
+        // 🟢 CREAR nuevo familiar - Usar POST /Personas/addMember/{afiliadoID}
+        const createPayload = {
+          ...payloadBase,
+          id: 0, // Nuevo registro
+        };
+
+        console.log(
+          "🎯 [ADD FAMILIAR] Payload a enviar:",
+          JSON.stringify(createPayload, null, 2)
+        );
+
+        result = await dispatch(
+          createMember({
+            afiliadoID: selectedAfiliado.id,
+            memberData: createPayload,
+          })
+        ).unwrap();
+        showSnackbar("Familiar agregado correctamente");
       }
 
-      // Nuevo array con el nuevo familiar agregado
-      const nuevosIntegrantes = [
-        ...(afiliadoActual.integrantes || []),
-        familiarPayload,
-      ];
-
-      const payload = {
-        ...afiliadoActual,
-        integrantes: nuevosIntegrantes,
-      };
-
-      console.log(
-        "🎯 [FINAL] Payload cambio integrantes a enviar:",
-        JSON.stringify(payload, null, 2)
-      );
-
-      await dispatch(
-        updateAfiliado({ id: afiliadoActual.id, payload })
-      ).unwrap();
-
-      showSnackbar("Familiar agregado correctamente");
+      // Recargar los afiliados para reflejar los cambios
       await dispatch(fetchAfiliados()).unwrap();
 
       setOpenFamiliarDialog(false);
       setSelectedFamiliar(null);
       setIsEditingFamiliar(false);
+      setFormFamiliar({});
     } catch (error) {
-      console.error("Error al guardar familiar:", error);
-      showSnackbar("Error al guardar el familiar", "error");
+      console.error("❌ Error al guardar familiar:", error);
+      showSnackbar(
+        "Error al guardar el familiar: " +
+          (error.message || "Error desconocido"),
+        "error"
+      );
     }
-  }, [formFamiliar, selectedAfiliado, dispatch, planesMedicos]);
+  }, [formFamiliar, selectedAfiliado, isEditingFamiliar, dispatch]);
 
   // ---------- Construcción payload afiliado ----------
   const buildAfiliadoPayload = useCallback(
