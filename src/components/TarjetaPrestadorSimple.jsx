@@ -9,11 +9,15 @@ import { useSelector } from 'react-redux';
 import { selectPrestadores } from '../store/prestadoresSlice';
 import { selectEspecialidades } from '../store/especialidadesSlice';
 
-export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo, onGestionarHorarios, onEliminarDireccion }) {
+export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo, onGestionarHorarios, onEliminarDireccion, emphasis = false }) {
   const todosPrestadores = useSelector(selectPrestadores);
-  const centroNombre = prestador.integraCentroMedicoId
-    ? (todosPrestadores || []).find(p => p.id === prestador.integraCentroMedicoId)?.nombreCompleto
-    : null;
+  const centroNombre = (() => {
+    if (prestador.integraCentroMedicoId) {
+      const c = (todosPrestadores || []).find(p => p.id === prestador.integraCentroMedicoId);
+      if (c && c.nombreCompleto) return c.nombreCompleto;
+    }
+    return prestador.centroMedicoNombre || prestador.centroMedico || null;
+  })();
 
   const getTipoColor = (tipo) => ({
     'Centro Médico': '#546e7a',
@@ -47,10 +51,13 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
     <Card
       sx={{
         p: 2,
-      mb: 2, 
+        mb: 2, 
         border: prestador.activo ? '1px solid #e0e0e0' : '1px solid #d1d5db',
-        backgroundColor: prestador.activo ? 'white' : '#f3f4f6',
+        backgroundColor: prestador.activo ? (emphasis ? '#fffef7' : 'white') : '#f3f4f6',
         opacity: prestador.activo ? 1 : 0.7,
+        boxShadow: emphasis ? 6 : 'none',
+        borderColor: emphasis ? '#ffb300' : (prestador.activo ? '#e0e0e0' : '#d1d5db'),
+        transition: 'background-color 200ms ease, box-shadow 200ms ease, border-color 200ms ease',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>

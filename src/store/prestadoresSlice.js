@@ -45,6 +45,19 @@ export const editarPrestador = createAsyncThunk(
   }
 );
 
+// Actualiza solo datos base e incluye direcciones (sin horarios)
+export const actualizarDireccionesPrestador = createAsyncThunk(
+  'prestadores/actualizarDirecciones',
+  async (prestador, { rejectWithValue }) => {
+    try {
+      const actualizado = await prestadoresService.update(prestador, { includeDirecciones: true });
+      return actualizado;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Error al actualizar direcciones');
+    }
+  }
+);
+
 export const actualizarHorariosPrestador = createAsyncThunk(
   'prestadores/actualizarHorarios',
   async ({ id, lugaresAtencion }, { rejectWithValue }) => {
@@ -71,9 +84,9 @@ export const eliminarPrestador = createAsyncThunk(
 
 export const toggleActivoPrestador = createAsyncThunk(
   'prestadores/toggleActivo',
-  async (id, { rejectWithValue, getState }) => {
+  async ({ id, activo }, { rejectWithValue }) => {
     try {
-      const result = await prestadoresService.toggleActivo(id);
+      const result = await prestadoresService.toggleActivo(id, activo);
       return result;
     } catch (error) {
       return rejectWithValue(error.message || 'Error al cambiar estado');
@@ -145,6 +158,23 @@ const slice = createSlice({
         state.error = action.payload || 'No se pudo actualizar el prestador';
       })
       
+      // Actualizar direcciones
+      .addCase(actualizarDireccionesPrestador.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(actualizarDireccionesPrestador.fulfilled, (state, action) => {
+        state.loading = false;
+        if (action.payload && action.payload.id) {
+          const idx = state.items.findIndex(p => p.id === action.payload.id);
+          if (idx !== -1) state.items[idx] = action.payload;
+        }
+      })
+      .addCase(actualizarDireccionesPrestador.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'No se pudieron actualizar las direcciones';
+      })
+      
       // Actualizar horarios
       .addCase(actualizarHorariosPrestador.pending, (state) => {
         state.error = null;
@@ -210,8 +240,8 @@ export const selectPrestadoresActivos = (state) => {
 // Selector para filtrar prestadores
 export const selectPrestadoresFiltrados = (searchTerm) => (state) => {
   // Dejar prestadores como están (sin resolver especialidades con catálogo)
-  const prestadoresActivos = selectPrestadores(state).filter(p => p.activo);
-  let resultado = prestadoresActivos;
+  const prestadoresBase = selectPrestadores(state); // incluir activos e inactivos (baja lógica visible)
+  let resultado = prestadoresBase;
   
   if (!searchTerm || searchTerm.trim() === '') {
     return resultado;

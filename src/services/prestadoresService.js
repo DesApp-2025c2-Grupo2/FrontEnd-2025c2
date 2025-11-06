@@ -207,6 +207,24 @@ export async function getAll() {
   }
 }
 
+export async function getById(id) {
+  try {
+    const [res, catalogo] = await Promise.all([
+      WebAPI.Instance().get(`${ENDPOINT}/${id}`),
+      especialidadesService.getAll().catch(() => [])
+    ]);
+    const data = res?.data || null;
+    if (!data) return null;
+    const idToNombre = new Map((catalogo || []).map(e => [e.id, e.nombre]));
+    return normalizeFromBackend(data, idToNombre);
+  } catch (_) {
+    // fallback mock
+    await delay();
+    const items = readAll();
+    return items.find(p => p.id === id) || null;
+  }
+}
+
 function toBackendPayload(prestador, options = {}) {
   const { includeLugares = true, includeDirecciones = true } = options;
   const idsFromEspecialidades = Array.isArray(prestador?.especialidades)
@@ -218,13 +236,27 @@ function toBackendPayload(prestador, options = {}) {
     nombreCompleto: prestador?.nombreCompleto || '',
     rol: prestador?.tipo === 'Centro Médico' ? 2 : 1,
     centroMedico: prestador?.centroMedico || '',
+    centroMedicoId: (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined,
+    integraCentroMedicoId: (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined,
     especialidadesIds: idsFromEspecialidades,
     documentacion: prestador?.cuilCuit || '',
     telefonos: Array.isArray(prestador?.telefonos) ? prestador.telefonos.map(t => t?.numero).filter(Boolean) : [],
     emails: Array.isArray(prestador?.emails) ? prestador.emails.map(e => e?.email).filter(Boolean) : [],
   };
   if (includeDirecciones) {
-    base.direcciones = Array.isArray(prestador?.lugaresAtencion) ? prestador.lugaresAtencion.map(l => l?.direccion).filter(Boolean) : [];
+    const dirs = Array.isArray(prestador?.lugaresAtencion)
+      ? prestador.lugaresAtencion
+          .map(l => (typeof l === 'string' ? l : (l?.direccion || '')))
+          .map(s => String(s).trim())
+          .filter(s => s !== '')
+      : [];
+    const seen = new Set();
+    base.direcciones = dirs.filter((d) => {
+      const k = d.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
   }
   if (!includeLugares) return base;
   return {
@@ -247,6 +279,17 @@ function toBackendPayload(prestador, options = {}) {
         }))
       : [],
   };
+}
+
+function parseActivo(raw) {
+  if (typeof raw === 'boolean') return raw;
+  if (typeof raw === 'number') return raw !== 0;
+  if (typeof raw === 'string') {
+    const t = raw.trim().toLowerCase();
+    if (t === 'true' || t === 'activo' || t === 'activa' || t === 'enabled') return true;
+    if (t === 'false' || t === 'inactivo' || t === 'inactiva' || t === 'disabled') return false;
+  }
+  return undefined;
 }
 
 function normalizeFromBackend(p, idToNombre) {
@@ -281,30 +324,57 @@ function normalizeFromBackend(p, idToNombre) {
 
   let lugaresAtencion = [];
   if (Array.isArray(p?.lugaresAtencion)) {
-    lugaresAtencion = p.lugaresAtencion.map((l) => ({
-      id: l?.id ?? null,
-      direccion: l?.direccion || (([l?.calle, l?.altura].filter(Boolean).join(' ') || l?.calle || '')),
-      horarios: buildHorarios(l),
-    }));
+    lugaresAtencion = p.lugaresAtencion.map((l) => {
+      const calle = typeof l?.calle === 'string' ? l.calle.trim() : '';
+      const alturaRaw = typeof l?.altura === 'string' ? l.altura.trim() : '';
+      const alturaEsSN = /^(s\/?n|s\/?d)$/i.test(alturaRaw);
+      const direccion = l?.direccion || (calle ? (alturaRaw && !alturaEsSN ? `${calle} ${alturaRaw}` : calle) : '');
+      return {
+        id: l?.id ?? null,
+        direccion,
+        horarios: buildHorarios(l),
+      };
+    });
   } else if (Array.isArray(p?.direcciones)) {
-    lugaresAtencion = p.direcciones.map((d) => ({
-      id: d?.id || null,
-      direccion: (typeof d === 'string') ? d : (([d?.calle, d?.altura].filter(Boolean).join(' ') || d?.calle || d?.direccion || '')),
-      horarios: buildHorarios(d),
-    }));
+    lugaresAtencion = p.direcciones.map((d) => {
+      if (typeof d === 'string') {
+        return { id: null, direccion: d, horarios: buildHorarios(d) };
+      }
+      const calle = typeof d?.calle === 'string' ? d.calle.trim() : (typeof d?.direccion === 'string' ? d.direccion.trim() : '');
+      const alturaRaw = typeof d?.altura === 'string' ? d.altura.trim() : '';
+      const alturaEsSN = /^(s\/?n|s\/?d)$/i.test(alturaRaw);
+      const direccion = calle ? (alturaRaw && !alturaEsSN ? `${calle} ${alturaRaw}` : calle) : '';
+      return {
+        id: d?.id || null,
+        direccion,
+        horarios: buildHorarios(d),
+      };
+    });
   }
+
+  const activoCalc =
+    parseActivo(p?.activo) ??
+    parseActivo(p?.habilitado) ??
+    parseActivo(p?.estaActivo) ??
+    parseActivo(p?.enabled) ??
+    parseActivo(p?.estado) ??
+    true;
 
   return {
     id: p.id,
     cuilCuit: p?.documentacion?.numero || p?.documentacion || '',
     nombreCompleto: p?.nombreCompleto || '',
     tipo: (p?.rol === 2 ? 'Centro Médico' : 'Profesional Independiente'),
-    integraCentroMedicoId: null,
+    rol: (typeof p?.rol === 'number') ? p.rol : (p?.tipo === 'Centro Médico' ? 2 : 1),
+    integraCentroMedicoId: (typeof p?.integraCentroMedicoId === 'number')
+      ? p.integraCentroMedicoId
+      : (typeof p?.centroMedicoId === 'number' ? p.centroMedicoId : null),
+    centroMedicoNombre: typeof p?.centroMedico === 'string' ? p.centroMedico : undefined,
     especialidades,
     telefonos: Array.isArray(p?.telefonos) ? p.telefonos.map(t => ({ numero: t?.numero || t })) : [],
     emails: Array.isArray(p?.emails) ? p.emails.map(e => ({ email: e?.correo || e })) : [],
     lugaresAtencion,
-    activo: true,
+    activo: activoCalc,
   };
 }
 
@@ -393,9 +463,10 @@ export async function create(prestador) {
   return nuevo;
 }
 
-export async function update(partial) {
+export async function update(partial, options = {}) {
   try {
-    const payload = toBackendPayload(partial, { includeLugares: false, includeDirecciones: false });
+    const includeDirecciones = !!options.includeDirecciones;
+    const payload = toBackendPayload(partial, { includeLugares: false, includeDirecciones });
     // Preferir PUT /Prestador/{id}
     let res = null;
     if (partial && partial.id != null) {
@@ -412,7 +483,18 @@ export async function update(partial) {
     if (actualizado && actualizado.id) {
       const catalogo = await especialidadesService.getAll().catch(() => []);
       const idToNombre = new Map((catalogo || []).map(e => [e.id, e.nombre]));
-      return normalizeFromBackend(actualizado, idToNombre);
+      const norm = normalizeFromBackend(actualizado, idToNombre);
+      // Preservar CUIT si la respuesta no lo trae
+      return { ...norm, cuilCuit: norm.cuilCuit || partial.cuilCuit || '' };
+    }
+    // Soportar 200/204 sin body o booleanos
+    if (res && res.status >= 200 && res.status < 300) {
+      // Intentar traer el registro actualizado
+      const rec = await getById(partial.id);
+      if (rec) return { ...rec, cuilCuit: rec.cuilCuit || partial.cuilCuit || '' };
+      const todos = await getAll();
+      const match = (todos || []).find(p => p.id === partial.id);
+      if (match) return { ...match, cuilCuit: match.cuilCuit || partial.cuilCuit || '' };
     }
   } catch (_) {
     // fallback a mock local
@@ -438,14 +520,34 @@ export async function deleteById(id) {
   return { id };
 }
 
-export async function toggleActivo(id) {
+export async function toggleActivo(id, activo) {
+  // Intentar backend primero
+  try {
+    const res = await WebAPI.Instance().put(`${ENDPOINT}/${id}/estado`, { activo: !!activo });
+    const data = res?.data;
+    if (data && typeof data.id === 'number' && typeof data.activo === 'boolean') {
+      return { id: data.id, activo: data.activo };
+    }
+    // Si no devuelve body, asumir éxito y reflejar el valor pedido
+    if (res && res.status >= 200 && res.status < 300) {
+      return { id, activo: !!activo };
+    }
+  } catch (err) {
+    // si el backend respondió con error con mensaje, propagar
+    if (err && err.response && err.response.data && err.response.data.message) {
+      throw new Error(err.response.data.message);
+    }
+    // continuar a mock local
+  }
+  // Mock local
   await delay();
   const items = readAll();
   const idx = items.findIndex(p => p.id === id);
   if (idx === -1) throw new Error('Prestador no encontrado');
-  items[idx].activo = !items[idx].activo;
+  const nuevo = (typeof activo === 'boolean') ? !!activo : !items[idx].activo;
+  items[idx].activo = nuevo;
   writeAll(items);
-  return { id, activo: items[idx].activo };
+  return { id, activo: nuevo };
 }
 
 export async function overwriteAll(items) {

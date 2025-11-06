@@ -2,6 +2,7 @@
 import WebAPI from './config/WebAPI';
 
 const ENDPOINT = '/Agenda';
+const USE_AGENDAS_MOCK = false; // desactivado por defecto
 
 function readMockAgendas(profesionalId) {
   try {
@@ -53,8 +54,10 @@ export async function getByProfesional(profesionalId) {
     const data = Array.isArray(res?.data) ? res.data : [];
     const norm = data.map(normalizeAgendaLugar);
     if (norm.length > 0) return norm;
-    const mock = readMockAgendas(profesionalId);
-    if (mock.length > 0) return mock;
+    if (USE_AGENDAS_MOCK) {
+      const mock = readMockAgendas(profesionalId);
+      if (mock.length > 0) return mock;
+    }
     return [];
   } catch (_) {
     // Fallback: /Agenda/getByProfesional/{id}
@@ -63,12 +66,16 @@ export async function getByProfesional(profesionalId) {
       const data2 = Array.isArray(res2?.data) ? res2.data : [];
       const norm2 = data2.map(normalizeAgendaLugar);
       if (norm2.length > 0) return norm2;
-      const mock = readMockAgendas(profesionalId);
-      if (mock.length > 0) return mock;
+      if (USE_AGENDAS_MOCK) {
+        const mock = readMockAgendas(profesionalId);
+        if (mock.length > 0) return mock;
+      }
       return [];
     } catch {
-      const mock = readMockAgendas(profesionalId);
-      if (mock.length > 0) return mock;
+      if (USE_AGENDAS_MOCK) {
+        const mock = readMockAgendas(profesionalId);
+        if (mock.length > 0) return mock;
+      }
       return [];
     }
   }
