@@ -40,7 +40,16 @@ export default function AltaDialog({
   }, [open]);
 
   const handleConfirm = () => {
-    const fechaAltaFinal = esAltaInmediata ? hoyISO() : fechaAlta;
+    let fechaAltaFinal;
+
+    if (esAltaInmediata) {
+      // Para alta inmediata, usar fecha y hora actual
+      fechaAltaFinal = new Date().toISOString();
+    } else {
+      // Para alta programada, usar inicio del día seleccionado
+      fechaAltaFinal = fechaAlta + "T00:00:00";
+    }
+
     if (!fechaAltaFinal) return;
 
     if (esAltaInmediata && afiliado?.baja) {

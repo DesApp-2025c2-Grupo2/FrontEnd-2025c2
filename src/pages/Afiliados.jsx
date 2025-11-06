@@ -13,6 +13,7 @@ import {
   fetchAfiliados,
   createAfiliado,
   updateAfiliado,
+  toggleAfiliadoStatus,
 } from "../store/afiliadosSlice";
 
 import {
@@ -23,6 +24,7 @@ import { cargarPlanes, selectPlanes } from "../store/planesSlice";
 import { personasService } from "../services/personasService";
 
 import { parentescos } from "../utilidades/parentesco";
+import { updatePersona } from "../store/personasSlice";
 
 const startOfDay = (d) => {
   const dt = new Date(d);
@@ -31,27 +33,35 @@ const startOfDay = (d) => {
 };
 const hoyISO = () => new Date().toISOString().split("T")[0];
 
+// Reemplazar la función actual por esta versión que compara fecha y hora completa
 const estaActivo = (alta, baja) => {
-  const hoy = startOfDay(new Date());
-  if (baja) {
-    const fechaBaja = startOfDay(new Date(baja));
-    if (fechaBaja <= hoy) return false;
-  }
-  if (alta) {
-    const fechaAlta = startOfDay(new Date(alta));
-    if (fechaAlta > hoy) return false;
-  }
+  const ahora = new Date();
+
+  // Si no tiene fecha de alta, no está activo
+  if (!alta) return false;
+
+  const fechaAlta = new Date(alta);
+  const fechaBaja = baja ? new Date(baja) : null;
+
+  // Si la fecha de alta es futura, no está activo
+  if (fechaAlta > ahora) return false;
+
+  // Si tiene fecha de baja y es anterior o igual al momento actual, no está activo
+  if (fechaBaja && fechaBaja <= ahora) return false;
+
+  // En cualquier otro caso, está activo
   return true;
 };
 
+// También actualizar las funciones auxiliares para usar comparación completa
 const tieneBajaProgramada = (baja) => {
   if (!baja) return false;
-  return startOfDay(new Date(baja)) > startOfDay(new Date());
+  return new Date(baja) > new Date();
 };
 
 const tieneAltaProgramada = (alta) => {
   if (!alta) return false;
-  return startOfDay(new Date(alta)) > startOfDay(new Date());
+  return new Date(alta) > new Date();
 };
 
 // helpers puros
@@ -154,6 +164,15 @@ export default function Afiliados() {
     setFilteredAfiliados((prev) => (prev === lista ? prev : lista));
   }, []);
 
+  // Función helper para convertir situaciones a objeto (debe estar en el scope del componente)
+  const convertirSituacionesAObjeto = (situacionesArray) => {
+    const obj = {};
+    situacionesArray.forEach((sit) => {
+      obj[sit.id] = sit.fechaFin ? new Date(sit.fechaFin).toISOString() : null;
+    });
+    return obj;
+  };
+
   // ---------- Afiliados: agregar/editar/ver ----------
   const handleAddAfiliado = useCallback(() => {
     setSelectedAfiliado(null);
@@ -192,16 +211,22 @@ export default function Afiliados() {
       alta: afiliado.alta ?? hoyISO(),
       telefonos: titular?.telefonos?.map((t) => t.numero) ?? [],
       emails: titular?.emails?.map((e) => e.correo) ?? [],
+      // CAMBIO: Mantener direcciones como objetos, no como strings
       direcciones:
-        titular?.direcciones?.map((d) =>
-          `${d.calle ?? ""} ${d.altura ?? ""}${
-            d.piso ? `, Piso ${d.piso}` : ""
-          }${d.departamento ? `, Dpto ${d.departamento}` : ""}${
-            d.provinciaCiudad ? `, ${d.provinciaCiudad}` : ""
-          }`.trim()
-        ) ?? [],
-      situacionesTerapeuticasIds:
-        titular?.situacionesTerapeuticas?.map((s) => s.id ?? s) ?? [],
+        titular?.direcciones?.map((d) => ({
+          calle: d.calle ?? "",
+          altura: d.altura ?? "",
+          piso: d.piso ?? "",
+          departamento: d.departamento ?? "",
+          provinciaCiudad: d.provinciaCiudad ?? "",
+        })) ?? [],
+      situacionesTerapeuticasIds: Array.isArray(
+        titular?.situacionesTerapeuticas
+      )
+        ? titular.situacionesTerapeuticas.map((s) =>
+            typeof s === "object" ? s : { id: s, nombre: "", fechaFin: null }
+          )
+        : [],
     });
 
     const miembros = Array.isArray(afiliado.integrantes)
@@ -234,14 +259,15 @@ export default function Afiliados() {
       alta: afiliado.alta ?? hoyISO(),
       telefonos: titular?.telefonos?.map((t) => t.numero) ?? [],
       emails: titular?.emails?.map((e) => e.correo) ?? [],
+      // CAMBIO: Mantener direcciones como objetos, no como strings
       direcciones:
-        titular?.direcciones?.map((d) =>
-          `${d.calle ?? ""} ${d.altura ?? ""}${
-            d.piso ? `, Piso ${d.piso}` : ""
-          }${d.departamento ? `, Dpto ${d.departamento}` : ""}${
-            d.provinciaCiudad ? `, ${d.provinciaCiudad}` : ""
-          }`.trim()
-        ) ?? [],
+        titular?.direcciones?.map((d) => ({
+          calle: d.calle ?? "",
+          altura: d.altura ?? "",
+          piso: d.piso ?? "",
+          departamento: d.departamento ?? "",
+          provinciaCiudad: d.provinciaCiudad ?? "",
+        })) ?? [],
       situacionesTerapeuticasIds:
         titular?.situacionesTerapeuticas?.map((s) => s.id ?? s) ?? [],
     });
@@ -267,7 +293,7 @@ export default function Afiliados() {
       setIsEditingFamiliar(false);
       setOpenFamiliarDialog(true);
     } catch (error) {
-      showSnackbar("Error al cargar los datos del familiar", "error");
+      showSnackbar("Error al cargar los datos del familiar", "error", error);
     }
   }, []);
 
@@ -280,7 +306,7 @@ export default function Afiliados() {
       setIsEditingFamiliar(true);
       setOpenFamiliarDialog(true);
     } catch (error) {
-      showSnackbar("Error al cargar el familiar para edición", "error");
+      showSnackbar("Error al cargar el familiar para edición", "error", error);
     }
   }, []);
 
@@ -312,7 +338,7 @@ export default function Afiliados() {
       });
       setOpenFamiliarDialog(true);
     } catch (error) {
-      showSnackbar("Error al preparar formulario de familiar", "error");
+      showSnackbar("Error al preparar formulario de familiar", "error", error);
     }
   }, []);
 
@@ -323,16 +349,33 @@ export default function Afiliados() {
     }
 
     try {
+      // Función helper para convertir situaciones a objeto
+      const convertirSituacionesAObjeto = (situacionesArray) => {
+        const obj = {};
+        situacionesArray.forEach((sit) => {
+          obj[sit.id] = sit.fechaFin
+            ? new Date(sit.fechaFin).toISOString()
+            : null;
+        });
+        return obj;
+      };
+
       // Construimos el familiar
       const familiarPayload = {
         id: formFamiliar.id || 0,
         numeroIntegrante: formFamiliar.numeroIntegrante,
         nombre: formFamiliar.nombre,
         apellido: formFamiliar.apellido,
-        fechaNacimiento: formFamiliar.fechaNacimiento,
+        fechaNacimiento: formFamiliar.fechaNacimiento
+          ? new Date(formFamiliar.fechaNacimiento).toISOString()
+          : new Date().toISOString(),
         parentesco: formFamiliar.parentesco,
-        alta: formFamiliar.alta,
-        baja: formFamiliar.baja ?? null,
+        alta: formFamiliar.alta
+          ? new Date(formFamiliar.alta).toISOString()
+          : new Date().toISOString(),
+        baja: formFamiliar.baja
+          ? new Date(formFamiliar.baja).toISOString()
+          : null,
         documentacion:
           formFamiliar.tipoDocumento ||
           formFamiliar.documentacion?.tipoDocumento ||
@@ -365,8 +408,10 @@ export default function Afiliados() {
           departamento: d.departamento ?? d.Departamento ?? "",
           provinciaCiudad: d.provinciaCiudad ?? d.ProvinciaCiudad ?? "",
         })),
-        situacionesTerapeuticasIds:
-          formFamiliar.situacionesTerapeuticasIds ?? [],
+        // CAMBIO: Convertir array de situaciones a objeto clave-valor
+        situacionesTerapeuticas: convertirSituacionesAObjeto(
+          formFamiliar.situacionesTerapeuticasIds ?? []
+        ),
       };
 
       // Obtener integrantes actuales del afiliado
@@ -381,6 +426,7 @@ export default function Afiliados() {
         showSnackbar("El plan médico del afiliado no existe", "error");
         return;
       }
+
       // Nuevo array con el nuevo familiar agregado
       const nuevosIntegrantes = [
         ...(afiliadoActual.integrantes || []),
@@ -391,16 +437,17 @@ export default function Afiliados() {
         ...afiliadoActual,
         integrantes: nuevosIntegrantes,
       };
+
       console.log(
         "🎯 [FINAL] Payload cambio integrantes a enviar:",
         JSON.stringify(payload, null, 2)
       );
+
       await dispatch(
         updateAfiliado({ id: afiliadoActual.id, payload })
       ).unwrap();
 
       showSnackbar("Familiar agregado correctamente");
-
       await dispatch(fetchAfiliados()).unwrap();
 
       setOpenFamiliarDialog(false);
@@ -410,13 +457,24 @@ export default function Afiliados() {
       console.error("Error al guardar familiar:", error);
       showSnackbar("Error al guardar el familiar", "error");
     }
-  }, [formFamiliar, selectedAfiliado, dispatch]);
+  }, [formFamiliar, selectedAfiliado, dispatch, planesMedicos]);
 
   // ---------- Construcción payload afiliado ----------
   const buildAfiliadoPayload = useCallback(
     (afiliadoToEdit = null) => {
       console.log("🔧 [DEBUG] Construyendo payload...");
       console.log("🔧 [DEBUG] formAfiliado:", formAfiliado);
+
+      // Función helper para convertir situaciones a objeto
+      const convertirSituacionesAObjeto = (situacionesArray) => {
+        const obj = {};
+        situacionesArray.forEach((sit) => {
+          obj[sit.id] = sit.fechaFin
+            ? new Date(sit.fechaFin).toISOString()
+            : null;
+        });
+        return obj;
+      };
 
       // Asegurar que el tipo de documento sea numérico (1, 2, 3, etc.)
       const tipoDocumentoNumerico =
@@ -429,9 +487,13 @@ export default function Afiliados() {
         numeroIntegrante: 1,
         nombre: formAfiliado.nombre?.trim() || "",
         apellido: formAfiliado.apellido?.trim() || "",
-        fechaNacimiento: formAfiliado.fechaNacimiento || hoyISO().toISOString(),
-        parentesco: 0, // 0 = Titular
-        alta: formAfiliado.alta || hoyISO().toISOString(),
+        fechaNacimiento: formAfiliado.fechaNacimiento
+          ? new Date(formAfiliado.fechaNacimiento).toISOString()
+          : new Date().toISOString(),
+        parentesco: 0, // 0 = Titular - CORREGIDO: debe ser número, no string
+        alta: formAfiliado.alta
+          ? new Date(formAfiliado.alta).toISOString()
+          : new Date().toISOString(),
         baja: null,
         documentacion: {
           tipoDocumento: parseInt(tipoDocumentoNumerico),
@@ -453,10 +515,10 @@ export default function Afiliados() {
             if (typeof d === "string") {
               return {
                 calle: d,
-                altura: "",
+                altura: "0",
                 piso: "",
                 departamento: "",
-                provinciaCiudad: "",
+                provinciaCiudad: "Buenos Aires",
               };
             }
             return {
@@ -467,8 +529,9 @@ export default function Afiliados() {
               provinciaCiudad: d.provinciaCiudad || "",
             };
           }),
-        situacionesTerapeuticasIds:
-          formAfiliado.situacionesTerapeuticasIds || [],
+        situacionesTerapeuticas: convertirSituacionesAObjeto(
+          formAfiliado.situacionesTerapeuticasIds || []
+        ),
       };
 
       console.log("🔧 [DEBUG] Titular payload:", titularPayload);
@@ -480,16 +543,20 @@ export default function Afiliados() {
           numeroIntegrante: i.numeroIntegrante || index + 2,
           nombre: i.nombre?.trim() || "",
           apellido: i.apellido?.trim() || "",
-          fechaNacimiento: i.fechaNacimiento || hoyISO(),
-          parentesco: i.parentesco || 2, // 2 = Cónyuge por defecto
-          alta: i.alta || hoyISO(),
-          baja: i.baja || null,
+          fechaNacimiento: i.fechaNacimiento
+            ? new Date(i.fechaNacimiento).toISOString()
+            : new Date().toISOString(),
+          parentesco: parseInt(i.parentesco) || 2, // CORREGIDO: asegurar que sea número
+          alta: i.alta
+            ? new Date(i.alta).toISOString()
+            : new Date().toISOString(),
+          baja: i.baja ? new Date(i.baja).toISOString() : null,
           documentacion:
             i.tipoDocumento || i.numeroDocumento
               ? {
                   tipoDocumento:
                     i.tipoDocumento && !isNaN(i.tipoDocumento)
-                      ? i.tipoDocumento
+                      ? parseInt(i.tipoDocumento)
                       : 1,
                   numero: i.numeroDocumento?.toString() || "",
                 }
@@ -526,7 +593,9 @@ export default function Afiliados() {
                 provinciaCiudad: d.provinciaCiudad || "",
               };
             }),
-          situacionesTerapeuticasIds: i.situacionesTerapeuticasIds || [],
+          situacionesTerapeuticas: convertirSituacionesAObjeto(
+            i.situacionesTerapeuticasIds || []
+          ),
         }));
 
       console.log(
@@ -540,8 +609,12 @@ export default function Afiliados() {
           ? afiliadoToEdit.numeroAfiliado
           : undefined,
         planMedicoId: parseInt(formAfiliado.planMedicoId) || 1,
-        alta: formAfiliado.alta || hoyISO(),
+        alta: formAfiliado.alta
+          ? new Date(formAfiliado.alta).toISOString()
+          : new Date().toISOString(),
         baja: null,
+        // NUEVO: Incluir titularID - aunque en creación puede ser 0, el backend lo asignará
+        titularID: 0,
         integrantes: [titularPayload, ...otrosIntegrantesPayload],
       };
 
@@ -563,6 +636,7 @@ export default function Afiliados() {
         finalPayload.integrantes.length
       );
       console.log("🔧 [DEBUG] numeroAfiliado:", finalPayload.numeroAfiliado);
+      console.log("🔧 [DEBUG] titularID:", finalPayload.titularID);
 
       return finalPayload;
     },
@@ -570,6 +644,7 @@ export default function Afiliados() {
   );
 
   // ---------- Guardar afiliado ----------
+  // En Afiliados.jsx - handleSaveAfiliado
   const handleSaveAfiliado = useCallback(async () => {
     if (
       !formAfiliado.nombre ||
@@ -583,29 +658,119 @@ export default function Afiliados() {
     }
 
     try {
-      const payload = buildAfiliadoPayload(selectedAfiliado);
-
-      console.log(
-        "🎯 [FINAL] Payload a enviar:",
-        JSON.stringify(payload, null, 2)
-      );
-
       if (selectedAfiliado && isEditing) {
-        await dispatch(
-          updateAfiliado({ id: selectedAfiliado.id, payload })
-        ).unwrap();
-        showSnackbar("Afiliado actualizado");
+        // ===== ESTRATEGIA DE ACTUALIZACIÓN SEPARADA =====
+
+        // 1. Obtener el titular actual del afiliado
+        const titularActual = getTitularDelAfiliado(selectedAfiliado);
+        if (!titularActual) {
+          throw new Error("No se encontró el titular del afiliado");
+        }
+
+        // 2. Construir payload para actualizar el AFILIADO (solo datos del afiliado)
+        const afiliadoPayload = {
+          numeroAfiliado: selectedAfiliado.numeroAfiliado,
+          planMedicoId: parseInt(formAfiliado.planMedicoId) || 1,
+          alta: formAfiliado.alta
+            ? new Date(formAfiliado.alta).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0],
+
+          baja: null,
+          // Mantener el TitularID original
+          titularID: selectedAfiliado.titularID || selectedAfiliado.titularId,
+        };
+
+        console.log("🎯 [AFILIADO] Payload a enviar:", afiliadoPayload);
+
+        // 3. Construir payload para actualizar el TITULAR (datos personales)
+        const titularPayload = {
+          id: titularActual.id, // ID del titular existente
+          numeroIntegrante: 1,
+          nombre: formAfiliado.nombre?.trim() || "",
+          apellido: formAfiliado.apellido?.trim() || "",
+          fechaNacimiento: formAfiliado.fechaNacimiento
+            ? new Date(formAfiliado.fechaNacimiento).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0],
+          parentesco: 0, // Titular
+          afiliadoId: selectedAfiliado.id, // ID del afiliado
+          alta: formAfiliado.alta
+            ? new Date(formAfiliado.alta).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0],
+          baja: null,
+          documentacion: {
+            tipoDocumento: parseInt(formAfiliado.tipoDocumento) || 1,
+            numero: formAfiliado.numeroDocumento?.toString() || "",
+          },
+          telefonos: (formAfiliado.telefonos || [])
+            .filter((t) => t && t.trim())
+            .map((t) => ({
+              numero:
+                typeof t === "string" ? t.trim() : (t.numero || "").trim(),
+            })),
+          emails: (formAfiliado.emails || [])
+            .filter((e) => e && e.trim())
+            .map((e) => ({
+              correo:
+                typeof e === "string" ? e.trim() : (e.correo || "").trim(),
+            })),
+          direcciones: (formAfiliado.direcciones || [])
+            .filter((d) => d && d.calle) // Solo direcciones con calle
+            .map((d) => ({
+              calle: (d.calle || "").substring(0, 100),
+              altura: d.altura || "",
+              piso: d.piso || "",
+              departamento: d.departamento || "",
+              provinciaCiudad: d.provinciaCiudad || "Bs As",
+            })),
+          situacionesTerapeuticas: convertirSituacionesAObjeto(
+            formAfiliado.situacionesTerapeuticasIds || []
+          ),
+        };
+
+        console.log("🎯 [TITULAR] Payload a enviar:", titularPayload);
+
+        // 4. Ejecutar ambas actualizaciones en paralelo
+        await Promise.all([
+          dispatch(
+            updateAfiliado({
+              id: selectedAfiliado.id,
+              payload: afiliadoPayload,
+            })
+          ).unwrap(),
+          dispatch(updatePersona(titularPayload)).unwrap(),
+        ]);
+
+        showSnackbar("Afiliado actualizado correctamente");
+
+        // 5. ACTUALIZACIÓN CRÍTICA: Refrescar los datos del afiliado
+        await dispatch(fetchAfiliados()).unwrap();
+
+        // Obtener el afiliado actualizado de la lista
+        const afiliadosActualizados = await dispatch(fetchAfiliados()).unwrap();
+        const afiliadoActualizado =
+          afiliadosActualizados.payload?.find(
+            (a) => a.id === selectedAfiliado.id
+          ) || afiliadosActualizados.find((a) => a.id === selectedAfiliado.id);
+
+        if (afiliadoActualizado) {
+          setSelectedAfiliado(afiliadoActualizado);
+        }
       } else {
+        // ===== CREACIÓN NUEVA (se mantiene igual) =====
+        const payload = buildAfiliadoPayload(selectedAfiliado);
+        console.log(
+          "🎯 [CREACIÓN] Payload a enviar:",
+          JSON.stringify(payload, null, 2)
+        );
         await dispatch(createAfiliado(payload)).unwrap();
         showSnackbar("Afiliado creado");
+        await dispatch(fetchAfiliados()).unwrap();
       }
-
-      await dispatch(fetchAfiliados()).unwrap();
     } catch (err) {
       console.error("❌ Error al guardar afiliado:", err);
       console.error("❌ Error details:", err.response?.data);
       showSnackbar(
-        "Error al guardar en backend: " + (err.message || "Error desconocido"),
+        "Error al guardar: " + (err.message || "Error desconocido"),
         "error"
       );
     } finally {
@@ -622,16 +787,22 @@ export default function Afiliados() {
   ]);
 
   // ---------- Alta / Baja ----------
+  // ---------- Reemplazar estas funciones ----------
+
   const handleProgramarAltaAfiliado = useCallback(
     async (afiliado, fechaAlta) => {
       try {
         await dispatch(
-          updateAfiliado({ id: afiliado.id, payload: { alta: fechaAlta } })
+          toggleAfiliadoStatus({
+            id: afiliado.id,
+            activo: true,
+            fecha: fechaAlta,
+          })
         ).unwrap();
         showSnackbar("Alta programada correctamente");
         await dispatch(fetchAfiliados()).unwrap();
       } catch (err) {
-        showSnackbar("Error al programar alta", "error");
+        showSnackbar("Error al programar alta", "error", err);
       }
     },
     [dispatch]
@@ -642,30 +813,36 @@ export default function Afiliados() {
       try {
         const hoy = hoyISO();
         await dispatch(
-          updateAfiliado({ id: afiliado.id, payload: { alta: hoy } })
+          toggleAfiliadoStatus({
+            id: afiliado.id,
+            activo: true,
+            fecha: hoy,
+          })
         ).unwrap();
         showSnackbar("Alta programada cancelada");
         await dispatch(fetchAfiliados()).unwrap();
       } catch (err) {
-        showSnackbar("Error al cancelar alta", "error");
+        showSnackbar("Error al cancelar alta", "error", err);
       }
     },
     [dispatch]
   );
+
   const handleReactivarInmediatamente = useCallback(
     async (afiliado) => {
       try {
         const hoy = hoyISO();
         await dispatch(
-          updateAfiliado({
+          toggleAfiliadoStatus({
             id: afiliado.id,
-            payload: { alta: hoy, baja: null },
+            activo: true,
+            fecha: hoy,
           })
         ).unwrap();
         showSnackbar("Afiliado reactivado inmediatamente");
         await dispatch(fetchAfiliados()).unwrap();
       } catch (err) {
-        showSnackbar("Error al reactivar", "error");
+        showSnackbar("Error al reactivar", "error", err);
       }
     },
     [dispatch]
@@ -675,12 +852,16 @@ export default function Afiliados() {
     async (afiliado, fechaBaja) => {
       try {
         await dispatch(
-          updateAfiliado({ id: afiliado.id, payload: { baja: fechaBaja } })
+          toggleAfiliadoStatus({
+            id: afiliado.id,
+            activo: false,
+            fecha: fechaBaja,
+          })
         ).unwrap();
         showSnackbar("Baja programada");
         await dispatch(fetchAfiliados()).unwrap();
       } catch (err) {
-        showSnackbar("Error al programar baja", "error");
+        showSnackbar("Error al programar baja", "error", err);
       }
     },
     [dispatch]
@@ -690,12 +871,16 @@ export default function Afiliados() {
     async (afiliado) => {
       try {
         await dispatch(
-          updateAfiliado({ id: afiliado.id, payload: { baja: null } })
+          toggleAfiliadoStatus({
+            id: afiliado.id,
+            activo: true,
+            fecha: hoyISO(),
+          })
         ).unwrap();
         showSnackbar("Baja cancelada");
         await dispatch(fetchAfiliados()).unwrap();
       } catch (err) {
-        showSnackbar("Error al cancelar baja", "error");
+        showSnackbar("Error al cancelar baja", "error", err);
       }
     },
     [dispatch]
