@@ -1,4 +1,3 @@
-// src/store/personasSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { personasService } from "../services/personasService";
 
@@ -27,9 +26,9 @@ export const createPersona = createAsyncThunk(
 
 export const updatePersona = createAsyncThunk(
   "personas/updatePersona",
-  async ({ id, personaData }, { rejectWithValue }) => {
+  async (personaData, { rejectWithValue }) => { // Cambiado: ahora recibe personaData directamente
     try {
-      return await personasService.updatePersona(id, personaData);
+      return await personasService.updatePersona(personaData);
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }

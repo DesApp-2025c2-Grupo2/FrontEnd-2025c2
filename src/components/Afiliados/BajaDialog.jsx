@@ -39,7 +39,16 @@ export default function BajaDialog({
   }, [open]);
 
   const handleConfirm = () => {
-    const fechaFinal = esBajaInmediata ? hoyISO() : fechaBaja;
+    let fechaFinal;
+
+    if (esBajaInmediata) {
+      // Para baja inmediata, usar fecha y hora actual
+      fechaFinal = new Date().toISOString();
+    } else {
+      // Para baja programada, usar fin del día seleccionado
+      fechaFinal = fechaBaja + "T23:59:59";
+    }
+
     if (!fechaFinal) return;
     onConfirm(afiliado, fechaFinal);
     onClose();

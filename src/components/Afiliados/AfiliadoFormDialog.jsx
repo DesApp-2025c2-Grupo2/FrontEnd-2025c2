@@ -23,6 +23,7 @@ import {
 } from "@mui/icons-material";
 import ContactInfoEditor from "./ContactInfoEditor";
 import SituacionesSelector from "./SituacionesSelector";
+import DireccionesEditor from "./DireccionesEditor";
 import { tiposDocumento } from "../../utilidades/tipoDocumento";
 
 const hoyISO = () => new Date().toISOString().split("T")[0];
@@ -52,7 +53,13 @@ export default function AfiliadoFormDialog({
 }) {
   const [newTelefono, setNewTelefono] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [newDireccion, setNewDireccion] = useState("");
+  const [newDireccion, setNewDireccion] = useState({
+    calle: "",
+    altura: "",
+    piso: "",
+    departamento: "",
+    provinciaCiudad: "",
+  });
 
   const getPlanMedicoNombre = (planMedicoId, planesMedicos) => {
     const plan = (planesMedicos || []).find(
@@ -69,7 +76,13 @@ export default function AfiliadoFormDialog({
     if (open) {
       setNewTelefono("");
       setNewEmail("");
-      setNewDireccion("");
+      setNewDireccion({
+        calle: "",
+        altura: "",
+        piso: "",
+        departamento: "",
+        provinciaCiudad: "",
+      });
     }
   }, [open]);
 
@@ -97,55 +110,41 @@ export default function AfiliadoFormDialog({
   };
   const handleRemoveEmail = (index) =>
     onEditEmailsChange((editEmails || []).filter((_, i) => i !== index));
-  const handleAddDireccion = () => {
-    if (!newDireccion.trim()) return;
-    const direccionObj = {
-      calle: newDireccion.trim(),
-      altura: "0", // valor por defecto no nulo
-      piso: "",
-      departamento: "",
-      provinciaCiudad: "Bs As",
-    };
-    onEditDireccionesChange([...(editDirecciones || []), direccionObj]);
-    setNewDireccion("");
+
+  const handleAddDireccion = (direccion) => {
+    onEditDireccionesChange([...(editDirecciones || []), direccion]);
   };
-  const handleRemoveDireccion = (index) =>
+
+  const handleRemoveDireccion = (index) => {
     onEditDireccionesChange(
       (editDirecciones || []).filter((_, i) => i !== index)
     );
+  };
 
   const handleFormChange = (field, value) => onFormChange(field, value);
+
   const handlePlanMedicoChange = (e) =>
     handleFormChange("planMedicoId", e.target.value);
+
   const handleTipoDocumentoChange = (e) =>
     handleFormChange("tipoDocumento", e.target.value);
 
-  const convertirASituacionesDiccionario = (arr) => {
-    const dict = {};
-    arr.forEach((it) => {
-      dict[it.id] = it.fechaFin || null;
-    });
-    return dict;
+  const handleAddSituacion = (sit) => {
+    const nuevas = [...(editSituaciones || []), sit];
+    onEditSituacionesChange(nuevas);
   };
 
-  const handleAddSituacion = (sit) => {
-  const nuevas = [...(editSituaciones || []), sit];
-  onEditSituacionesChange(nuevas);
-  handleFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
-};
+  const handleRemoveSituacion = (idx) => {
+    const nuevas = (editSituaciones || []).filter((_, i) => i !== idx);
+    onEditSituacionesChange(nuevas);
+  };
 
-const handleRemoveSituacion = (idx) => {
-  const nuevas = (editSituaciones || []).filter((_, i) => i !== idx);
-  onEditSituacionesChange(nuevas);
-  handleFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
-};
+  const handleUpdateSituacion = (idx, updated) => {
+    const nuevas = [...(editSituaciones || [])];
+    nuevas[idx] = updated;
+    onEditSituacionesChange(nuevas);
+  };
 
-const handleUpdateSituacion = (idx, updated) => {
-  const nuevas = [...(editSituaciones || [])];
-  nuevas[idx] = updated;
-  onEditSituacionesChange(nuevas);
-  handleFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
-};
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
@@ -330,11 +329,29 @@ const handleUpdateSituacion = (idx, updated) => {
                         ml: 2,
                       }}
                     >
-                      {(titular.situacionesTerapeuticas || []).map((s, i) => (
-                        <Typography key={i} variant="body2">
-                          • {typeof s === "string" ? s : s?.nombre ?? String(s)}
-                        </Typography>
-                      ))}
+                      {(titular.situacionesTerapeuticas || []).map((s, i) => {
+                        // s puede ser string, number o objeto {id,nombre,fechaFin}
+                        const nombre =
+                          typeof s === "string"
+                            ? s
+                            : s && s.nombre
+                            ? s.nombre
+                            : String(s);
+                        const fechaFin =
+                          s && (s.fechaFin || s.fechaFin === null)
+                            ? s.fechaFin
+                            : null;
+                        return (
+                          <Typography key={i} variant="body2">
+                            • {nombre}
+                            {fechaFin
+                              ? ` — hasta: ${new Date(
+                                  fechaFin
+                                ).toLocaleDateString("es-AR")}`
+                              : ""}
+                          </Typography>
+                        );
+                      })}
                     </Box>
                   </Box>
                 )}
@@ -493,15 +510,13 @@ const handleUpdateSituacion = (idx, updated) => {
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12}>
-                <ContactInfoEditor
-                  icon={<HomeIcon sx={{ mr: 1, color: "#1976d2" }} />}
-                  title="Direcciones"
+                <DireccionesEditor
                   items={editDirecciones || []}
                   newValue={newDireccion}
-                  placeholder="Agregar dirección"
                   onNewValueChange={setNewDireccion}
                   onAdd={handleAddDireccion}
                   onRemove={handleRemoveDireccion}
+                  disabled={false}
                 />
               </Grid>
             </Grid>
@@ -509,11 +524,11 @@ const handleUpdateSituacion = (idx, updated) => {
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12}>
                 <SituacionesSelector
-                    items={editSituaciones || []}
-                    opciones={situacionesCatalogo}
-                    onAdd={handleAddSituacion}
-                    onRemove={handleRemoveSituacion}
-                    onUpdate={handleUpdateSituacion}
+                  items={editSituaciones || []}
+                  opciones={situacionesCatalogo}
+                  onAdd={handleAddSituacion}
+                  onRemove={handleRemoveSituacion}
+                  onUpdate={handleUpdateSituacion}
                 />
               </Grid>
             </Grid>
