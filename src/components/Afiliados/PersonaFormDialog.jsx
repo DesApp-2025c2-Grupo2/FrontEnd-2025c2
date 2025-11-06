@@ -271,10 +271,30 @@ export default function PersonaFormDialog({
   const handleTipoDocumentoChange = (e) =>
     handleFormChange("tipoDocumento", e.target.value);
 
+  const convertirASituacionesDiccionario = (situacionesArray) => {
+    const dict = {};
+    situacionesArray.forEach((s) => {
+      dict[s.id] = s.fechaFin || null;
+    });
+    return dict;
+  };
+
+  const handleAddSituacion = (nueva) => {
+    const nuevas = [...(editSituaciones || []), nueva];
+    onEditSituacionesChange(nuevas);
+    onFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
+  };
+  
+  const handleRemoveSituacion = (idx) => {
+    const nuevas = (editSituaciones || []).filter((_, i) => i !== idx);
+    onEditSituacionesChange(nuevas);
+    onFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
+  };
   const handleUpdateSituacion = (idx, nuevaSituacion) => {
     const nuevas = [...(editSituaciones || [])];
     nuevas[idx] = nuevaSituacion;
     onEditSituacionesChange(nuevas);
+    onFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
   };
 
   // Validación mínima local
@@ -668,17 +688,8 @@ export default function PersonaFormDialog({
                 <SituacionesSelector
                   items={editSituaciones || []}
                   opciones={situacionesCatalogo}
-                  onAdd={(nueva) =>
-                    onEditSituacionesChange([
-                      ...(editSituaciones || []),
-                      nueva,
-                    ])
-                  }
-                  onRemove={(idx) =>
-                    onEditSituacionesChange(
-                      (editSituaciones || []).filter((_, i) => i !== idx)
-                    )
-                  }
+                  onAdd={handleAddSituacion}
+                  onRemove={handleRemoveSituacion}
                   onUpdate={handleUpdateSituacion}
                 />
               </Grid>

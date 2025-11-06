@@ -3,7 +3,7 @@ import { Card, Box, Typography, Select, MenuItem, IconButton, TextField} from "@
 import { Add as AddIcon, Delete as DeleteIcon } from "@mui/icons-material";
 
 /**
- * items: array de objetos {id, nombre, fechaInicio, fechaFin} (situaciones ya asignadas)
+ * items: array de objetos {id, nombre, fechaFin} (situaciones ya asignadas)
  * opciones: array de objetos { id, nombre, descripcion, activa }
  * onAdd(nombre) -> agrega nombre
  * onRemove(index) -> quita por índice
@@ -19,7 +19,6 @@ export default function SituacionesSelector({ items = [], opciones = [], onAdd, 
     const nuevaSituacion = {
       id: opt.id,
       nombre: opt.nombre,
-      fechaInicio: new Date().toISOString().split("T")[0],
       fechaFin: ""
     };
     const exists = items.some((i) => i.id === opt.id);
@@ -69,17 +68,6 @@ export default function SituacionesSelector({ items = [], opciones = [], onAdd, 
               </IconButton>
             </Box>
             <Box sx={{ display: "flex", gap: 2 }}>
-              <TextField
-                label="Fecha Inicio"
-                type="date"
-                size="small"
-                value={it.fechaInicio || ""}
-                InputLabelProps={{ shrink: true }}
-                onChange={(e) =>
-                  onUpdate(idx, { ...it, fechaInicio: e.target.value })
-                }
-                disabled={disabled}
-              />
               <TextField
                 label="Fecha Fin"
                 type="date"

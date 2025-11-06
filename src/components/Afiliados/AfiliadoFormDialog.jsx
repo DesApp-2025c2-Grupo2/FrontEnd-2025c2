@@ -120,6 +120,32 @@ export default function AfiliadoFormDialog({
   const handleTipoDocumentoChange = (e) =>
     handleFormChange("tipoDocumento", e.target.value);
 
+  const convertirASituacionesDiccionario = (arr) => {
+    const dict = {};
+    arr.forEach((it) => {
+      dict[it.id] = it.fechaFin || null;
+    });
+    return dict;
+  };
+
+  const handleAddSituacion = (sit) => {
+  const nuevas = [...(editSituaciones || []), sit];
+  onEditSituacionesChange(nuevas);
+  handleFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
+};
+
+const handleRemoveSituacion = (idx) => {
+  const nuevas = (editSituaciones || []).filter((_, i) => i !== idx);
+  onEditSituacionesChange(nuevas);
+  handleFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
+};
+
+const handleUpdateSituacion = (idx, updated) => {
+  const nuevas = [...(editSituaciones || [])];
+  nuevas[idx] = updated;
+  onEditSituacionesChange(nuevas);
+  handleFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
+};
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
@@ -485,17 +511,9 @@ export default function AfiliadoFormDialog({
                 <SituacionesSelector
                     items={editSituaciones || []}
                     opciones={situacionesCatalogo}
-                    onAdd={(sit) => onEditSituacionesChange([...(editSituaciones || []), sit])}
-                    onRemove={(idx) =>
-                      onEditSituacionesChange(
-                        (editSituaciones || []).filter((_, i) => i !== idx)
-                      )
-                    }
-                    onUpdate={(idx, updated) => {
-                      const nuevas = [...(editSituaciones || [])];
-                      nuevas[idx] = updated;
-                      onEditSituacionesChange(nuevas);
-                    }}
+                    onAdd={handleAddSituacion}
+                    onRemove={handleRemoveSituacion}
+                    onUpdate={handleUpdateSituacion}
                 />
               </Grid>
             </Grid>
