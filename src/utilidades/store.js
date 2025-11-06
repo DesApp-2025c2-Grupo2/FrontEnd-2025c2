@@ -6,6 +6,7 @@ import afiliadosReducer from "../store/afiliadosSlice";
 import prestadoresReducer from '../store/prestadoresSlice';
 import reportesReducer from '../store/reportesSlice';
 import personasReducer from '../store/personasSlice';
+import dashboardReducer from '../store/dashboardSlice';
 import { loadState, saveState } from './localStorage';
 
 // Cargar estado inicial desde localStorage (solo partes no-catálogo)
@@ -19,7 +20,8 @@ export const store = configureStore({
     afiliados: afiliadosReducer,
     prestadores: prestadoresReducer,
     reportes: reportesReducer,
-    personas: personasReducer
+    personas: personasReducer,
+    dashboard: dashboardReducer,
   },
   preloadedState: persistedState,
 });
