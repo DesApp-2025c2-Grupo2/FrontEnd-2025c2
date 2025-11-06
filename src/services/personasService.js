@@ -51,4 +51,17 @@ export const personasService = {
     });
     return response.data;
   },
+
+  addMember: async (afiliadoID, memberData) => {
+    const payloadPascal = toPascalCaseKeys(memberData);
+    console.log(
+      "personasService.addMember payload (PascalCase):",
+      payloadPascal
+    );
+    const response = await WebAPI.Instance().post(
+      `${ENDPOINT}/addMember/${afiliadoID}`,
+      payloadPascal
+    );
+    return response.data;
+  },
 };
