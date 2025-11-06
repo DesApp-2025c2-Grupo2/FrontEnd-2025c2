@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Chip, Card, Typography, Box, Accordion, AccordionSummary, AccordionDetails, IconButton, Tooltip } from '@mui/material';
+import { Button, Chip, Card, Typography, Box, Accordion, AccordionSummary, AccordionDetails, IconButton, Tooltip, CircularProgress } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import PersonIcon from '@mui/icons-material/Person';
@@ -9,7 +9,7 @@ import { useSelector } from 'react-redux';
 import { selectPrestadores } from '../store/prestadoresSlice';
 import { selectEspecialidades } from '../store/especialidadesSlice';
 
-export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo, onGestionarHorarios, onEliminarDireccion, emphasis = false }) {
+export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo, onGestionarHorarios, onEliminarDireccion, emphasis = false, isRefreshing = false }) {
   const todosPrestadores = useSelector(selectPrestadores);
   const centroNombre = (() => {
     if (prestador.integraCentroMedicoId) {
@@ -33,6 +33,14 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
   };
 
   const diasSemanaOrden = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  const canonDia = (d) => {
+    const t = String(d || '').trim().toLowerCase();
+    if (!t) return '';
+    if (t === 'miercoles') return 'Miércoles';
+    if (t === 'sabado') return 'Sábado';
+    const map = { lunes: 'Lunes', martes: 'Martes', miércoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes', sábado: 'Sábado', domingo: 'Domingo' };
+    return map[t] || (t.charAt(0).toUpperCase() + t.slice(1));
+  };
   const catalogoEspecialidades = useSelector(selectEspecialidades);
   const especialidadIdToNombre = React.useMemo(() => {
     const map = new Map();
@@ -157,6 +165,12 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
             <Typography variant="subtitle2">
               Lugares de Atención ({prestador.lugaresAtencion.length})
             </Typography>
+            {isRefreshing && (
+              <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
+                <CircularProgress size={14} sx={{ ml: 1 }} />
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>actualizando…</Typography>
+              </Box>
+            )}
           </AccordionSummary>
           <AccordionDetails>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -218,20 +232,22 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                       {(() => {
                         const dayToRanges = {};
                         (lugar.horarios || []).forEach((h) => {
-                          const dias = Array.isArray(h.dias) && h.dias.length > 0 ? h.dias : [];
+                          const dias = Array.isArray(h.dias) && h.dias.length > 0 ? h.dias.map(canonDia).filter(Boolean) : [];
                           const inicio = h.horaInicio || h.desde || '';
                           const fin = h.horaFin || h.hasta || '';
-                          const espId = (typeof h.especialidadId === 'number') ? h.especialidadId : null;
+                          const espIds = Array.isArray(h.especialidades) && h.especialidades.length > 0
+                            ? h.especialidades
+                            : ((typeof h.especialidadId === 'number' && h.especialidadId > 0) ? [h.especialidadId] : []);
                           dias.forEach((dia) => {
                             if (!dayToRanges[dia]) dayToRanges[dia] = [];
-                            dayToRanges[dia].push({ rango: `${inicio} - ${fin}`, dur: h.duracionMinutos, espId });
+                            dayToRanges[dia].push({ rango: `${inicio} - ${fin}`, dur: h.duracionMinutos, espIds });
                           });
                         });
                         return diasSemanaOrden
                           .filter((dia) => (dayToRanges[dia] || []).length > 0)
                           .map((dia, idxCard) => {
                             const rangos = dayToRanges[dia];
-                            const uniqueEspIds = Array.from(new Set(rangos.map(r => r.espId).filter((id) => typeof id === 'number')));
+                            const uniqueEspIds = Array.from(new Set(rangos.flatMap(r => r.espIds || []).filter((id) => typeof id === 'number' && id > 0)));
                             return (
                               <Card key={idxCard} variant="outlined" sx={{ p: 1.25, borderColor: '#e0e0e0', backgroundColor: '#f8f9fa', minWidth: 180 }}>
                                 <Chip
@@ -242,7 +258,9 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                                 {uniqueEspIds.length > 0 && (
                                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 0.5 }}>
                                     {uniqueEspIds.map((id) => (
-                                      <Chip key={id} label={especialidadIdToNombre.get(id) || `Esp. ${id}`} size="small" sx={{ backgroundColor: '#e3f2fd', color: '#1976d2', fontWeight: 600 }} />
+                                      especialidadIdToNombre.get(id)
+                                        ? <Chip key={id} label={especialidadIdToNombre.get(id)} size="small" sx={{ backgroundColor: '#e3f2fd', color: '#1976d2', fontWeight: 600 }} />
+                                        : null
                                     ))}
                                   </Box>
                                 )}

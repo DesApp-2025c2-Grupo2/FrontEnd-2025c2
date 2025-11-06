@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import * as prestadoresService from '../services/prestadoresService';
+import * as agendasService from '../services/agendasService';
 
 const initialState = {
   items: [],
@@ -62,8 +63,9 @@ export const actualizarHorariosPrestador = createAsyncThunk(
   'prestadores/actualizarHorarios',
   async ({ id, lugaresAtencion }, { rejectWithValue }) => {
     try {
-      const result = await prestadoresService.updateHorarios(id, lugaresAtencion);
-      return { id, lugaresAtencion: Array.isArray(result?.lugaresAtencion) ? result.lugaresAtencion : lugaresAtencion };
+      const normalizados = await agendasService.updateLugares(id, lugaresAtencion);
+      // normalizados: [{ id, direccion, horarios: [...] }]
+      return { id, lugaresAtencion: Array.isArray(normalizados) ? normalizados : lugaresAtencion };
     } catch (error) {
       return rejectWithValue(error.message || 'Error al actualizar horarios');
     }

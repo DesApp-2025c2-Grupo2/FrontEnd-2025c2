@@ -450,7 +450,7 @@ export default function DialogPrestador({
     if (
       form.tipo === "Profesional Independiente" &&
       form.vinculaCentro &&
-      !form.integraCentroMedicoId
+      !(form.integraCentroMedicoId || (String(form.centroMedicoNombre || "").trim() !== ""))
     ) {
       errores.integraCentroMedico = "Debe seleccionar un centro médico";
     }

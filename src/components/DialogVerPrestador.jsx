@@ -255,12 +255,24 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
                               }}
                             >
                               <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2' }}>
-                                {horario.dias.join(', ')}
+                                {(() => {
+                                  const canon = (d) => {
+                                    const t = String(d || '').trim().toLowerCase();
+                                    if (!t) return '';
+                                    if (t === 'miercoles') return 'Miércoles';
+                                    if (t === 'sabado') return 'Sábado';
+                                    const map = { lunes: 'Lunes', martes: 'Martes', miércoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes', sábado: 'Sábado', domingo: 'Domingo' };
+                                    return map[t] || (t.charAt(0).toUpperCase() + t.slice(1));
+                                  };
+                                  return (horario.dias || []).map(canon).filter(Boolean).join(', ');
+                                })()}
                               </Typography>
                               <Typography variant="body2" sx={{ color: '#1976d2' }}>
                                 {(() => {
-                                  const espNombre = typeof horario.especialidadId === 'number' ? (especialidadIdToNombre.get(horario.especialidadId) || `Esp. ${horario.especialidadId}`) : null;
-                                  return espNombre ? `🩺 ${espNombre} • ${horario.horaInicio} - ${horario.horaFin}` : `⏰ ${horario.horaInicio} - ${horario.horaFin}`;
+                                  const nombre = (typeof horario.especialidadId === 'number' && horario.especialidadId > 0)
+                                    ? (especialidadIdToNombre.get(horario.especialidadId) || null)
+                                    : null;
+                                  return nombre ? `🩺 ${nombre} • ${horario.horaInicio} - ${horario.horaFin}` : `⏰ ${horario.horaInicio} - ${horario.horaFin}`;
                                 })()}
                                 {typeof horario.duracionMinutos === 'number' && horario.duracionMinutos > 0 ? ` • ${horario.duracionMinutos} min` : ''}
                               </Typography>

@@ -62,6 +62,7 @@ function Prestadores() {
     if (!el) return;
     itemRefs.current.set(id, el);
   };
+  const [refreshingHorarios, setRefreshingHorarios] = useState({}); // idPrestador -> boolean
 
   // Selectores de Redux
   const prestadoresFiltrados = useSelector(selectPrestadoresFiltrados(searchTerm));
@@ -98,7 +99,10 @@ function Prestadores() {
             const lugaresMergeados = lugaresBase.map((l) => {
               const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
               if (a) {
-                return { ...l, horarios: a.horarios || [] };
+                // Tomar id y direccion desde agenda cuando el original no los trae o están vacíos
+                const nuevoId = (l.id != null) ? l.id : (a.id ?? null);
+                const nuevaDir = l.direccion || a.direccion || '';
+                return { ...l, id: nuevoId, direccion: nuevaDir, horarios: a.horarios || [] };
               }
               return l;
             });
@@ -317,6 +321,7 @@ function Prestadores() {
               <TarjetaPrestadorSimple
                 prestador={pMerge}
                 emphasis={highlightId === pMerge.id}
+                isRefreshing={!!refreshingHorarios[pMerge.id]}
                 onVer={handleVer}
                 onEditar={handleEditar}
                 onToggleActivo={handleToggleActivo}
@@ -410,6 +415,7 @@ function Prestadores() {
               await dispatch(actualizarHorariosPrestador({ id, lugaresAtencion })).unwrap();
               // Refrescar cache local consultando agendas reales (para reflejar ids/direcciones definitivos)
               try {
+        setRefreshingHorarios((prev) => ({ ...prev, [id]: true }));
                 const ags = await agendasService.getByProfesional(id);
                 const agendaById = new Map((Array.isArray(ags) ? ags : []).map((a) => [a.id, a]));
                 const agendaByDir = new Map((Array.isArray(ags) ? ags : []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
@@ -430,6 +436,8 @@ function Prestadores() {
                   const actualizado = { ...base, id, lugaresAtencion: JSON.parse(JSON.stringify(lugaresAtencion)) };
                   return { ...prev, [id]: actualizado };
                 });
+      } finally {
+        setRefreshingHorarios((prev) => ({ ...prev, [id]: false }));
               }
               setDialogoHorarios(false);
               setPrestadorSeleccionado(null);

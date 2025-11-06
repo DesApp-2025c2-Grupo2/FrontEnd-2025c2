@@ -80,16 +80,45 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
   };
 
   const guardar = () => {
-    onGuardar?.(local);
+    // Validación y saneo antes de enviar
+    const copia = JSON.parse(JSON.stringify(local));
+    const lugares = Array.isArray(copia.lugaresAtencion) ? copia.lugaresAtencion : [];
+    let totalValidos = 0;
+    copia.lugaresAtencion = lugares.map((l) => {
+      const hs = Array.isArray(l.horarios) ? l.horarios : [];
+      const validos = hs.filter((h) => {
+        const diasOK = Array.isArray(h.dias) && h.dias.length > 0;
+        const hi = String(h.horaInicio || '').trim();
+        const hf = String(h.horaFin || '').trim();
+        const horasOK = hi !== '' && hf !== '' && hf > hi; // comparaciones de HH:mm funcionan como strings
+        return diasOK && horasOK;
+      }).map((h) => {
+        // Preferir la edición actual (especialidadId) sobre cualquier array previo
+        const ids = (typeof h.especialidadId === 'number')
+          ? [h.especialidadId]
+          : (Array.isArray(h.especialidades) ? h.especialidades : []);
+        return {
+          id: h?.id ?? null,
+          dias: h.dias,
+          horaInicio: h.horaInicio,
+          horaFin: h.horaFin,
+          duracionMinutos: typeof h.duracionMinutos === 'number' && h.duracionMinutos > 0 ? h.duracionMinutos : 30,
+          especialidades: ids
+        };
+      });
+      totalValidos += validos.length;
+      return { ...l, horarios: validos };
+    });
+
+    if (totalValidos === 0 && lugares.length > 0) {
+      alert('Agrega al menos un horario válido (días, inicio y fin).');
+      return;
+    }
+
+    onGuardar?.(copia);
   };
 
   const lugarActual = local.lugaresAtencion[lugarIndex] || {};
-
-  const handleEspecialidadLugar = (nueva) => {
-    const copia = JSON.parse(JSON.stringify(local));
-    copia.lugaresAtencion[lugarIndex].especialidadSeleccionada = nueva || null;
-    setLocal(copia);
-  };
 
   
 
@@ -126,26 +155,12 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
                 </Select>
               </FormControl>
             )}
-            <Box sx={{ mt: 1.5 }}>
-              <FormControl size="small" fullWidth>
-                <InputLabel>Especialidad en esta dirección</InputLabel>
-                <Select
-                  label="Especialidad en esta dirección"
-                  value={lugarActual.especialidadSeleccionada || ''}
-                  onChange={(e) => handleEspecialidadLugar(e.target.value)}
-                >
-                  {especialidadesPrestador.map((esp) => (
-                    <MenuItem key={esp.id} value={esp.nombre}>{esp.nombre}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Box>
           </Box>
 
           <Card variant="outlined">
             <CardContent>
               <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{lugarActual.direccion || `Lugar #${lugarIndex + 1}`}</Typography>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Horarios</Typography>
                 <Button variant="contained" startIcon={<AddIcon />} onClick={agregarHorario} sx={{ textTransform: 'none', fontWeight: 700 }}>Agregar Horario</Button>
               </Stack>
 
@@ -167,24 +182,38 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
                         )}
                         sx={{ flex: 2, minWidth: 220 }}
                       />
-                      <TextField
-                        label="Inicio"
-                        type="time"
-                        value={h.horaInicio || ''}
-                        onChange={(e) => actualizarHorario(hIdx, 'horaInicio', e.target.value)}
-                        size="small"
-                        sx={{ flex: 1 }}
-                        InputLabelProps={{ shrink: true }}
-                      />
-                      <TextField
-                        label="Fin"
-                        type="time"
-                        value={h.horaFin || ''}
-                        onChange={(e) => actualizarHorario(hIdx, 'horaFin', e.target.value)}
-                        size="small"
-                        sx={{ flex: 1 }}
-                        InputLabelProps={{ shrink: true }}
-                      />
+                      {(() => {
+                        const inicio = h.horaInicio || '';
+                        const fin = h.horaFin || '';
+                        const intervaloInvalido = Boolean(inicio && fin && fin <= inicio);
+                        return (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 2, minWidth: 260 }}>
+                            <TextField
+                              label="Desde"
+                              type="time"
+                              value={inicio}
+                              onChange={(e) => actualizarHorario(hIdx, 'horaInicio', e.target.value)}
+                              size="small"
+                              sx={{ width: 140 }}
+                              InputLabelProps={{ shrink: true }}
+                              inputProps={{ step: 300 }}
+                            />
+                            <Typography variant="body2" color="text.secondary">a</Typography>
+                            <TextField
+                              label="Hasta"
+                              type="time"
+                              value={fin}
+                              onChange={(e) => actualizarHorario(hIdx, 'horaFin', e.target.value)}
+                              size="small"
+                              sx={{ width: 140 }}
+                              InputLabelProps={{ shrink: true }}
+                              inputProps={{ step: 300 }}
+                              error={intervaloInvalido}
+                              helperText={intervaloInvalido ? 'Fin debe ser mayor a inicio' : ''}
+                            />
+                          </Box>
+                        );
+                      })()}
                       <FormControl size="small" sx={{ minWidth: 140 }}>
                         <InputLabel>Duración (min)</InputLabel>
                         <Select
