@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSelector, useDispatch, shallowEqual } from "react-redux";
 import { Box, Typography, Fab, Snackbar, Alert } from "@mui/material";
+import PageHeader from "../components/Ui/PageHeader.jsx";
+
 import { Add as AddIcon, Person as PersonIcon } from "@mui/icons-material";
 import AdvancedSearchBar from "../components/Afiliados/AdvancedSearchBar";
 import AfiliadoCard from "../components/Afiliados/AfiliadosCard";
@@ -897,14 +899,8 @@ export default function Afiliados() {
   );
 
   return (
-    <Box>
-      <Typography
-        variant="h4"
-        gutterBottom
-        sx={{ fontWeight: "bold", color: "#1976d2" }}
-      >
-        Afiliados
-      </Typography>
+    <>
+      <PageHeader title="Afiliados" subtitle="Gestión de afiliados" />
 
       <AdvancedSearchBar
         afiliados={afiliados}
@@ -1090,6 +1086,6 @@ export default function Afiliados() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </>
   );
 }

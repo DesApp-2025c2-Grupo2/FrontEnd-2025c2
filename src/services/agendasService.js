@@ -35,7 +35,10 @@ function readMockAgendas(profesionalId) {
 }
 
 function normalizeAgendaLugar(item) {
-  const baseDuracion = (typeof item?.duracionConsulta === 'number') ? item.duracionConsulta : null;
+  const baseDuracion =
+    (typeof item?.duracionConsulta === 'number') ? item.duracionConsulta :
+    (typeof item?.duracionMinutos === 'number') ? item.duracionMinutos :
+    null;
   const espLugar = (typeof item?.especialidadId === 'number') ? item.especialidadId : null;
   const horarios = Array.isArray(item?.horariosAtencion) ? item.horariosAtencion : [];
   const normalizados = horarios.map((h) => {
@@ -43,7 +46,10 @@ function normalizeAgendaLugar(item) {
     const dias = diasRaw.map(canonDia).filter(Boolean);
     const horaInicio = h?.horaInicio || h?.desde || '';
     const horaFin = h?.horaFin || h?.hasta || '';
-    const duracionMinutos = (typeof h?.duracionMinutos === 'number') ? h.duracionMinutos : (baseDuracion ?? 30);
+    const duracionMinutos =
+      (typeof h?.duracionMinutos === 'number') ? h.duracionMinutos :
+      (typeof h?.duracionConsulta === 'number') ? h.duracionConsulta :
+      (baseDuracion ?? 30);
     let especialidades = Array.isArray(h?.especialidades) ? h.especialidades.filter((x) => typeof x === 'number' && x > 0) : [];
     if (especialidades.length === 0 && (typeof h?.especialidadId === 'number' && h.especialidadId > 0)) {
       especialidades = [h.especialidadId];
@@ -54,7 +60,7 @@ function normalizeAgendaLugar(item) {
     return { id: h?.id ?? null, dias, horaInicio, horaFin, duracionMinutos, especialidades, especialidadId };
   });
   return {
-    id: item?.id ?? null, // id del lugar/agenda
+    id: item?.id ?? item?.lugarId ?? item?.lugarAtencionId ?? null, // id del lugar/agenda
     direccion: item?.direccion || '',
     horarios: normalizados,
   };
@@ -63,9 +69,12 @@ function normalizeAgendaLugar(item) {
 export async function getByProfesional(profesionalId) {
   // Versión principal: query param (según tu back)
   try {
-    const res = await WebAPI.Instance().get(`${ENDPOINT}/getByProfesional`, { params: { profesionalId, id: profesionalId } });
-    const data = Array.isArray(res?.data) ? res.data : [];
-    const norm = data.map(normalizeAgendaLugar);
+    const res = await WebAPI.Instance().get(`${ENDPOINT}/getByProfesional/${profesionalId}` );
+    const raw = res?.data;
+    const data = Array.isArray(raw)
+      ? raw
+      : (Array.isArray(raw?.direcciones) ? raw.direcciones : (Array.isArray(raw?.lugares) ? raw.lugares : []));
+    const norm = (Array.isArray(data) ? data : []).map(normalizeAgendaLugar);
     if (norm.length > 0) return norm;
     if (USE_AGENDAS_MOCK) {
       const mock = readMockAgendas(profesionalId);
@@ -73,11 +82,14 @@ export async function getByProfesional(profesionalId) {
     }
     return [];
   } catch (_) {
-    // Fallback: /Agenda/getByProfesional/{id}
+    // Fallbacks alternativos
     try {
-      const res2 = await WebAPI.Instance().get(`${ENDPOINT}/getByProfesional/${profesionalId}`);
-      const data2 = Array.isArray(res2?.data) ? res2.data : [];
-      const norm2 = data2.map(normalizeAgendaLugar);
+      const res2 = await WebAPI.Instance().get(`${ENDPOINT}/getByProfesional`, { params: { profesionalId } });
+      const raw2 = res2?.data;
+      const data2 = Array.isArray(raw2)
+        ? raw2
+        : (Array.isArray(raw2?.direcciones) ? raw2.direcciones : (Array.isArray(raw2?.lugares) ? raw2.lugares : []));
+      const norm2 = (Array.isArray(data2) ? data2 : []).map(normalizeAgendaLugar);
       if (norm2.length > 0) return norm2;
       if (USE_AGENDAS_MOCK) {
         const mock = readMockAgendas(profesionalId);
@@ -121,7 +133,7 @@ function mapLugaresForAPI(lugaresAtencion) {
           especialidades: ids
         };
       });
-    if (horariosAtencion.length === 0) return; // evitar 500 por listas vacías
+    // Incluir también direcciones con horarios vacíos, para que el backend pueda limpiar todos los horarios de ese lugar
     result.push({ id: l?.id ?? null, direccion, horariosAtencion });
   });
   return result;
@@ -154,6 +166,16 @@ export async function updateLugares(profesionalId, lugaresAtencion) {
     // No mockear para no desincronizar
     throw e;
   }
+}
+
+// Eliminar un horario específico
+export async function deleteHorario(profesionalId, lugarId, horarioId) {
+  if (profesionalId == null || lugarId == null || horarioId == null) {
+    throw new Error('Parámetros inválidos para eliminar horario');
+  }
+  const url = `${ENDPOINT}/${profesionalId}/lugares/${lugarId}/horarios/${horarioId}`;
+  const res = await WebAPI.Instance().delete(url);
+  return (res && res.status >= 200 && res.status < 300);
 }
 
 

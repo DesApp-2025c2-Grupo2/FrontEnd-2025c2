@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { Box, Typography, Container, Alert, CircularProgress } from '@mui/material';
+import { Box, Typography, Alert, CircularProgress } from '@mui/material';
 import SearchField from '../components/Ui/SearchField.jsx';
 import EstadoFilter from '../components/Ui/EstadoFilter.jsx';
 import SnackbarMini from '../components/Ui/SnackbarMini.jsx';
@@ -9,6 +9,8 @@ import EspecialidadCard from '../components/EspecialidadCard';
 import BotonFlotante from '../components/BotonFlotante';
 import { toggleEspecialidadStatus, addEspecialidad, updateEspecialidad, selectEspecialidadesFiltradas, selectLoading, selectError, cargarEspecialidades } from '../store/especialidadesSlice';
 import DialogEspecialidad from '../components/DialogEspecialidad';
+import PageHeader from '../components/Ui/PageHeader.jsx';
+
 
 function Especialidades() {
   const dispatch = useDispatch();
@@ -85,15 +87,8 @@ function Especialidades() {
   
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" sx={{ color: '#2563eb', fontWeight: 700, mb: 1 }}>
-          Especialidades
-        </Typography>
-        <Typography variant="subtitle1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
-          Gestión de especialidades médicas
-        </Typography>
-      </Box>
+    <>
+      <PageHeader title="Especialidades" subtitle="Gestión de especialidades médicas" />
 
       <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
         <SearchField value={search} onChange={setSearch} placeholder="Buscar por nombre o descripción" />
@@ -143,7 +138,7 @@ function Especialidades() {
       />
 
       <SnackbarMini open={snackbarOpen} message={snackbarMessage} severity={snackbarSeverity} onClose={() => setSnackbarOpen(false)} />
-    </Container>
+    </>
   );
 }
 

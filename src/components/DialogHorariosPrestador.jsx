@@ -123,14 +123,20 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
   
 
   return (
-    <Dialog open={abierto} onClose={onCerrar} fullWidth maxWidth="md">
+    <Dialog
+      open={abierto}
+      onClose={onCerrar}
+      fullWidth
+      maxWidth="lg"
+      PaperProps={{ sx: { height: '90vh', maxHeight: '90vh', display: 'flex', flexDirection: 'column' } }}
+    >
       <DialogTitle sx={{ fontWeight: 800 }}>
         <Stack direction="row" spacing={1} alignItems="center">
           <ScheduleIcon color="primary" />
           <Typography variant="h6">Gestionar Horarios</Typography>
         </Stack>
       </DialogTitle>
-      <DialogContent dividers>
+      <DialogContent dividers sx={{ flex: 1, overflowY: 'auto' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Box>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>

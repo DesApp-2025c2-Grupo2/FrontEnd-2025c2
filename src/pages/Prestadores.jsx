@@ -17,11 +17,13 @@ import {
   DialogActions,
   Button
 } from '@mui/material';
+import PageHeader from '../components/Ui/PageHeader.jsx';
 import {
   Search as SearchIcon,
   Add as AddIcon,
   Person as PersonIcon
 } from '@mui/icons-material';
+
 import TarjetaPrestadorSimple from '../components/TarjetaPrestadorSimple';
 import DialogPrestador from '../components/DialogPrestador';
 import DialogVerPrestador from '../components/DialogVerPrestador';
@@ -53,7 +55,6 @@ function Prestadores() {
   const [prestadoresConAgenda, setPrestadoresConAgenda] = useState({}); // id -> prestador mergeado
   const [horariosContext, setHorariosContext] = useState({ lugarIndex: 0, horarioIndex: null });
   // Agenda creation was simplified and is not used directly from Prestadores
-  const [confirmEliminarDireccion, setConfirmEliminarDireccion] = useState({ open: false, prestador: null, lugarIndex: null });
   const [prestadorSeleccionado, setPrestadorSeleccionado] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [highlightId, setHighlightId] = useState(null);
@@ -93,20 +94,46 @@ function Prestadores() {
         promises.push(
           agendasService.getByProfesional(p.id).then((agendas) => {
             if (cancelado) return;
-            const agendaById = new Map((agendas || []).map((a) => [a.id, a]));
-            const agendaByDir = new Map((agendas || []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
+            const listaAgendas = Array.isArray(agendas) ? agendas : [];
+            const normalizar = (s) => String(s || '').trim().toLowerCase();
             const lugaresBase = Array.isArray(p.lugaresAtencion) ? JSON.parse(JSON.stringify(p.lugaresAtencion)) : [];
+            const matchedKeys = new Set();
             const lugaresMergeados = lugaresBase.map((l) => {
-              const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
-              if (a) {
-                // Tomar id y direccion desde agenda cuando el original no los trae o están vacíos
-                const nuevoId = (l.id != null) ? l.id : (a.id ?? null);
-                const nuevaDir = l.direccion || a.direccion || '';
-                return { ...l, id: nuevoId, direccion: nuevaDir, horarios: a.horarios || [] };
+              const lid = l?.id;
+              const dirNorm = normalizar(l?.direccion);
+              // Tomar todas las agendas que correspondan por id de lugar (lugarId/id) o por dirección normalizada
+              const matches = listaAgendas.filter((a) => {
+                const aLugarId = a?.lugarId ?? a?.lugarAtencionId ?? a?.id;
+                const aDirNorm = normalizar(a?.direccion);
+                const matchId = lid != null && (String(aLugarId) === String(lid));
+                const matchDir = !!dirNorm && aDirNorm === dirNorm;
+                return matchId || matchDir;
+              });
+              if (matches.length > 0) {
+                const primera = matches[0];
+                const horarios = matches.flatMap((m) => m.horarios || m.horariosAtencion || []);
+                const nuevoId = lid != null ? lid : (primera?.lugarId ?? primera?.lugarAtencionId ?? primera?.id ?? null);
+                const nuevaDir = l.direccion || primera?.direccion || '';
+                // Marcar como matcheadas todas las agendas usadas
+                matches.forEach((m) => {
+                  const key = (m?.id != null) ? `id:${m.id}` : `dir:${normalizar(m?.direccion)}`;
+                  matchedKeys.add(key);
+                });
+                return { ...l, id: nuevoId, direccion: nuevaDir, horarios };
               }
               return l;
             });
-            actuales[p.id] = { ...p, lugaresAtencion: lugaresMergeados };
+            // Agregar agendas que no matchearon ningún lugar base (union)
+            const extras = listaAgendas.filter((a) => {
+              const key = (a?.id != null) ? `id:${a.id}` : `dir:${normalizar(a?.direccion)}`;
+              return !matchedKeys.has(key);
+            }).map((a) => ({
+              id: a?.id ?? null,
+              direccion: a?.direccion || '',
+              horarios: a?.horarios || a?.horariosAtencion || []
+            }));
+            const lugaresFinal = [...lugaresMergeados, ...extras];
+            actuales[p.id] = { ...p, lugaresAtencion: lugaresFinal };
           }).catch(() => {})
         );
       });
@@ -253,32 +280,9 @@ function Prestadores() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3 } }}>
+    <>
       {/* Header de la página */}
-      <Typography 
-        variant="h4" 
-        component="h1" 
-        gutterBottom 
-        sx={{ 
-          color: '#1976d2',
-          mb: { xs: 0.5, sm: 1 }, 
-          fontWeight: 'bold',
-          fontSize: { xs: '1.5rem', sm: '2.125rem' }
-        }}
-      >
-        Prestadores
-      </Typography>
-      <Typography 
-        variant="subtitle1" 
-        color="text.secondary" 
-        gutterBottom 
-        sx={{ 
-          mb: { xs: 3, sm: 4 }, 
-          fontSize: { xs: '0.875rem', sm: '1rem' }
-        }}
-      >
-        Gestión de prestadores médicos y centros de salud
-      </Typography>
+      <PageHeader title="Prestadores" subtitle="Gestión de prestadores médicos y centros de salud" />
 
       {/* Buscador unificado */}
       <TextField
@@ -329,9 +333,6 @@ function Prestadores() {
                   setPrestadorSeleccionado(p);
                   setHorariosContext({ lugarIndex, horarioIndex: null });
                   setDialogoHorarios(true);
-                }}
-                onEliminarDireccion={async (p, lugarIndex) => {
-                  setConfirmEliminarDireccion({ open: true, prestador: p, lugarIndex });
                 }}
               />
             </div>
@@ -412,6 +413,50 @@ function Prestadores() {
               const id = prestadorSeleccionado?.id || prestadorActualizado?.id;
               const lugaresAtencion = prestadorActualizado?.lugaresAtencion || [];
               if (!id) throw new Error('ID de prestador no disponible');
+              // Pre-borrado de horarios que desaparecieron (maneja multi-día)
+              try {
+                const originalLugares = Array.isArray(prestadorSeleccionado?.lugaresAtencion) ? prestadorSeleccionado.lugaresAtencion : [];
+                const normalizar = (s) => String(s || '').trim().toLowerCase();
+                const keyLugar = (l) => (l && l.id != null) ? `id:${l.id}` : `dir:${normalizar(l?.direccion)}`;
+                const mapOriginal = new Map();
+                originalLugares.forEach((l) => {
+                  const key = keyLugar(l);
+                  const lugarId = (l && l.id != null) ? l.id : null;
+                  const ids = new Set((Array.isArray(l?.horarios) ? l.horarios : [])
+                    .map((h) => h?.id)
+                    .filter((x) => typeof x === 'number'));
+                  mapOriginal.set(key, { lugarId, ids });
+                });
+                const mapActual = new Map();
+                (Array.isArray(lugaresAtencion) ? lugaresAtencion : []).forEach((l) => {
+                  const key = keyLugar(l);
+                  const lugarId = (l && l.id != null) ? l.id : null;
+                  const ids = new Set((Array.isArray(l?.horarios) ? l.horarios : [])
+                    .map((h) => h?.id)
+                    .filter((x) => typeof x === 'number'));
+                  mapActual.set(key, { lugarId, ids });
+                });
+                const deletions = [];
+                mapOriginal.forEach((orig, key) => {
+                  const upd = mapActual.get(key);
+                  const updIds = upd ? upd.ids : new Set();
+                  orig.ids.forEach((hid) => {
+                    if (!updIds.has(hid)) {
+                      const lugarId = (typeof orig.lugarId === 'number') ? orig.lugarId : (upd && typeof upd.lugarId === 'number' ? upd.lugarId : null);
+                      if (typeof lugarId === 'number') {
+                        deletions.push({ lugarId, horarioId: hid });
+                      }
+                    }
+                  });
+                });
+                if (deletions.length > 0) {
+                  await Promise.allSettled(
+                    deletions.map((d) => agendasService.deleteHorario(id, d.lugarId, d.horarioId))
+                  );
+                }
+              } catch (_) {
+                // si falla borrado granular, continuamos con PUT en bloque
+              }
               await dispatch(actualizarHorariosPrestador({ id, lugaresAtencion })).unwrap();
               // Refrescar cache local consultando agendas reales (para reflejar ids/direcciones definitivos)
               try {
@@ -420,14 +465,29 @@ function Prestadores() {
                 const agendaById = new Map((Array.isArray(ags) ? ags : []).map((a) => [a.id, a]));
                 const agendaByDir = new Map((Array.isArray(ags) ? ags : []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
                 const lugaresBase = JSON.parse(JSON.stringify(lugaresAtencion));
+                const matchedKeys = new Set();
                 const lugaresMergeados = lugaresBase.map((l) => {
                   const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
-                  if (a) return { ...l, horarios: a.horarios || [] };
+                  if (a) {
+                    const key = (a?.id != null) ? `id:${a.id}` : `dir:${String(a?.direccion || '').trim().toLowerCase()}`;
+                    matchedKeys.add(key);
+                    return { ...l, horarios: a.horarios || a.horariosAtencion || [] };
+                  }
                   return l;
                 });
+                // Agregar agendas que no matchearon ningún lugar base
+                const extras = (Array.isArray(ags) ? ags : []).filter((a) => {
+                  const key = (a?.id != null) ? `id:${a.id}` : `dir:${String(a?.direccion || '').trim().toLowerCase()}`;
+                  return !matchedKeys.has(key);
+                }).map((a) => ({
+                  id: a?.id ?? null,
+                  direccion: a?.direccion || '',
+                  horarios: a?.horarios || a?.horariosAtencion || []
+                }));
+                const lugaresFinal = [...lugaresMergeados, ...extras];
                 setPrestadoresConAgenda((prev) => {
                   const base = prev[id] || prestadorSeleccionado || prestadorActualizado || {};
-                  return { ...prev, [id]: { ...base, id, lugaresAtencion: lugaresMergeados } };
+                  return { ...prev, [id]: { ...base, id, lugaresAtencion: lugaresFinal } };
                 });
               } catch (_) {
                 // fallback a actualizar con lo que tenemos
@@ -452,33 +512,6 @@ function Prestadores() {
 
       {/* Crear/editar agenda se realiza desde la pantalla de agendas, no desde Prestadores */}
 
-      {/* Confirmación eliminar dirección */}
-      <Dialog open={confirmEliminarDireccion.open} onClose={() => setConfirmEliminarDireccion({ open: false, prestador: null, lugarIndex: null })}>
-        <DialogTitle>Eliminar dirección</DialogTitle>
-        <DialogContent>
-          <Typography>¿Seguro que deseas eliminar esta dirección y sus horarios?</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button type="button" onClick={() => setConfirmEliminarDireccion({ open: false, prestador: null, lugarIndex: null })}>Cancelar</Button>
-          <Button type="button" color="error" onClick={async () => {
-            const { prestador, lugarIndex } = confirmEliminarDireccion;
-            if (!prestador || lugarIndex == null) return;
-            try {
-              const copia = JSON.parse(JSON.stringify(prestador));
-              copia.lugaresAtencion = (copia.lugaresAtencion || []).filter((_, i) => i !== lugarIndex);
-              await dispatch(actualizarDireccionesPrestador(copia)).unwrap();
-              // Refrescar cache local inmediatamente con direcciones actualizadas
-              setPrestadoresConAgenda((prev) => ({ ...prev, [copia.id]: { ...copia } }));
-              setSnackbar({ open: true, message: 'Dirección eliminada', severity: 'success' });
-            } catch (error) {
-              setSnackbar({ open: true, message: (typeof error === 'string' ? error : (error?.message || 'No se pudo eliminar la dirección')), severity: 'error' });
-            } finally {
-              setConfirmEliminarDireccion({ open: false, prestador: null, lugarIndex: null });
-            }
-          }}>Eliminar</Button>
-        </DialogActions>
-      </Dialog>
-
       {/* Snackbar para notificaciones */}
       <Snackbar
         open={snackbar.open}
@@ -494,7 +527,7 @@ function Prestadores() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </>
   );
 }
 

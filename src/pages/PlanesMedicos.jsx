@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Container, Box, Typography, Snackbar, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, Snackbar, CircularProgress, Alert } from '@mui/material';
 import SearchField from '../components/Ui/SearchField.jsx';
 import EstadoFilter from '../components/Ui/EstadoFilter.jsx';
 import SnackbarMini from '../components/Ui/SnackbarMini.jsx';
@@ -10,6 +10,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import { selectPlanesFiltrados, cargarPlanes, crearPlan, editarPlan, alternarPlanThunk } from '../store/planesSlice.js';
 import { useEffect } from 'react';
 import SearchIcon from '@mui/icons-material/Search';
+import PageHeader from '../components/Ui/PageHeader.jsx';
+
 
 function PlanesMedicos() {
   const dispatch = useDispatch();
@@ -64,15 +66,8 @@ function PlanesMedicos() {
   });
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" >
-          Planes Médicos
-        </Typography>
-        <Typography variant="subtitle1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
-          Gestión de planes médicos y coberturas
-        </Typography>
-      </Box>
+    <>
+      <PageHeader title="Planes Médicos" subtitle="Gestión de planes médicos y coberturas" />
 
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-start', gap: 2 }}>
         <SearchField value={search} onChange={setSearch} placeholder="Buscar plan por nombre o descripción" />
@@ -107,7 +102,7 @@ function PlanesMedicos() {
       <BotonFlotante onClick={handleOpenAdd} title="Agregar plan" />
 
       <SnackbarMini open={snackbarOpen} message={snackbarMessage} severity={snackbarSeverity} onClose={() => setSnackbarOpen(false)} />
-    </Container>
+    </>
   );
 }
 

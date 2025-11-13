@@ -14,29 +14,43 @@ import {
   Divider,
   Card,
   CardContent,
-  Grid
+  Grid,
+  IconButton
 } from '@mui/material';
+import { Link as MuiLink } from '@mui/material';
+import { useTheme, alpha } from '@mui/material/styles';
 import {
-  Person as PersonIcon,
   MedicalServices as MedicalServicesIcon,
   Phone as PhoneIcon,
   Email as EmailIcon,
   LocationOn as LocationOnIcon,
   Schedule as ScheduleIcon,
-  Business as BusinessIcon
+  Business as BusinessIcon,
+  Close as CloseIcon,
+  InfoOutlined as InfoIcon,
+  ContactPhone as ContactPhoneIcon
 } from '@mui/icons-material';
 import { selectPrestadores } from '../store/prestadoresSlice';
 
 export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
   if (!prestador) return null;
 
+  const theme = useTheme();
   const todosPrestadores = useSelector(selectPrestadores);
-  const centroNombre = prestador.integraCentroMedicoId
-    ? (todosPrestadores || []).find(p => p.id === prestador.integraCentroMedicoId)?.nombreCompleto
+  const integraId = prestador?.integraCentroMedicoId ?? prestador?.centroMedicoId ?? null;
+  const centroDeLista = integraId != null
+    ? (todosPrestadores || []).find(p => String(p.id) === String(integraId))
     : null;
+  const centroNombre =
+    prestador?.centroMedicoNombre ||
+    prestador?.centroMedico ||
+    centroDeLista?.nombreCompleto ||
+    null;
+  const centroDisplay = centroNombre ? centroNombre : '—';
 
   const getTipoColor = (tipo) => {
-    return tipo === 'Centro Médico' ? '#9c27b0' : '#2196f3';
+    // Centro = secundario (verde), Profesional = primario (azul)
+    return tipo === 'Centro Médico' ? theme.palette.secondary.main : theme.palette.primary.main;
   };
 
   const catalogoEspecialidades = useSelector(selectEspecialidades);
@@ -52,80 +66,86 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
   }, [catalogoEspecialidades, prestador.especialidades]);
 
   return (
-    <Dialog open={abierto} onClose={onCerrar} fullWidth maxWidth="md">
-      <DialogTitle sx={{ fontWeight: 800, color: '#111827', pb: 2 }}>
-        <Stack direction="row" spacing={1} alignItems="center">
-          <PersonIcon color="primary" />
-          <Typography variant="h6">Detalles del Prestador</Typography>
-        </Stack>
+    <Dialog
+      open={abierto}
+      onClose={onCerrar}
+      fullWidth
+      maxWidth="lg"
+      PaperProps={{
+        sx: { borderRadius: 2, height: '90vh' }
+      }}
+    >
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}>
+        <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary' }}>
+          Detalles del Prestador
+        </Typography>
+        <IconButton onClick={onCerrar} aria-label="Cerrar">
+          <CloseIcon />
+        </IconButton>
       </DialogTitle>
 
       <DialogContent dividers>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-          {/* Información Básica */}
-          <Card variant="outlined" sx={{ backgroundColor: '#f8f9fa' }}>
+          {/* Información General */}
+          <Stack direction="row" spacing={1} alignItems="center">
+            <InfoIcon color="primary" fontSize="small" />
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Información General</Typography>
+          </Stack>
+          <Card
+            variant="outlined"
+            sx={{
+              backgroundColor: 'background.paper',
+              borderColor: 'divider'
+            }}
+          >
             <CardContent>
               <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <Typography variant="h5" sx={{ fontWeight: 700, color: '#111827', mb: 2 }}>
+                {/* Cabecera en 4 columnas: Nombre, CUIL/CUIT, Tipo, Centro Médico */}
+                <Grid item xs={12} md={3}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                    NOMBRE
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700 }}>
                     {prestador.nombreCompleto}
                   </Typography>
-                  <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                    <Chip
-                      label={prestador.tipo}
-                      sx={{
-                        backgroundColor: getTipoColor(prestador.tipo),
-                        color: 'white',
-                        fontWeight: 'bold'
-                      }}
-                    />
-                  </Stack>
                 </Grid>
 
-                <Grid item xs={12} sm={6}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                    <BusinessIcon color="action" fontSize="small" />
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      CUIL/CUIT
-                    </Typography>
-                  </Stack>
-                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                    {prestador.cuilCuit}
+                <Grid item xs={12} md={3}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                    CUIL/CUIT
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                    {prestador.cuilCuit || prestador.documentacion?.numero || '—'}
                   </Typography>
                 </Grid>
 
-                <Grid item xs={12} sm={6}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                    <BusinessIcon color="action" fontSize="small" />
-                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                      TIPO DE PRESTADOR
-                    </Typography>
-                  </Stack>
-                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                <Grid item xs={12} md={3}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                    TIPO DE PRESTADOR
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700 }}>
                     {prestador.tipo}
                   </Typography>
                 </Grid>
-                
-                {/* Centro Médico - Solo si es profesional independiente y tiene valor */}
-                {prestador.tipo === 'Profesional Independiente' && centroNombre && (
-                  <Grid item xs={12} sm={6}>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                      <BusinessIcon color="action" fontSize="small" />
-                      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                        INTEGRA CENTRO MÉDICO
-                      </Typography>
-                    </Stack>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                      {centroNombre}
+
+                {/* Centro Médico */}
+                <Grid item xs={12} md={3}>
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <BusinessIcon color="action" fontSize="small" />
+                    <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                      CENTRO MÉDICO
                     </Typography>
-                  </Grid>
-                )}
+                  </Stack>
+                  <Typography variant="body1" sx={{ fontWeight: 700 }}>
+                    {centroDisplay}
+                  </Typography>
+                </Grid>
               </Grid>
             </CardContent>
           </Card>
 
           {/* Especialidades */}
-          {prestador.especialidades && prestador.especialidades.length > 0 && (
+          {Array.isArray(prestador.especialidades) && prestador.especialidades.length > 0 && (
             <Box>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
                 <MedicalServicesIcon color="primary" />
@@ -134,74 +154,89 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
                 </Typography>
               </Stack>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                {prestador.especialidades.map((esp, idx) => (
+                {prestador.especialidades.map((esp, idx) => {
+                  const label = typeof esp === 'number' ? (especialidadIdToNombre.get(esp) || `#${esp}`) : (esp?.nombre || String(esp));
+                  return (
                   <Chip
                     key={idx}
-                    label={esp.nombre}
+                    label={label}
                     sx={{
-                      backgroundColor: '#e3f2fd',
-                      color: 'text.primary',
+                      border: `1px solid ${theme.palette.primary.main}`,
+                      color: 'primary.main',
+                      backgroundColor: 'transparent',
+                      borderRadius: 9999,
+                      px: 1.5,
                       fontWeight: 600
                     }}
                   />
-                ))}
+                )})}
               </Box>
             </Box>
           )}
 
-          {/* Información de Contacto */}
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-              Información de Contacto
-            </Typography>
-            <Grid container spacing={2}>
-              {/* Teléfonos */}
-              {prestador.telefonos && prestador.telefonos.length > 0 && (
-                <Grid item xs={12} md={6}>
-                  <Card variant="outlined" sx={{ backgroundColor: '#f8f9fa' }}>
-                    <CardContent>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                        <PhoneIcon color="primary" fontSize="small" />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                          Teléfonos
-                        </Typography>
-                      </Stack>
-                      {prestador.telefonos.map((tel, idx) => (
-                        <Box key={idx} sx={{ mb: 1 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {tel.numero}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </CardContent>
-                  </Card>
-                </Grid>
-              )}
+          <Divider />
 
-              {/* Emails */}
-              {prestador.emails && prestador.emails.length > 0 && (
-                <Grid item xs={12} md={6}>
-                  <Card variant="outlined" sx={{ backgroundColor: '#f8f9fa' }}>
-                    <CardContent>
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                        <EmailIcon color="primary" fontSize="small" />
-                        <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                          Emails
-                        </Typography>
-                      </Stack>
-                      {prestador.emails.map((email, idx) => (
-                        <Box key={idx} sx={{ mb: 1 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {email.email}
-                          </Typography>
+          {/* Contacto */}
+          {(prestador.telefonos?.length || prestador.emails?.length) ? (
+            <>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                <ContactPhoneIcon color="primary" />
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Información de Contacto
+                </Typography>
+              </Stack>
+              <Grid container spacing={3}>
+                {prestador.telefonos && prestador.telefonos.length > 0 && (
+                  <Grid item xs={12} sm={6} md={6}>
+                    <Card variant="outlined" sx={{ backgroundColor: 'background.paper', borderColor: 'divider' }}>
+                      <CardContent>
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                          <PhoneIcon color="primary" fontSize="small" />
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Teléfonos</Typography>
+                        </Stack>
+                        <Box>
+                          {prestador.telefonos.map((tel, idx) => (
+                            <Typography key={idx} variant="body2" sx={{ fontWeight: 600, mb: 0.75 }}>
+                              <MuiLink
+                                href={`tel:${String(tel.numero || '').replace(/\s+/g, '')}`}
+                                sx={{ color: 'text.primary', textDecoration: 'none' }}
+                              >
+                                {tel.numero}
+                              </MuiLink>
+                            </Typography>
+                          ))}
                         </Box>
-                      ))}
-                    </CardContent>
-                  </Card>
-                </Grid>
-              )}
-            </Grid>
-          </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+                {prestador.emails && prestador.emails.length > 0 && (
+                  <Grid item xs={12} sm={6} md={6}>
+                    <Card variant="outlined" sx={{ backgroundColor: 'background.paper', borderColor: 'divider' }}>
+                      <CardContent>
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                          <EmailIcon color="primary" fontSize="small" />
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Emails</Typography>
+                        </Stack>
+                        <Box>
+                          {prestador.emails.map((email, idx) => (
+                            <Typography key={idx} variant="body2" sx={{ fontWeight: 600, mb: 0.75 }}>
+                              <MuiLink
+                                href={`mailto:${String(email?.email || email?.correo || '')}`}
+                                sx={{ color: 'text.primary', textDecoration: 'none' }}
+                              >
+                                {email?.email || email?.correo || ''}
+                              </MuiLink>
+                            </Typography>
+                          ))}
+                        </Box>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                )}
+              </Grid>
+            </>
+          ) : null}
 
           {/* Lugares de Atención */}
           {prestador.lugaresAtencion && prestador.lugaresAtencion.length > 0 && (
@@ -219,7 +254,7 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
                   variant="outlined"
                   sx={{
                     mb: 2,
-                    border: '2px solid #e0e0e0',
+                    borderColor: 'divider',
                     '&:hover': {
                       boxShadow: 4
                     }
@@ -228,13 +263,18 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
                   <CardContent>
                     {/* Dirección */}
                     <Box sx={{ mb: 2 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#111827', mb: 0.5 }}>
-                        📍 {lugar.direccion}
+                      <Typography variant="subtitle1" sx={{ fontWeight: 700, color: 'text.primary', mb: 0.5 }}>
+                        {lugar.direccion}
                       </Typography>
                     </Box>
 
-                    {/* Horarios */}
-                    {lugar.horarios && lugar.horarios.length > 0 && (
+                    {/* Horarios (acepta lugar.horarios o lugar.horariosAtencion) */}
+                    {(() => {
+                      const horarios = Array.isArray(lugar.horarios)
+                        ? lugar.horarios
+                        : (Array.isArray(lugar.horariosAtencion) ? lugar.horariosAtencion : []);
+                      return Array.isArray(horarios) && horarios.length > 0;
+                    })() && (
                       <Box>
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
                           <ScheduleIcon fontSize="small" color="primary" />
@@ -244,40 +284,56 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
                         </Stack>
 
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                          {lugar.horarios.map((horario, hIdx) => (
-                            <Box
-                              key={hIdx}
-                              sx={{
-                                p: 1.5,
-                                backgroundColor: '#e3f2fd',
-                                borderRadius: 1,
-                                border: '1px solid #2196f3'
-                              }}
-                            >
-                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2' }}>
-                                {(() => {
-                                  const canon = (d) => {
-                                    const t = String(d || '').trim().toLowerCase();
-                                    if (!t) return '';
-                                    if (t === 'miercoles') return 'Miércoles';
-                                    if (t === 'sabado') return 'Sábado';
-                                    const map = { lunes: 'Lunes', martes: 'Martes', miércoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes', sábado: 'Sábado', domingo: 'Domingo' };
-                                    return map[t] || (t.charAt(0).toUpperCase() + t.slice(1));
-                                  };
-                                  return (horario.dias || []).map(canon).filter(Boolean).join(', ');
-                                })()}
-                              </Typography>
-                              <Typography variant="body2" sx={{ color: '#1976d2' }}>
-                                {(() => {
-                                  const nombre = (typeof horario.especialidadId === 'number' && horario.especialidadId > 0)
-                                    ? (especialidadIdToNombre.get(horario.especialidadId) || null)
-                                    : null;
-                                  return nombre ? `🩺 ${nombre} • ${horario.horaInicio} - ${horario.horaFin}` : `⏰ ${horario.horaInicio} - ${horario.horaFin}`;
-                                })()}
-                                {typeof horario.duracionMinutos === 'number' && horario.duracionMinutos > 0 ? ` • ${horario.duracionMinutos} min` : ''}
-                              </Typography>
-                            </Box>
-                          ))}
+                          {(Array.isArray(lugar.horarios) ? lugar.horarios : (Array.isArray(lugar.horariosAtencion) ? lugar.horariosAtencion : [])).map((horario, hIdx) => {
+                            const parseDias = (d) => {
+                              if (Array.isArray(d)) return d;
+                              if (typeof d === 'string') return d.split(/[,/]/).map(s => s.trim()).filter(Boolean);
+                              return [];
+                            };
+                            const canon = (d) => {
+                              const t = String(d || '').trim().toLowerCase();
+                              if (!t) return '';
+                              if (t === 'miercoles') return 'Miércoles';
+                              if (t === 'sabado') return 'Sábado';
+                              const map = { lunes: 'Lunes', martes: 'Martes', miércoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes', sábado: 'Sábado', domingo: 'Domingo' };
+                              return map[t] || (t.charAt(0).toUpperCase() + t.slice(1));
+                            };
+                            const diasLinea = parseDias(horario.dias || horario.diasDeLaSemana).map(canon).filter(Boolean).join(', ');
+                            const inicio = horario.horaInicio || horario.desde || horario.inicio || '';
+                            const fin = horario.horaFin || horario.hasta || horario.fin || '';
+                            const rango = [inicio, fin].filter(Boolean).join(' - ');
+                            const duracion = typeof horario.duracionMinutos === 'number' && horario.duracionMinutos > 0
+                              ? horario.duracionMinutos
+                              : (typeof horario.duracionConsulta === 'number' && horario.duracionConsulta > 0 ? horario.duracionConsulta : null);
+                            const dur = duracion ? ` • ${duracion} min` : '';
+                            const nombre =
+                              (typeof horario.especialidadId === 'number' && horario.especialidadId > 0
+                                ? (especialidadIdToNombre.get(horario.especialidadId) || null)
+                                : (typeof horario.especialidad === 'string' ? horario.especialidad : null));
+                            const lineaDetalle = nombre ? `${nombre} • ${rango}${dur}` : `${rango}${dur}`;
+
+                            // Ocultar filas totalmente vacías
+                            if (!diasLinea && !rango) return null;
+
+                            return (
+                              <Box
+                                key={hIdx}
+                                sx={{
+                                  p: 1.5,
+                                  backgroundColor: theme.palette.action.selected,
+                                  borderRadius: 1,
+                                  border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
+                                }}
+                              >
+                                <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                                  {diasLinea}
+                                </Typography>
+                                <Typography variant="body2" sx={{ color: 'text.primary' }}>
+                                  {lineaDetalle}
+                                </Typography>
+                              </Box>
+                            );
+                          })}
                         </Box>
                       </Box>
                     )}
@@ -287,39 +343,6 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
             </Box>
           )}
 
-          {/* Resumen */}
-          <Card variant="outlined" sx={{ backgroundColor: '#e3f2fd' }}>
-            <CardContent>
-              <Stack direction="row" spacing={3} alignItems="center" justifyContent="center">
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" sx={{ fontWeight: 800, color: '#2196f3' }}>
-                    {prestador.especialidades?.length || 0}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    {prestador.especialidades?.length === 1 ? 'ESPECIALIDAD' : 'ESPECIALIDADES'}
-                  </Typography>
-                </Box>
-                <Divider orientation="vertical" flexItem />
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" sx={{ fontWeight: 800, color: '#2196f3' }}>
-                    {prestador.lugaresAtencion?.length || 0}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    {prestador.lugaresAtencion?.length === 1 ? 'LUGAR' : 'LUGARES'}
-                  </Typography>
-                </Box>
-                <Divider orientation="vertical" flexItem />
-                <Box sx={{ textAlign: 'center' }}>
-                  <Typography variant="h4" sx={{ fontWeight: 800, color: '#2196f3' }}>
-                    {prestador.telefonos?.length || 0}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                    TELÉFONOS
-                  </Typography>
-                </Box>
-              </Stack>
-            </CardContent>
-          </Card>
         </Box>
       </DialogContent>
 

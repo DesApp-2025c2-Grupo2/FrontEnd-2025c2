@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Box, Typography, Container, Alert, CircularProgress } from '@mui/material';
+import { Box, Typography, Alert, CircularProgress } from '@mui/material';
 import SearchField from '../components/Ui/SearchField.jsx';
 import EstadoFilter from '../components/Ui/EstadoFilter.jsx';
 import SnackbarMini from '../components/Ui/SnackbarMini.jsx';
@@ -8,6 +8,8 @@ import TarjetaSituacionTerapeutica from '../components/TarjetaSituacionTerapeuti
 import BotonFlotante from '../components/BotonFlotante';
 import DialogSituacion from '../components/DialogSituacion.jsx';
 import { cargarSituaciones, crearSituacion, editarSituacion, alternarSituacionThunk, selectSituaciones, selectSituacionesLoading, selectSituacionesError } from '../store/situacionesTerapeuticasSlice';
+import PageHeader from '../components/Ui/PageHeader.jsx';
+
 
 function SituacionesTerapeuticas() {
   const dispatch = useDispatch();
@@ -89,15 +91,8 @@ function SituacionesTerapeuticas() {
   }, [dispatch, editSituacion]);
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" sx={{ color: '#2563eb', fontWeight: 700, mb: 1 }}>
-          Situaciones Terapéuticas
-        </Typography>
-        <Typography variant="subtitle1" color="text.secondary" sx={{ fontSize: '1.1rem' }}>
-          Gestión de situaciones terapéuticas y tratamientos
-        </Typography>
-      </Box>
+    <>
+      <PageHeader title="Situaciones Terapéuticas" subtitle="Gestión de situaciones terapéuticas y tratamientos" />
 
       
 
@@ -144,7 +139,7 @@ function SituacionesTerapeuticas() {
       <BotonFlotante onClick={handleOpenAdd} title="Agregar situación" />
 
       <SnackbarMini open={snackbarOpen} message={snackbarMessage} severity={snackbarSeverity} onClose={() => setSnackbarOpen(false)} />
-    </Container>
+    </>
   );
 }
 

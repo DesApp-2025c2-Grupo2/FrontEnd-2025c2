@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { Box, Container, Typography, CircularProgress } from "@mui/material";
+import { Box, Typography, CircularProgress } from "@mui/material";
+import PageHeader from "../components/Ui/PageHeader.jsx";
 import SeccionAccionesRapidas from "../components/SeccionAccionesRapidas";
 import {
   PersonAdd,
@@ -124,13 +125,8 @@ function Dashboard() {
   }, [estadisticas]);
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
-      <Typography variant="h3" fontWeight="bold">
-        Dashboard
-      </Typography>
-      <Typography variant="body2" color="text.secondary" mb={3}>
-        Resumen general de la plataforma de servicios médicos
-      </Typography>
+    <>
+      <PageHeader title="Dashboard" subtitle="Resumen general de la plataforma de servicios médicos" />
 
       <Box>
         <SeccionAccionesRapidas actions={actions} />
@@ -208,7 +204,7 @@ function Dashboard() {
         onSave={handleSaveAfiliado}
         onEdit={() => {}}
       />
-    </Container>
+    </>
   );
 }
 

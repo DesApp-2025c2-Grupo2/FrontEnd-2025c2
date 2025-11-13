@@ -7,7 +7,7 @@ export default function Header({ onMenuClick }) {
       position="fixed"
       sx={{
         display: { xs: "flex", md: "none" },
-        bgcolor: "primary.main",
+        bgcolor: "background.paper",
         color: "text.primary",
       }}
     >

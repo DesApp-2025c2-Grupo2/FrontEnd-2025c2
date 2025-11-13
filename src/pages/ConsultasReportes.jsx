@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   Box,
   Typography,
-  Container,
   Alert,
   Snackbar
 } from '@mui/material';
@@ -26,6 +25,8 @@ import { cargarEspecialidades } from '../store/especialidadesSlice';
 import { fetchAfiliados } from '../store/afiliadosSlice';
 import SelectorReporte from '../components/Reportes/SelectorReporte';
 import HistorialReportes from '../components/Reportes/HistorialReportes';
+import PageHeader from '../components/Ui/PageHeader.jsx';
+
 
 function ConsultasReportes() {
   const dispatch = useDispatch();
@@ -105,29 +106,9 @@ function ConsultasReportes() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography 
-          variant="h4" 
-          sx={{ 
-            fontWeight: 700, 
-            color: '#1f2937',
-            mb: 1
-          }}
-        >
-          Consultas y Reportes
-        </Typography>
-        <Typography 
-          variant="body1" 
-          sx={{ 
-            color: '#6b7280',
-            fontSize: '1.1rem'
-          }}
-        >
-          Análisis y estadísticas del sistema
-        </Typography>
-      </Box>
+      <PageHeader title="Consultas y Reportes" subtitle="Análisis y estadísticas del sistema" />
 
       {/* Selector de Reportes */}
       <SelectorReporte
@@ -166,7 +147,7 @@ function ConsultasReportes() {
           {snackbarMessage}
         </Alert>
       </Snackbar>
-    </Container>
+    </>
   );
 }
 

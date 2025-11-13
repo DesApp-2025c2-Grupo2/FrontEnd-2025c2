@@ -49,14 +49,14 @@ const menuItems = [
 export default function NavBar({ mobileOpen, handleDrawerToggle }) {
   const location = useLocation();
   const renderDrawerContent = (closeOnClick = false) => (
-    <Box sx={{ bgcolor: "primary.main", height: "100%" }}>
+    <Box sx={{ bgcolor: "background.paper", height: "100%" }}>
       <List>
         {/* Logo */}
         <ListItem>
           <ListItemIcon>
             <Box
               sx={{
-                color: "white",
+                color: "common.white",
                 bgcolor: "text.primary",
                 p: 1,
                 borderRadius: "50%",
@@ -97,13 +97,19 @@ export default function NavBar({ mobileOpen, handleDrawerToggle }) {
               onClick={closeOnClick ? handleDrawerToggle : undefined}
               selected={isActive}
               sx={{
-                color: isActive ? "text.primary" : "text.secondary",
+                color: "text.secondary",
                 "&.Mui-selected": {
-                  bgcolor: "action.selected",
-                  color: "text.primary",
-                  "& .MuiListItemIcon-root": { color: "text.primary" },
+                  bgcolor: "primary.main",
+                  color: "common.white",
+                  "& .MuiListItemIcon-root": { color: "common.white" },
                 },
-                "&:hover": {
+                "&.Mui-selected:hover": {
+                  bgcolor: "primary.main",
+                  color: "common.white",
+                  "& .MuiListItemIcon-root": { color: "common.white" },
+                },
+                "&:not(.Mui-selected):hover": {
+                  bgcolor: "action.selected",
                   color: "text.primary",
                   "& .MuiListItemIcon-root": { color: "text.primary" },
                 },

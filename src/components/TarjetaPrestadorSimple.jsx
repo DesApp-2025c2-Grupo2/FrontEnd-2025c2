@@ -1,15 +1,14 @@
 import React from 'react';
-import { Button, Chip, Card, Typography, Box, Accordion, AccordionSummary, AccordionDetails, IconButton, Tooltip, CircularProgress } from '@mui/material';
+import { Button, Chip, Card, Typography, Box, Accordion, AccordionSummary, AccordionDetails, IconButton, Tooltip, CircularProgress, Stack } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import PersonIcon from '@mui/icons-material/Person';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector } from 'react-redux';
 import { selectPrestadores } from '../store/prestadoresSlice';
 import { selectEspecialidades } from '../store/especialidadesSlice';
 
-export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo, onGestionarHorarios, onEliminarDireccion, emphasis = false, isRefreshing = false }) {
+export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo, onGestionarHorarios, emphasis = false, isRefreshing = false }) {
   const todosPrestadores = useSelector(selectPrestadores);
   const centroNombre = (() => {
     if (prestador.integraCentroMedicoId) {
@@ -213,76 +212,53 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                           <EditIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onEliminarDireccion?.(prestador, idx);
-                        }}
-                        aria-label="Eliminar dirección"
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+                      {/* Eliminar dirección se realiza desde Editar Prestador */}
                     </Box>
                   </Box>
-                  {Array.isArray(lugar.horarios) && lugar.horarios.length > 0 && (
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 0.5 }}>
-                      {(() => {
-                        const dayToRanges = {};
-                        (lugar.horarios || []).forEach((h) => {
-                          const dias = Array.isArray(h.dias) && h.dias.length > 0 ? h.dias.map(canonDia).filter(Boolean) : [];
+                  <Box sx={{ mt: 1 }}>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                      <ScheduleIcon color="action" />
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        Horarios de Atención
+                      </Typography>
+                    </Stack>
+                    {Array.isArray(lugar.horarios) && lugar.horarios.length > 0 ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {(lugar.horarios || []).map((h, i) => {
+                          const dias = Array.isArray(h.dias) ? h.dias.map(canonDia).filter(Boolean) : [];
                           const inicio = h.horaInicio || h.desde || '';
                           const fin = h.horaFin || h.hasta || '';
-                          const espIds = Array.isArray(h.especialidades) && h.especialidades.length > 0
-                            ? h.especialidades
-                            : ((typeof h.especialidadId === 'number' && h.especialidadId > 0) ? [h.especialidadId] : []);
-                          dias.forEach((dia) => {
-                            if (!dayToRanges[dia]) dayToRanges[dia] = [];
-                            dayToRanges[dia].push({ rango: `${inicio} - ${fin}`, dur: h.duracionMinutos, espIds });
-                          });
-                        });
-                        return diasSemanaOrden
-                          .filter((dia) => (dayToRanges[dia] || []).length > 0)
-                          .map((dia, idxCard) => {
-                            const rangos = dayToRanges[dia];
-                            const uniqueEspIds = Array.from(new Set(rangos.flatMap(r => r.espIds || []).filter((id) => typeof id === 'number' && id > 0)));
-                            return (
-                              <Card key={idxCard} variant="outlined" sx={{ p: 1.25, borderColor: '#e0e0e0', backgroundColor: '#f8f9fa', minWidth: 180 }}>
-                                <Chip
-                                  label={dia}
-                                  size="small"
-                                  sx={{ backgroundColor: '#2196f3', color: 'white', fontWeight: 'bold', mb: 0.75 }}
-                                />
-                                {uniqueEspIds.length > 0 && (
-                                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 0.5 }}>
-                                    {uniqueEspIds.map((id) => (
-                                      especialidadIdToNombre.get(id)
-                                        ? <Chip key={id} label={especialidadIdToNombre.get(id)} size="small" sx={{ backgroundColor: '#e3f2fd', color: '#1976d2', fontWeight: 600 }} />
-                                        : null
-                                    ))}
-                                  </Box>
-                                )}
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-                                  {rangos.map((item, i) => (
-                                    <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                      <ScheduleIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2' }}>{item.rango}</Typography>
-                                      {typeof item.dur === 'number' && item.dur > 0 && (
-                                        <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-                                          • {item.dur} min
-                                        </Typography>
-                                      )}
-                                    </Box>
-                                  ))}
-                                </Box>
-                              </Card>
-                            );
-                          });
-                      })()}
-                    </Box>
-                  )}
+                          const dur = (typeof h.duracionMinutos === 'number' && h.duracionMinutos > 0) ? h.duracionMinutos : undefined;
+                          const espId = (Array.isArray(h.especialidades) && h.especialidades.length > 0)
+                            ? h.especialidades[0]
+                            : ((typeof h.especialidadId === 'number' && h.especialidadId > 0) ? h.especialidadId : null);
+                          const espNombre = (espId != null) ? especialidadIdToNombre.get(espId) : null;
+                          return (
+                            <Box
+                              key={i}
+                              sx={{
+                                backgroundColor: '#eaf2ff',
+                                border: '1px solid #c7d7fe',
+                                borderRadius: 1.5,
+                                p: 1.25
+                              }}
+                            >
+                              <Typography variant="subtitle2" sx={{ color: '#1e40af', fontWeight: 700, mb: 0.25 }}>
+                                {dias.length > 0 ? dias.join(', ') : 'Horario'}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                {espNombre ? `${espNombre} • ` : ''}
+                                {inicio} - {fin}
+                                {dur ? ` • ${dur} min` : ''}
+                              </Typography>
+                            </Box>
+                          );
+                        })}
+                      </Box>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">No hay horarios cargados.</Typography>
+                    )}
+                  </Box>
                 </Card>
               ))}
             </Box>

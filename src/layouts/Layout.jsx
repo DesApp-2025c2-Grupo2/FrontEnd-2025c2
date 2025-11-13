@@ -31,7 +31,9 @@ export default function Layout() {
         <Toolbar sx={{ display: { xs: "block", md: "none" } }} />
 
         <Box sx={{ flexGrow: 1, p: 3, minHeight: 0, overflowY: 'auto' }}>
-          <Outlet />
+          <Box sx={{ maxWidth: 1200, mr: 'auto' }}>
+            <Outlet />
+          </Box>
         </Box>
         <Footer />
       </Box>
