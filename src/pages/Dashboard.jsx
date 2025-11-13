@@ -1,36 +1,55 @@
-import React, { useMemo, useState } from "react";
-import { Box, Container, Typography } from "@mui/material";
+import React, { useMemo, useState, useEffect } from "react";
+import { Box, Container, Typography, CircularProgress } from "@mui/material";
 import SeccionAccionesRapidas from "../components/SeccionAccionesRapidas";
-import SeccionEstadisticasRecientes from "../components/SeccionEstadisticasRecientes";
-import { useEstadisticasRecientes } from "../hooks/useEstadisticasRecientes.jsx";
-import { PersonAdd, LocalHospital, MedicalServices } from "@mui/icons-material";
+import {
+  PersonAdd,
+  LocalHospital,
+  Description as DescriptionIcon,
+} from "@mui/icons-material";
 import DialogPrestador from "../components/DialogPrestador";
-import DialogEspecialidad from "../components/DialogEspecialidad";
+import DialogoPlan from "../components/DialogoPlan.jsx";
 import AfiliadoFormDialog from "../components/Afiliados/AfiliadoFormDialog";
 import { useDispatch, useSelector } from "react-redux";
 import { crearPrestador } from "../store/prestadoresSlice";
-import { addEspecialidad } from "../store/especialidadesSlice";
-import { selectPlanes } from "../store/planesSlice"; // ejemplo
+import { selectPlanes, crearPlan, editarPlan } from "../store/planesSlice";
 import TablaCrecimiento from "../components/TablaCrecimiento.jsx";
-
 import PeopleIcon from "@mui/icons-material/People";
 import MedicalServicesIcon from "@mui/icons-material/MedicalServices";
 import EventIcon from "@mui/icons-material/Event";
-import DescriptionIcon from "@mui/icons-material/Description";
 import TarjetaEstadistica from "../components/TarjetaEstadistica.jsx";
+import SnackbarMini from "../components/Ui/SnackbarMini.jsx";
+
+// Importar el slice del dashboard
+import {
+  fetchEstadisticas,
+  selectEstadisticas,
+  selectDashboardLoading,
+  selectDashboardError,
+} from "../store/dashboardSlice";
 
 function Dashboard() {
-  const { stats: recentStats } = useEstadisticasRecientes("dashboard");
   const dispatch = useDispatch();
 
+  // Estado de Redux
+  const estadisticas = useSelector(selectEstadisticas);
+  const loading = useSelector(selectDashboardLoading);
+  const error = useSelector(selectDashboardError);
+
+  // Otros estados
   const planesMedicos = useSelector(selectPlanes) || [];
-
   const [openPrestador, setOpenPrestador] = useState(false);
-  const [openEspecialidad, setOpenEspecialidad] = useState(false);
   const [openAfiliado, setOpenAfiliado] = useState(false);
-
-  // Para crear un nuevo afiliado
   const [newAfiliadoData, setNewAfiliadoData] = useState({});
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editPlan, setEditPlan] = useState(null);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+
+  // Cargar estadísticas al montar
+  useEffect(() => {
+    dispatch(fetchEstadisticas());
+  }, [dispatch]);
 
   const actions = useMemo(
     () => [
@@ -40,7 +59,7 @@ function Dashboard() {
         icon: <PersonAdd />,
         backgroundColor: "#28a745",
         onClick: () => {
-          setNewAfiliadoData({}); // resetear form
+          setNewAfiliadoData({});
           setOpenAfiliado(true);
         },
       },
@@ -52,43 +71,94 @@ function Dashboard() {
         onClick: () => setOpenPrestador(true),
       },
       {
-        title: "Nueva Especialidad",
-        subtitle: "Agregar especialidad médica",
-        icon: <MedicalServices />,
+        title: "Nuevo Plan",
+        subtitle: "Agregar plan de salud",
+        icon: <DescriptionIcon />,
         backgroundColor: "#007bff",
-        onClick: () => setOpenEspecialidad(true),
+        onClick: () => setDialogOpen(true),
       },
     ],
     []
   );
 
+  const handleClosePlan = () => setDialogOpen(false);
+
+  const handleSubmitPlan = (data) => {
+    if (editPlan) {
+      dispatch(editarPlan({ ...data, id: editPlan.id }));
+      setSnackbarMessage("Plan actualizado correctamente");
+    } else {
+      dispatch(crearPlan(data));
+      setSnackbarMessage("Plan agregado correctamente");
+    }
+    setSnackbarSeverity("success");
+    setDialogOpen(false);
+    setSnackbarOpen(true);
+  };
+
   const handleSaveAfiliado = () => {
-    // Aquí iría la lógica para guardar el afiliado en Redux o backend
     console.log("Crear afiliado con datos:", newAfiliadoData);
     setOpenAfiliado(false);
   };
 
-  const metrics = [
-    { title: "Total Afiliados", value: "13,698", changeValue: "+12.5%", positive: true, icon: <PeopleIcon color="secondary" /> },
-    { title: "Prestadores Activos", value: "327", changeValue: "+5.2%", positive: true, icon: <MedicalServicesIcon color="secondary" /> },
-    { title: "Turnos del Mes", value: "8,234", changeValue: "-2.4%", positive: false, icon: <EventIcon color="secondary" /> },
-    { title: "Planes Activos", value: "12", changeValue: "+8.1%", positive: true, icon: <DescriptionIcon color="secondary" /> },
-  ];
+  // Construcción dinámica de métricas según backend
+  const metrics = useMemo(() => {
+    if (!estadisticas) return [];
+    return [
+      {
+        title: "Afiliados Totales",
+        value: estadisticas.totalAfiliados ?? 0,
+        icon: <PeopleIcon color="secondary" />,
+      },
+      {
+        title: "Afiliados Activos",
+        value: estadisticas.afiliadosActivos ?? 0,
+        icon: <PeopleIcon color="secondary" />,
+      },
+      {
+        title: "Planes Totales",
+        value: estadisticas.totalPlanesMedicos ?? 0,
+        icon: <DescriptionIcon color="secondary" />,
+      },
+    ];
+  }, [estadisticas]);
+
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
-      <Typography variant="h3" fontWeight="bold">Dashboard</Typography>
+      <Typography variant="h3" fontWeight="bold">
+        Dashboard
+      </Typography>
       <Typography variant="body2" color="text.secondary" mb={3}>
         Resumen general de la plataforma de servicios médicos
       </Typography>
-      
+
       <Box>
         <SeccionAccionesRapidas actions={actions} />
-        <Box display="flex" gap={2} flexWrap="wrap" mb={4}>
-          {metrics.map((m, i) => <TarjetaEstadistica key={i} {...m} />)}
-        </Box>
-        <Box display="flex" gap={2} flexWrap="wrap">
-          <TablaCrecimiento/>
-        </Box>
+
+        {loading ? (
+          <Box
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
+            height={200}
+          >
+            <CircularProgress />
+          </Box>
+        ) : error ? (
+          <Typography color="error" textAlign="center">
+            Error al cargar estadísticas: {error}
+          </Typography>
+        ) : (
+          <Box display="flex" gap={2} flexWrap="wrap" mb={4}>
+            {metrics.map((m, i) => (
+              <TarjetaEstadistica key={i} {...m} />
+            ))}
+          </Box>
+        )}
+
+        {/*<Box display="flex" gap={2} flexWrap="wrap">
+          <TablaCrecimiento />
+        </Box>*/}
       </Box>
 
       {/* Modal Nuevo Prestador */}
@@ -102,20 +172,18 @@ function Dashboard() {
         }}
       />
 
-      {/* Modal Nueva Especialidad */}
-      <DialogEspecialidad
-        abierto={openEspecialidad}
-        valorInicial={null}
-        onCerrar={() => setOpenEspecialidad(false)}
-        onGuardar={async (esp) => {
-          await dispatch(
-            addEspecialidad({
-              nombre: esp.nombre,
-              descripcion: esp.descripcion,
-            })
-          );
-          setOpenEspecialidad(false);
-        }}
+      {/* Modal Nuevo plan médico */}
+      <DialogoPlan
+        abierto={dialogOpen}
+        onCerrar={handleClosePlan}
+        onGuardar={handleSubmitPlan}
+      />
+
+      <SnackbarMini
+        open={snackbarOpen}
+        message={snackbarMessage}
+        severity={snackbarSeverity}
+        onClose={() => setSnackbarOpen(false)}
       />
 
       {/* Modal Nuevo Afiliado */}

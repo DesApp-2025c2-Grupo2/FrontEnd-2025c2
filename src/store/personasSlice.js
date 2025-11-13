@@ -1,4 +1,3 @@
-// src/store/personasSlice.js
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { personasService } from "../services/personasService";
 
@@ -27,9 +26,10 @@ export const createPersona = createAsyncThunk(
 
 export const updatePersona = createAsyncThunk(
   "personas/updatePersona",
-  async ({ id, personaData }, { rejectWithValue }) => {
+  async (personaData, { rejectWithValue }) => {
+    // Cambiado: ahora recibe personaData directamente
     try {
-      return await personasService.updatePersona(id, personaData);
+      return await personasService.updatePersona(personaData);
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
@@ -42,6 +42,17 @@ export const deletePersona = createAsyncThunk(
     try {
       await personasService.deletePersona(personaId);
       return personaId;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+export const createMember = createAsyncThunk(
+  "personas/createMember",
+  async ({ afiliadoID, memberData }, { rejectWithValue }) => {
+    try {
+      return await personasService.addMember(afiliadoID, memberData);
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
     }
@@ -131,6 +142,23 @@ const personasSlice = createSlice({
         state.error = null;
       })
       .addCase(deletePersona.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+        state.operationSuccess = false;
+      })
+      // Crear meimbro
+      .addCase(createMember.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        state.operationSuccess = false;
+      })
+      .addCase(createMember.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentPersona = action.payload;
+        state.operationSuccess = true;
+        state.error = null;
+      })
+      .addCase(createMember.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
         state.operationSuccess = false;

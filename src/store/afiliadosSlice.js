@@ -48,6 +48,17 @@ export const deleteAfiliado = createAsyncThunk(
   }
 );
 
+export const toggleAfiliadoStatus = createAsyncThunk(
+  "afiliados/toggleStatus",
+  async ({ id, activo, fecha }, { rejectWithValue }) => {
+    try {
+      return await AfiliadosService.toggleStatus(id, activo, fecha);
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
 // --- Slice ---
 const afiliadosSlice = createSlice({
   name: "afiliados",
@@ -106,7 +117,8 @@ const afiliadosSlice = createSlice({
         state.loading = false;
         const index = state.lista.findIndex((a) => a.id === action.payload.id);
         if (index >= 0) state.lista[index] = action.payload;
-        if (state.selected?.id === action.payload.id) state.selected = action.payload;
+        if (state.selected?.id === action.payload.id)
+          state.selected = action.payload;
       })
       .addCase(updateAfiliado.rejected, (state, action) => {
         state.loading = false;
@@ -125,6 +137,21 @@ const afiliadosSlice = createSlice({
         if (state.selected?.id === action.payload) state.selected = null;
       })
       .addCase(deleteAfiliado.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(toggleAfiliadoStatus.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(toggleAfiliadoStatus.fulfilled, (state, action) => {
+        state.loading = false;
+        const index = state.lista.findIndex((a) => a.id === action.payload.id);
+        if (index >= 0) state.lista[index] = action.payload;
+        if (state.selected?.id === action.payload.id)
+          state.selected = action.payload;
+      })
+      .addCase(toggleAfiliadoStatus.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

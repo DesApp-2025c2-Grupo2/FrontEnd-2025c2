@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, Chip, Card, Typography, Box, Accordion, AccordionSummary, AccordionDetails, IconButton, Tooltip } from '@mui/material';
+import { Button, Chip, Card, Typography, Box, Accordion, AccordionSummary, AccordionDetails, IconButton, Tooltip, CircularProgress } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import ScheduleIcon from '@mui/icons-material/Schedule';
 import PersonIcon from '@mui/icons-material/Person';
@@ -7,12 +7,17 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useSelector } from 'react-redux';
 import { selectPrestadores } from '../store/prestadoresSlice';
+import { selectEspecialidades } from '../store/especialidadesSlice';
 
-export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo, onGestionarHorarios, onEliminarDireccion }) {
+export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo, onGestionarHorarios, onEliminarDireccion, emphasis = false, isRefreshing = false }) {
   const todosPrestadores = useSelector(selectPrestadores);
-  const centroNombre = prestador.integraCentroMedicoId
-    ? (todosPrestadores || []).find(p => p.id === prestador.integraCentroMedicoId)?.nombreCompleto
-    : null;
+  const centroNombre = (() => {
+    if (prestador.integraCentroMedicoId) {
+      const c = (todosPrestadores || []).find(p => p.id === prestador.integraCentroMedicoId);
+      if (c && c.nombreCompleto) return c.nombreCompleto;
+    }
+    return prestador.centroMedicoNombre || prestador.centroMedico || null;
+  })();
 
   const getTipoColor = (tipo) => ({
     'Centro Médico': '#546e7a',
@@ -28,15 +33,39 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
   };
 
   const diasSemanaOrden = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  const canonDia = (d) => {
+    const t = String(d || '').trim().toLowerCase();
+    if (!t) return '';
+    if (t === 'miercoles') return 'Miércoles';
+    if (t === 'sabado') return 'Sábado';
+    const map = { lunes: 'Lunes', martes: 'Martes', miércoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes', sábado: 'Sábado', domingo: 'Domingo' };
+    return map[t] || (t.charAt(0).toUpperCase() + t.slice(1));
+  };
+  const catalogoEspecialidades = useSelector(selectEspecialidades);
+  const especialidadIdToNombre = React.useMemo(() => {
+    const map = new Map();
+    // Preferir catálogo global si existe
+    (catalogoEspecialidades || []).forEach((e) => {
+      if (e && typeof e.id === 'number') map.set(e.id, e.nombre);
+    });
+    // Completar con las del prestador por si hay extras
+    (prestador.especialidades || []).forEach((e) => {
+      if (e && typeof e.id === 'number' && !map.has(e.id)) map.set(e.id, e.nombre);
+    });
+    return map;
+  }, [catalogoEspecialidades, prestador.especialidades]);
 
   return (
     <Card
       sx={{
         p: 2,
-      mb: 2, 
+        mb: 2, 
         border: prestador.activo ? '1px solid #e0e0e0' : '1px solid #d1d5db',
-        backgroundColor: prestador.activo ? 'white' : '#f3f4f6',
+        backgroundColor: prestador.activo ? (emphasis ? '#fffef7' : 'white') : '#f3f4f6',
         opacity: prestador.activo ? 1 : 0.7,
+        boxShadow: emphasis ? 6 : 'none',
+        borderColor: emphasis ? '#ffb300' : (prestador.activo ? '#e0e0e0' : '#d1d5db'),
+        transition: 'background-color 200ms ease, box-shadow 200ms ease, border-color 200ms ease',
       }}
     >
       <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
@@ -136,6 +165,12 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
             <Typography variant="subtitle2">
               Lugares de Atención ({prestador.lugaresAtencion.length})
             </Typography>
+            {isRefreshing && (
+              <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
+                <CircularProgress size={14} sx={{ ml: 1 }} />
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>actualizando…</Typography>
+              </Box>
+            )}
           </AccordionSummary>
           <AccordionDetails>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -197,18 +232,22 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                       {(() => {
                         const dayToRanges = {};
                         (lugar.horarios || []).forEach((h) => {
-                          const dias = Array.isArray(h.dias) && h.dias.length > 0 ? h.dias : [];
+                          const dias = Array.isArray(h.dias) && h.dias.length > 0 ? h.dias.map(canonDia).filter(Boolean) : [];
                           const inicio = h.horaInicio || h.desde || '';
                           const fin = h.horaFin || h.hasta || '';
+                          const espIds = Array.isArray(h.especialidades) && h.especialidades.length > 0
+                            ? h.especialidades
+                            : ((typeof h.especialidadId === 'number' && h.especialidadId > 0) ? [h.especialidadId] : []);
                           dias.forEach((dia) => {
                             if (!dayToRanges[dia]) dayToRanges[dia] = [];
-                            dayToRanges[dia].push({ rango: `${inicio} - ${fin}`, dur: h.duracionMinutos });
+                            dayToRanges[dia].push({ rango: `${inicio} - ${fin}`, dur: h.duracionMinutos, espIds });
                           });
                         });
                         return diasSemanaOrden
                           .filter((dia) => (dayToRanges[dia] || []).length > 0)
                           .map((dia, idxCard) => {
                             const rangos = dayToRanges[dia];
+                            const uniqueEspIds = Array.from(new Set(rangos.flatMap(r => r.espIds || []).filter((id) => typeof id === 'number' && id > 0)));
                             return (
                               <Card key={idxCard} variant="outlined" sx={{ p: 1.25, borderColor: '#e0e0e0', backgroundColor: '#f8f9fa', minWidth: 180 }}>
                                 <Chip
@@ -216,13 +255,20 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                                   size="small"
                                   sx={{ backgroundColor: '#2196f3', color: 'white', fontWeight: 'bold', mb: 0.75 }}
                                 />
+                                {uniqueEspIds.length > 0 && (
+                                  <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', mb: 0.5 }}>
+                                    {uniqueEspIds.map((id) => (
+                                      especialidadIdToNombre.get(id)
+                                        ? <Chip key={id} label={especialidadIdToNombre.get(id)} size="small" sx={{ backgroundColor: '#e3f2fd', color: '#1976d2', fontWeight: 600 }} />
+                                        : null
+                                    ))}
+                                  </Box>
+                                )}
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
                                   {rangos.map((item, i) => (
                                     <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                       <ScheduleIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2' }}>
-                                        {item.rango}
-                                      </Typography>
+                                      <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2' }}>{item.rango}</Typography>
                                       {typeof item.dur === 'number' && item.dur > 0 && (
                                         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
                                           • {item.dur} min

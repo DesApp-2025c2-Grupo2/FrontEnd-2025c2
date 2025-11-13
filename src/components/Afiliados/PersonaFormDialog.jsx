@@ -21,7 +21,7 @@ import {
   Email as EmailIcon,
   Home as HomeIcon,
 } from "@mui/icons-material";
-import ContactInfoEditor from "./ContactInfoEditor";
+import ContactInfoEditor from "../ContactInfoEditor";
 import SituacionesSelector from "./SituacionesSelector";
 import { selectSituaciones } from "../../store/situacionesTerapeuticasSlice";
 import { useSelector } from "react-redux";
@@ -270,6 +270,32 @@ export default function PersonaFormDialog({
 
   const handleTipoDocumentoChange = (e) =>
     handleFormChange("tipoDocumento", e.target.value);
+
+  const convertirASituacionesDiccionario = (situacionesArray) => {
+    const dict = {};
+    situacionesArray.forEach((s) => {
+      dict[s.id] = s.fechaFin || null;
+    });
+    return dict;
+  };
+
+  const handleAddSituacion = (nueva) => {
+    const nuevas = [...(editSituaciones || []), nueva];
+    onEditSituacionesChange(nuevas);
+    onFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
+  };
+  
+  const handleRemoveSituacion = (idx) => {
+    const nuevas = (editSituaciones || []).filter((_, i) => i !== idx);
+    onEditSituacionesChange(nuevas);
+    onFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
+  };
+  const handleUpdateSituacion = (idx, nuevaSituacion) => {
+    const nuevas = [...(editSituaciones || [])];
+    nuevas[idx] = nuevaSituacion;
+    onEditSituacionesChange(nuevas);
+    onFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
+  };
 
   // Validación mínima local
   const validateBeforeSave = () => {
@@ -662,17 +688,9 @@ export default function PersonaFormDialog({
                 <SituacionesSelector
                   items={editSituaciones || []}
                   opciones={situacionesCatalogo}
-                  onAdd={(nombre) =>
-                    onEditSituacionesChange([
-                      ...(editSituaciones || []),
-                      nombre,
-                    ])
-                  }
-                  onRemove={(idx) =>
-                    onEditSituacionesChange(
-                      (editSituaciones || []).filter((_, i) => i !== idx)
-                    )
-                  }
+                  onAdd={handleAddSituacion}
+                  onRemove={handleRemoveSituacion}
+                  onUpdate={handleUpdateSituacion}
                 />
               </Grid>
             </Grid>

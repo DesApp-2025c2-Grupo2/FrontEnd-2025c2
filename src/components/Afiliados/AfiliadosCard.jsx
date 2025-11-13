@@ -180,14 +180,29 @@ export default function AfiliadosCard({
                 fontWeight: "bold",
               }}
             />
-            {situacionesList.map((situacion, index) => (
-              <Chip
-                key={index}
-                label={situacion}
-                size="small"
-                color="warning"
-              />
-            ))}
+            {titularesafe.situacionesTerapeuticas?.map((situacion, index) => {
+              const hoy = new Date().setHours(0,0,0,0);
+              const baja = situacion.fechaBaja ? new Date(situacion.fechaBaja).setHours(0,0,0,0) : null;
+              const activa = !baja || baja > hoy;
+
+              return (
+                <Chip
+                  key={index}
+                  label={situacion.nombre}
+                  size="small"
+                  color={activa ? "warning" : "default"}
+                  variant={activa ? "filled" : "outlined"}
+                  title={
+                    (situacion.fechaAlta
+                      ? `Alta: ${new Date(situacion.fechaAlta).toLocaleDateString("es-AR")}`
+                      : "") +
+                    (situacion.fechaBaja
+                      ? ` | Baja: ${new Date(situacion.fechaBaja).toLocaleDateString("es-AR")}`
+                      : "")
+                  }
+                />
+              );
+            })}
           </Box>
         </Box>
 

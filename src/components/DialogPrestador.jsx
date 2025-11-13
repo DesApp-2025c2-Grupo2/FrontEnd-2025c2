@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useSelector } from "react-redux";
 import {
   Dialog,
@@ -14,7 +14,6 @@ import {
   Box,
   Typography,
   IconButton,
-  Chip,
   Stack,
   Divider,
   Grid,
@@ -37,6 +36,7 @@ import {
 } from "@mui/icons-material";
 import { selectEspecialidades } from "../store/especialidadesSlice";
 import { selectPrestadores } from "../store/prestadoresSlice";
+import ContactInfoEditor from "./ContactInfoEditor";
 
 const diasSemana = [
   "Lunes",
@@ -47,6 +47,14 @@ const diasSemana = [
   "Sábado",
   "Domingo",
 ];
+
+// Dirección válida: al menos una letra (permite números), no vacío
+const isValidDireccion = (s) => {
+  const t = String(s || "").trim();
+  if (t.length < 4) return false;
+  if (!/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(t)) return false; // evita solo números
+  return true;
+};
 
 // Función para verificar si dos rangos horarios se solapan
 const horariosSeSuperponen = (horario1, horario2) => {
@@ -163,6 +171,7 @@ export default function DialogPrestador({
     emails: [],
     lugaresAtencion: [],
     integraCentroMedicoId: null,
+    centroMedicoNombre: "",
     vinculaCentro: false,
   });
 
@@ -170,12 +179,34 @@ export default function DialogPrestador({
   const [conflictosEntreLugares, setConflictosEntreLugares] = useState([]);
   const [intentoGuardar, setIntentoGuardar] = useState(false);
 
+  // Estados para ContactInfoEditor
+  const [newTelefono, setNewTelefono] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+
   const especialidadesDisponibles = useSelector(selectEspecialidades);
+  const especialidadesActivas = (especialidadesDisponibles || []).filter(e => e && e.activa !== false);
   const todosPrestadores = useSelector(selectPrestadores);
 
   const centrosMedicos = (todosPrestadores || []).filter(
-    (p) => p.tipo === "Centro Médico"
+    (p) => p?.rol === 2 || p?.tipo === "Centro Médico"
   );
+
+  // Si el prestador viene con nombre de centro pero sin ID, intentar resolver solo una vez
+  const autoCentroAplicado = useRef(false);
+  useEffect(() => {
+    if (!abierto) return;
+    if (autoCentroAplicado.current) return;
+    if (!valorInicial) return;
+    if (valorInicial?.tipo !== 'Profesional Independiente') return;
+    if (valorInicial?.integraCentroMedicoId) return;
+    const nombre = valorInicial?.centroMedicoNombre || valorInicial?.centroMedico;
+    if (!nombre) return;
+    const match = centrosMedicos.find(c => c?.nombreCompleto === nombre);
+    if (match && match.id) {
+      setForm((prev) => ({ ...prev, integraCentroMedicoId: match.id, centroMedicoNombre: match.nombreCompleto, vinculaCentro: true }));
+      autoCentroAplicado.current = true;
+    }
+  }, [abierto, valorInicial, centrosMedicos]);
 
   // Inicializar formulario
   useEffect(() => {
@@ -190,14 +221,18 @@ export default function DialogPrestador({
         lugaresAtencion: valorInicial?.lugaresAtencion ?? [],
         id: valorInicial?.id,
         integraCentroMedicoId: valorInicial?.integraCentroMedicoId ?? null,
+        centroMedicoNombre: valorInicial?.centroMedicoNombre || valorInicial?.centroMedico || "",
+        // Consideramos vinculado si viene ID o nombre desde el backend
         vinculaCentro: !!(
           valorInicial?.tipo === "Profesional Independiente" &&
-          valorInicial?.integraCentroMedicoId
+          (valorInicial?.integraCentroMedicoId || valorInicial?.centroMedico || valorInicial?.centroMedicoNombre)
         ),
       });
       setConflictosHorarios({});
       setConflictosEntreLugares([]);
       setIntentoGuardar(false);
+      setNewTelefono("");
+      setNewEmail("");
     }
   }, [abierto, valorInicial]);
 
@@ -249,12 +284,14 @@ export default function DialogPrestador({
     }));
   };
 
-  // ===== TELÉFONOS =====
+  // ===== TELÉFONOS con ContactInfoEditor =====
   const agregarTelefono = () => {
+    if (!newTelefono.trim()) return;
     setForm((prev) => ({
       ...prev,
-      telefonos: [...prev.telefonos, { numero: "" }],
+      telefonos: [...prev.telefonos, { numero: newTelefono.trim() }],
     }));
+    setNewTelefono("");
   };
 
   const eliminarTelefono = (index) => {
@@ -264,36 +301,20 @@ export default function DialogPrestador({
     }));
   };
 
-  const actualizarTelefono = (index, campo, valor) => {
-    setForm((prev) => ({
-      ...prev,
-      telefonos: prev.telefonos.map((tel, i) =>
-        i === index ? { ...tel, [campo]: valor } : tel
-      ),
-    }));
-  };
-
-  // ===== EMAILS =====
+  // ===== EMAILS con ContactInfoEditor =====
   const agregarEmail = () => {
+    if (!newEmail.trim()) return;
     setForm((prev) => ({
       ...prev,
-      emails: [...prev.emails, { email: "" }],
+      emails: [...prev.emails, { email: newEmail.trim() }],
     }));
+    setNewEmail("");
   };
 
   const eliminarEmail = (index) => {
     setForm((prev) => ({
       ...prev,
       emails: prev.emails.filter((_, i) => i !== index),
-    }));
-  };
-
-  const actualizarEmail = (index, campo, valor) => {
-    setForm((prev) => ({
-      ...prev,
-      emails: prev.emails.map((email, i) =>
-        i === index ? { ...email, [campo]: valor } : email
-      ),
     }));
   };
 
@@ -399,6 +420,11 @@ export default function DialogPrestador({
 
     if (form.lugaresAtencion.length === 0) {
       errores.lugaresAtencion = "Debe agregar al menos un lugar de atención";
+    } else {
+      const invalidas = (form.lugaresAtencion || []).map(l => isValidDireccion(l.direccion));
+      if (invalidas.some(v => v === false)) {
+        errores.direccionesInvalidas = true;
+      }
     }
 
     // Validar conflictos de horarios dentro de cada lugar
@@ -416,7 +442,7 @@ export default function DialogPrestador({
     if (
       form.tipo === "Profesional Independiente" &&
       form.vinculaCentro &&
-      !form.integraCentroMedicoId
+      !(form.integraCentroMedicoId || (String(form.centroMedicoNombre || "").trim() !== ""))
     ) {
       errores.integraCentroMedico = "Debe seleccionar un centro médico";
     }
@@ -446,7 +472,7 @@ export default function DialogPrestador({
             "\n\nDebe resolver estos conflictos antes de continuar."
         );
       } else {
-        alert("Por favor complete todos los campos requeridos");
+        alert("Por favor complete todos los campos requeridos (revise direcciones válidas)");
       }
       return;
     }
@@ -477,6 +503,9 @@ export default function DialogPrestador({
             horaInicio: h.horaInicio,
             horaFin: h.horaFin,
             duracionMinutos: Number(h.duracionMinutos || 30),
+            especialidadId: (h.especialidadId !== undefined && h.especialidadId !== null)
+              ? Number(h.especialidadId)
+              : null,
           }));
         return {
           id: l.id,
@@ -484,14 +513,19 @@ export default function DialogPrestador({
           horarios: horariosLimpios,
         };
       })
-      .filter(
-        (l) => l.direccion !== "" || (l.horarios && l.horarios.length > 0)
-      );
+      .filter((l) => isValidDireccion(l.direccion));
 
     const integraCentroMedicoNormalizado =
       form.tipo === "Profesional Independiente" && form.vinculaCentro
         ? form.integraCentroMedicoId || null
         : null;
+    const centroNombre = (() => {
+      if (integraCentroMedicoNormalizado) {
+        const c = centrosMedicos.find(cm => cm.id === integraCentroMedicoNormalizado);
+        return c ? c.nombreCompleto : (form.centroMedicoNombre || '');
+      }
+      return form.vinculaCentro ? (form.centroMedicoNombre || '') : '';
+    })();
 
     const payload = {
       id: form.id,
@@ -499,6 +533,7 @@ export default function DialogPrestador({
       nombreCompleto: (form.nombreCompleto || "").trim(),
       tipo: form.tipo,
       integraCentroMedicoId: integraCentroMedicoNormalizado,
+      centroMedico: centroNombre || undefined,
       especialidades: especialidadesLimpias,
       telefonos: telefonosLimpios,
       emails: emailsLimpios,
@@ -525,13 +560,6 @@ export default function DialogPrestador({
 
         <DialogContent
           dividers
-          sx={{
-            "& .MuiFormControlLabel-label": {
-              fontWeight: 700,
-              color: "#111827",
-            },
-            "& .MuiInputBase-input": { color: "#111827", fontWeight: 600 },
-          }}
         >
           {/* Alerta general de conflictos dentro de lugares */}
           {Object.keys(conflictosHorarios).length > 0 && (
@@ -574,9 +602,7 @@ export default function DialogPrestador({
           <Box sx={{ display: "flex", flexDirection: "column", gap: 3, pt: 1 }}>
             {/* DATOS BÁSICOS */}
             <Box>
-              <Typography variant="h6">
-                Datos Básicos
-              </Typography>
+              <Typography variant="h6">Datos Básicos</Typography>
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   <TextField
@@ -632,9 +658,7 @@ export default function DialogPrestador({
 
                 {form.tipo === "Profesional Independiente" && (
                   <Grid item xs={12}>
-                    <Box
-
-                    >
+                    <Box>
                       <Stack
                         direction={{ xs: "column", sm: "row" }}
                         spacing={2}
@@ -645,43 +669,54 @@ export default function DialogPrestador({
                             <Switch
                               checked={form.vinculaCentro}
                               color="secondary"
-                              onChange={(e) =>
+                              onChange={(e) => {
+                                const checked = e.target.checked;
                                 setForm((prev) => ({
                                   ...prev,
-                                  vinculaCentro: e.target.checked,
-                                }))
-                              }
+                                  vinculaCentro: checked,
+                                  integraCentroMedicoId: checked ? prev.integraCentroMedicoId : null,
+                                  centroMedicoNombre: checked ? prev.centroMedicoNombre : "",
+                                }));
+                              }}
                             />
                           }
                           label={<Typography>Integra centro médico</Typography>}
                         />
 
                         {form.vinculaCentro && (
-                          <FormControl size="small" sx={{ minWidth: 260 }}>
-                            <InputLabel>Centro Médico</InputLabel>
-                            <Select
-                              value={form.integraCentroMedicoId || ""}
-                              label="Centro Médico"
-                              onChange={(e) =>
-                                setForm((prev) => ({
-                                  ...prev,
-                                  integraCentroMedicoId: e.target.value,
-                                }))
-                              }
-                            >
-                              {centrosMedicos.length === 0 ? (
-                                <MenuItem value="" disabled>
-                                  No hay centros disponibles
-                                </MenuItem>
-                              ) : (
-                                centrosMedicos.map((c) => (
-                                  <MenuItem key={c.id} value={c.id}>
-                                    {c.nombreCompleto}
-                                  </MenuItem>
-                                ))
-                              )}
-                            </Select>
-                          </FormControl>
+                          <Box sx={{ minWidth: 260 }}>
+                            {(() => {
+                              const valorCentro = form.integraCentroMedicoId
+                                ? centrosMedicos.find(c => c.id === form.integraCentroMedicoId) || null
+                                : (form.centroMedicoNombre ? { id: null, nombreCompleto: form.centroMedicoNombre } : null);
+                              return (
+                                <Autocomplete
+                                  size="small"
+                                  options={centrosMedicos}
+                                  getOptionLabel={(option) => option?.nombreCompleto || ""}
+                                  isOptionEqualToValue={(o, v) => o?.id === v?.id}
+                                  value={valorCentro}
+                                  disableClearable
+                                  onChange={(e, newValue) => {
+                                    setForm((prev) => ({
+                                      ...prev,
+                                      integraCentroMedicoId: newValue?.id || null,
+                                      centroMedicoNombre: newValue?.nombreCompleto || "",
+                                    }));
+                                  }}
+                                  renderInput={(params) => (
+                                    <TextField
+                                      {...params}
+                                      label="Centro Médico"
+                                      placeholder="Seleccionar centro"
+                                      inputProps={{ ...params.inputProps, readOnly: true }}
+                                    />
+                                  )}
+                                  noOptionsText="No hay centros disponibles"
+                                />
+                              );
+                            })()}
+                          </Box>
                         )}
                       </Stack>
                       {intentoGuardar &&
@@ -710,10 +745,8 @@ export default function DialogPrestador({
                 }}
               >
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <MedicalServicesIcon color="primary" />
-                  <Typography variant="h6">
-                    Especialidades
-                  </Typography>
+                  <MedicalServicesIcon color="secondary" />
+                  <Typography variant="h6">Especialidades</Typography>
                 </Stack>
                 <Button
                   variant="outlined"
@@ -739,7 +772,7 @@ export default function DialogPrestador({
                   <Box sx={{ flex: 1 }}>
                     <Autocomplete
                       size="small"
-                      options={especialidadesDisponibles.filter(
+                      options={especialidadesActivas.filter(
                         (esp) =>
                           !form.especialidades.some(
                             (e, i) => i !== index && e?.id === esp.id
@@ -798,115 +831,38 @@ export default function DialogPrestador({
 
             <Divider />
 
-            {/* TELÉFONOS */}
+            {/* TELÉFONOS con ContactInfoEditor */}
             <Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <PhoneIcon color="primary" />
-                  <Typography variant="h6">
-                    Teléfonos
-                  </Typography>
-                </Stack>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  size="medium"
-                  startIcon={<AddIcon />}
-                  onClick={agregarTelefono}
-                >
-                  Agregar Teléfono
-                </Button>
-              </Box>
-
-              {form.telefonos.map((tel, index) => (
-                <Grid container spacing={2} key={index} sx={{ mb: 1 }}>
-                  <Grid item xs={12} sm={10}>
-                    <TextField
-                      label="Número"
-                      value={tel.numero}
-                      onChange={(e) =>
-                        actualizarTelefono(index, "numero", e.target.value)
-                      }
-                      fullWidth
-                      size="small"
-                      placeholder="011-4567-8901"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={2}>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => eliminarTelefono(index)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Grid>
-                </Grid>
-              ))}
+              <ContactInfoEditor
+                icon={<PhoneIcon color="secondary" />}
+                title="Teléfonos"
+                items={form.telefonos}
+                keyProp="numero"
+                newValue={newTelefono}
+                placeholder="Número de teléfono (ej: 011-4567-8901)"
+                inputType="tel"
+                onNewValueChange={setNewTelefono}
+                onAdd={agregarTelefono}
+                onRemove={eliminarTelefono}
+              />
             </Box>
 
             <Divider />
 
-            {/* EMAILS */}
+            {/* EMAILS con ContactInfoEditor */}
             <Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mb: 2,
-                }}
-              >
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <EmailIcon color="primary" />
-                  <Typography variant="h6">
-                    Emails
-                  </Typography>
-                </Stack>
-                <Button
-                  variant="outlined"
-                  color="primary"
-                  size="medium"
-                  startIcon={<AddIcon />}
-                  onClick={agregarEmail}
-                >
-                  Agregar Email
-                </Button>
-              </Box>
-
-              {form.emails.map((email, index) => (
-                <Grid container spacing={2} key={index} sx={{ mb: 1 }}>
-                  <Grid item xs={12} sm={10}>
-                    <TextField
-                      label="Email"
-                      value={email.email}
-                      onChange={(e) =>
-                        actualizarEmail(index, "email", e.target.value)
-                      }
-                      fullWidth
-                      size="small"
-                      placeholder="email@ejemplo.com"
-                      type="email"
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={2}>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => eliminarEmail(index)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Grid>
-                </Grid>
-              ))}
+              <ContactInfoEditor
+                icon={<EmailIcon color="secondary" />}
+                title="Emails"
+                items={form.emails}
+                keyProp="email"
+                newValue={newEmail}
+                placeholder="Correo electrónico"
+                inputType="email"
+                onNewValueChange={setNewEmail}
+                onAdd={agregarEmail}
+                onRemove={eliminarEmail}
+              />
             </Box>
 
             <Divider />
@@ -922,10 +878,8 @@ export default function DialogPrestador({
                 }}
               >
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <LocationOnIcon color="primary" />
-                  <Typography variant="h6">
-                    Lugares de Atención
-                  </Typography>
+                  <LocationOnIcon color="secondary" />
+                  <Typography variant="h6">Lugares de Atención</Typography>
                 </Stack>
                 <Button
                   variant="outlined"
@@ -984,6 +938,8 @@ export default function DialogPrestador({
                           }
                           fullWidth
                           placeholder="Avenida Vergara 1908, CABA"
+                          error={intentoGuardar && !isValidDireccion(lugar.direccion)}
+                          helperText={intentoGuardar && !isValidDireccion(lugar.direccion) ? "Ingrese una dirección válida (calle y número/barrio)" : ""}
                         />
                       </Grid>
                     </Grid>
@@ -1006,18 +962,10 @@ export default function DialogPrestador({
         </DialogContent>
 
         <DialogActions>
-          <Button
-            color="secondary"
-            variant="outlined"
-            onClick={onCerrar}
-          >
+          <Button color="secondary" variant="outlined" onClick={onCerrar}>
             CANCELAR
           </Button>
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={guardar}
-          >
+          <Button variant="contained" color="secondary" onClick={guardar}>
             {form.id ? "GUARDAR CAMBIOS" : "CREAR PRESTADOR"}
           </Button>
         </DialogActions>

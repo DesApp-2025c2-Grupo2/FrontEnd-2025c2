@@ -34,7 +34,9 @@ import {
   cargarPrestadores,
   crearPrestador,
   editarPrestador,
-  toggleActivoPrestador
+  toggleActivoPrestador,
+  actualizarHorariosPrestador,
+  actualizarDireccionesPrestador
 } from '../store/prestadoresSlice';
 import { cargarEspecialidades } from '../store/especialidadesSlice';
 
@@ -54,6 +56,13 @@ function Prestadores() {
   const [confirmEliminarDireccion, setConfirmEliminarDireccion] = useState({ open: false, prestador: null, lugarIndex: null });
   const [prestadorSeleccionado, setPrestadorSeleccionado] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [highlightId, setHighlightId] = useState(null);
+  const itemRefs = React.useRef(new Map());
+  const setItemRef = (id) => (el) => {
+    if (!el) return;
+    itemRefs.current.set(id, el);
+  };
+  const [refreshingHorarios, setRefreshingHorarios] = useState({}); // idPrestador -> boolean
 
   // Selectores de Redux
   const prestadoresFiltrados = useSelector(selectPrestadoresFiltrados(searchTerm));
@@ -73,30 +82,38 @@ function Prestadores() {
       const actuales = { ...prestadoresConAgenda };
       const promises = [];
       prestadoresFiltrados.forEach((p) => {
-        if (!actuales[p.id]) {
-          promises.push(
-            agendasService.getByProfesional(p.id).then((agendas) => {
-              if (cancelado) return;
-              const agendaById = new Map((agendas || []).map((a) => [a.id, a]));
-              const agendaByDir = new Map((agendas || []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
-              const lugaresBase = Array.isArray(p.lugaresAtencion) ? JSON.parse(JSON.stringify(p.lugaresAtencion)) : [];
-              const lugaresMergeados = lugaresBase.map((l) => {
-                const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
-                if (a) {
-                  return { ...l, horarios: a.horarios || [] };
-                }
-                return l;
-              });
-              // No agregar lugares nuevos desde agenda: solo completar horarios en los existentes
-              actuales[p.id] = { ...p, lugaresAtencion: lugaresMergeados };
-            }).catch(() => {})
-          );
+        // Mantener horarios existentes en cache pero refrescar datos base (nombre, tipo, etc.)
+        const existente = actuales[p.id];
+        if (existente) {
+          const lugares = Array.isArray(existente.lugaresAtencion) ? existente.lugaresAtencion : p.lugaresAtencion;
+          actuales[p.id] = { ...p, lugaresAtencion: lugares };
+          return;
         }
+        // Si no hay cache, cargar agendas y mergear
+        promises.push(
+          agendasService.getByProfesional(p.id).then((agendas) => {
+            if (cancelado) return;
+            const agendaById = new Map((agendas || []).map((a) => [a.id, a]));
+            const agendaByDir = new Map((agendas || []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
+            const lugaresBase = Array.isArray(p.lugaresAtencion) ? JSON.parse(JSON.stringify(p.lugaresAtencion)) : [];
+            const lugaresMergeados = lugaresBase.map((l) => {
+              const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
+              if (a) {
+                // Tomar id y direccion desde agenda cuando el original no los trae o están vacíos
+                const nuevoId = (l.id != null) ? l.id : (a.id ?? null);
+                const nuevaDir = l.direccion || a.direccion || '';
+                return { ...l, id: nuevoId, direccion: nuevaDir, horarios: a.horarios || [] };
+              }
+              return l;
+            });
+            actuales[p.id] = { ...p, lugaresAtencion: lugaresMergeados };
+          }).catch(() => {})
+        );
       });
       if (promises.length > 0) {
         await Promise.all(promises);
-        if (!cancelado) setPrestadoresConAgenda(actuales);
       }
+      if (!cancelado) setPrestadoresConAgenda(actuales);
     }
     if (prestadoresFiltrados && prestadoresFiltrados.length > 0) {
       cargarAgendas();
@@ -155,7 +172,7 @@ function Prestadores() {
 
   const handleToggleActivo = async (prestador) => {
     try {
-      await dispatch(toggleActivoPrestador(prestador.id)).unwrap();
+      await dispatch(toggleActivoPrestador({ id: prestador.id, activo: !prestador.activo })).unwrap();
       setSnackbar({
         open: true,
         message: `Prestador ${prestador.activo ? 'dado de baja' : 'rehabilitado'} exitosamente`,
@@ -198,9 +215,23 @@ function Prestadores() {
 
   const handleGuardarEdicion = async (prestadorEditado) => {
     try {
-      await dispatch(editarPrestador(prestadorEditado)).unwrap();
-      // Re-cargar lista desde backend tras editar
-      dispatch(cargarPrestadores());
+      // Incluir direcciones en el PUT de edición
+      const actualizado = await dispatch(actualizarDireccionesPrestador(prestadorEditado)).unwrap();
+      // Refrescar cache local inmediatamente
+      setPrestadoresConAgenda((prev) => {
+        if (!actualizado || !actualizado.id) return prev;
+        // Usar las direcciones actualizadas; si querés, luego se completarán horarios vía efecto de agendas
+        return { ...prev, [actualizado.id]: { ...actualizado, lugaresAtencion: actualizado.lugaresAtencion || [] } };
+      });
+      // Resaltar y hacer scroll al editado
+      if (actualizado && actualizado.id) {
+        setHighlightId(actualizado.id);
+        const node = itemRefs.current.get(actualizado.id);
+        if (node && node.scrollIntoView) {
+          node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        setTimeout(() => setHighlightId(null), 2500);
+      }
       setDialogoEditar(false);
       setPrestadorSeleccionado(null);
       setSnackbar({
@@ -286,22 +317,24 @@ function Prestadores() {
           prestadoresFiltrados.map((prestador) => {
             const pMerge = prestadoresConAgenda[prestador.id] || prestador;
             return (
-            <TarjetaPrestadorSimple
-              key={pMerge.id}
-              prestador={pMerge}
-              onVer={handleVer}
-              onEditar={handleEditar}
-              onToggleActivo={handleToggleActivo}
-              onGestionarHorarios={(p, lugarIndex) => {
-                setPrestadorSeleccionado(p);
-                setHorariosContext({ lugarIndex, horarioIndex: null });
-                setDialogoHorarios(true);
-              }}
-              onEliminarDireccion={async (p, lugarIndex) => {
-                setConfirmEliminarDireccion({ open: true, prestador: p, lugarIndex });
-              }}
-              // Mostrar especialidad elegida por dirección
-            />
+            <div key={pMerge.id} ref={setItemRef(pMerge.id)}>
+              <TarjetaPrestadorSimple
+                prestador={pMerge}
+                emphasis={highlightId === pMerge.id}
+                isRefreshing={!!refreshingHorarios[pMerge.id]}
+                onVer={handleVer}
+                onEditar={handleEditar}
+                onToggleActivo={handleToggleActivo}
+                onGestionarHorarios={(p, lugarIndex) => {
+                  setPrestadorSeleccionado(p);
+                  setHorariosContext({ lugarIndex, horarioIndex: null });
+                  setDialogoHorarios(true);
+                }}
+                onEliminarDireccion={async (p, lugarIndex) => {
+                  setConfirmEliminarDireccion({ open: true, prestador: p, lugarIndex });
+                }}
+              />
+            </div>
             );
           })
         ) : (
@@ -376,7 +409,36 @@ function Prestadores() {
           }}
           onGuardar={async (prestadorActualizado) => {
             try {
-              await dispatch(editarPrestador(prestadorActualizado)).unwrap();
+              const id = prestadorSeleccionado?.id || prestadorActualizado?.id;
+              const lugaresAtencion = prestadorActualizado?.lugaresAtencion || [];
+              if (!id) throw new Error('ID de prestador no disponible');
+              await dispatch(actualizarHorariosPrestador({ id, lugaresAtencion })).unwrap();
+              // Refrescar cache local consultando agendas reales (para reflejar ids/direcciones definitivos)
+              try {
+        setRefreshingHorarios((prev) => ({ ...prev, [id]: true }));
+                const ags = await agendasService.getByProfesional(id);
+                const agendaById = new Map((Array.isArray(ags) ? ags : []).map((a) => [a.id, a]));
+                const agendaByDir = new Map((Array.isArray(ags) ? ags : []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
+                const lugaresBase = JSON.parse(JSON.stringify(lugaresAtencion));
+                const lugaresMergeados = lugaresBase.map((l) => {
+                  const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
+                  if (a) return { ...l, horarios: a.horarios || [] };
+                  return l;
+                });
+                setPrestadoresConAgenda((prev) => {
+                  const base = prev[id] || prestadorSeleccionado || prestadorActualizado || {};
+                  return { ...prev, [id]: { ...base, id, lugaresAtencion: lugaresMergeados } };
+                });
+              } catch (_) {
+                // fallback a actualizar con lo que tenemos
+                setPrestadoresConAgenda((prev) => {
+                  const base = prev[id] || prestadorSeleccionado || prestadorActualizado || {};
+                  const actualizado = { ...base, id, lugaresAtencion: JSON.parse(JSON.stringify(lugaresAtencion)) };
+                  return { ...prev, [id]: actualizado };
+                });
+      } finally {
+        setRefreshingHorarios((prev) => ({ ...prev, [id]: false }));
+              }
               setDialogoHorarios(false);
               setPrestadorSeleccionado(null);
               setSnackbar({ open: true, message: 'Horarios actualizados', severity: 'success' });
@@ -404,7 +466,9 @@ function Prestadores() {
             try {
               const copia = JSON.parse(JSON.stringify(prestador));
               copia.lugaresAtencion = (copia.lugaresAtencion || []).filter((_, i) => i !== lugarIndex);
-              await dispatch(editarPrestador(copia)).unwrap();
+              await dispatch(actualizarDireccionesPrestador(copia)).unwrap();
+              // Refrescar cache local inmediatamente con direcciones actualizadas
+              setPrestadoresConAgenda((prev) => ({ ...prev, [copia.id]: { ...copia } }));
               setSnackbar({ open: true, message: 'Dirección eliminada', severity: 'success' });
             } catch (error) {
               setSnackbar({ open: true, message: (typeof error === 'string' ? error : (error?.message || 'No se pudo eliminar la dirección')), severity: 'error' });

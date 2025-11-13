@@ -1,4 +1,6 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
+import { selectEspecialidades } from '../store/especialidadesSlice';
 import {
   Dialog,
   DialogTitle,
@@ -23,7 +25,6 @@ import {
   Schedule as ScheduleIcon,
   Business as BusinessIcon
 } from '@mui/icons-material';
-import { useSelector } from 'react-redux';
 import { selectPrestadores } from '../store/prestadoresSlice';
 
 export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
@@ -37,6 +38,18 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
   const getTipoColor = (tipo) => {
     return tipo === 'Centro Médico' ? '#9c27b0' : '#2196f3';
   };
+
+  const catalogoEspecialidades = useSelector(selectEspecialidades);
+  const especialidadIdToNombre = React.useMemo(() => {
+    const map = new Map();
+    (catalogoEspecialidades || []).forEach((e) => {
+      if (e && typeof e.id === 'number') map.set(e.id, e.nombre);
+    });
+    (prestador.especialidades || []).forEach((e) => {
+      if (e && typeof e.id === 'number' && !map.has(e.id)) map.set(e.id, e.nombre);
+    });
+    return map;
+  }, [catalogoEspecialidades, prestador.especialidades]);
 
   return (
     <Dialog open={abierto} onClose={onCerrar} fullWidth maxWidth="md">
@@ -242,10 +255,25 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
                               }}
                             >
                               <Typography variant="body2" sx={{ fontWeight: 600, color: '#1976d2' }}>
-                                {horario.dias.join(', ')}
+                                {(() => {
+                                  const canon = (d) => {
+                                    const t = String(d || '').trim().toLowerCase();
+                                    if (!t) return '';
+                                    if (t === 'miercoles') return 'Miércoles';
+                                    if (t === 'sabado') return 'Sábado';
+                                    const map = { lunes: 'Lunes', martes: 'Martes', miércoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes', sábado: 'Sábado', domingo: 'Domingo' };
+                                    return map[t] || (t.charAt(0).toUpperCase() + t.slice(1));
+                                  };
+                                  return (horario.dias || []).map(canon).filter(Boolean).join(', ');
+                                })()}
                               </Typography>
                               <Typography variant="body2" sx={{ color: '#1976d2' }}>
-                                ⏰ {horario.horaInicio} - {horario.horaFin}
+                                {(() => {
+                                  const nombre = (typeof horario.especialidadId === 'number' && horario.especialidadId > 0)
+                                    ? (especialidadIdToNombre.get(horario.especialidadId) || null)
+                                    : null;
+                                  return nombre ? `🩺 ${nombre} • ${horario.horaInicio} - ${horario.horaFin}` : `⏰ ${horario.horaInicio} - ${horario.horaFin}`;
+                                })()}
                                 {typeof horario.duracionMinutos === 'number' && horario.duracionMinutos > 0 ? ` • ${horario.duracionMinutos} min` : ''}
                               </Typography>
                             </Box>
