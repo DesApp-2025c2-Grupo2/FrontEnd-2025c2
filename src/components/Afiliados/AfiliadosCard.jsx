@@ -56,12 +56,6 @@ export default function AfiliadosCard({
     return p ? p.nombre : "Desconocido";
   };
 
-  const situacionesList = Array.isArray(titularesafe.situacionesTerapeuticas)
-    ? titularesafe.situacionesTerapeuticas.map((s) =>
-        typeof s === "string" ? s : s?.nombre ?? String(s)
-      )
-    : [];
-
   return (
     <Card
       sx={{
@@ -181,8 +175,10 @@ export default function AfiliadosCard({
               }}
             />
             {titularesafe.situacionesTerapeuticas?.map((situacion, index) => {
-              const hoy = new Date().setHours(0,0,0,0);
-              const baja = situacion.fechaBaja ? new Date(situacion.fechaBaja).setHours(0,0,0,0) : null;
+              const hoy = new Date().setHours(0, 0, 0, 0);
+              const baja = situacion.fechaBaja
+                ? new Date(situacion.fechaBaja).setHours(0, 0, 0, 0)
+                : null;
               const activa = !baja || baja > hoy;
 
               return (
@@ -194,10 +190,14 @@ export default function AfiliadosCard({
                   variant={activa ? "filled" : "outlined"}
                   title={
                     (situacion.fechaAlta
-                      ? `Alta: ${new Date(situacion.fechaAlta).toLocaleDateString("es-AR")}`
+                      ? `Alta: ${new Date(
+                          situacion.fechaAlta
+                        ).toLocaleDateString("es-AR")}`
                       : "") +
                     (situacion.fechaBaja
-                      ? ` | Baja: ${new Date(situacion.fechaBaja).toLocaleDateString("es-AR")}`
+                      ? ` | Baja: ${new Date(
+                          situacion.fechaBaja
+                        ).toLocaleDateString("es-AR")}`
                       : "")
                   }
                 />
@@ -234,7 +234,19 @@ export default function AfiliadosCard({
             Editar
           </Button>
 
-          {!estaActivo || tieneBajaProgramada || tieneAltaProgramada ? (
+          {/* Lógica corregida para mostrar los botones de alta/baja */}
+          {tieneBajaProgramada ? (
+            <Button
+              size="small"
+              startIcon={<ScheduleIcon />}
+              color="warning"
+              onClick={() => onSetBaja(afiliado)}
+              variant="outlined"
+              fullWidth
+            >
+              Gestionar Baja
+            </Button>
+          ) : tieneAltaProgramada ? (
             <Button
               size="small"
               startIcon={<ArrowUpwardIcon />}
@@ -243,7 +255,18 @@ export default function AfiliadosCard({
               variant="outlined"
               fullWidth
             >
-              {tieneAltaProgramada ? "Gestionar Alta" : "Programar Alta"}
+              Gestionar Alta
+            </Button>
+          ) : !estaActivo ? (
+            <Button
+              size="small"
+              startIcon={<ArrowUpwardIcon />}
+              color="success"
+              onClick={() => onSetAlta(afiliado)}
+              variant="outlined"
+              fullWidth
+            >
+              Programar Alta
             </Button>
           ) : (
             <Button

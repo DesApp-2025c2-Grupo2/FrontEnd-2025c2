@@ -42,11 +42,12 @@ export default function BajaDialog({
     let fechaFinal;
 
     if (esBajaInmediata) {
-      // Para baja inmediata, usar fecha y hora actual
-      fechaFinal = new Date().toISOString();
+      // Para baja inmediata, usar fecha y hora actual con calculo de zona horaria
+      const fechaAux = new Date().getTime() - 3 * 60 * 60 * 1000;
+      fechaFinal = new Date(fechaAux).toISOString();
     } else {
-      // Para baja programada, usar fin del día seleccionado
-      fechaFinal = fechaBaja + "T23:59:59";
+      // Para baja programada, usar horario 00:00
+      fechaFinal = fechaBaja + "T00:00:00";
     }
 
     if (!fechaFinal) return;
@@ -54,13 +55,10 @@ export default function BajaDialog({
     onClose();
   };
 
-  const handleCancelBaja = () => {
-    onCancelBaja(afiliado);
-    onClose();
-  };
-
   const hoy = startOfDay(new Date());
+
   const afiliadoTieneBaja = Boolean(afiliado?.baja);
+
   const bajaEsFutura =
     afiliadoTieneBaja && startOfDay(new Date(afiliado.baja)) > hoy;
 
@@ -72,62 +70,63 @@ export default function BajaDialog({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        {afiliado?.baja
+        {bajaEsFutura
+          ? "Gestión de Baja Programada"
+          : afiliado?.baja
           ? "Gestión de Baja del Afiliado"
           : "Programar Baja del Afiliado"}
       </DialogTitle>
       <DialogContent>
         <Box sx={{ pt: 2 }}>
-          {afiliadoTieneBaja ? (
+          {bajaEsFutura ? (
             <>
               <Typography variant="body1" gutterBottom>
                 Este afiliado tiene una baja programada para el{" "}
                 <strong>
-                  {new Date(afiliado.baja).toLocaleDateString("es-AR")}
+                  {new Date(fechaBaja)
+                    .toISOString()
+                    .slice(0, 10)
+                    .split("-")
+                    .reverse()
+                    .join("/")}
                 </strong>
                 .
               </Typography>
 
-              {bajaEsFutura ? (
-                <Alert severity="warning" sx={{ mt: 2, mb: 2 }}>
-                  La baja aún no ha entrado en efecto. Puede cancelarla o
-                  modificar la fecha.
-                </Alert>
-              ) : (
-                <Alert severity="info" sx={{ mt: 2, mb: 2 }}>
-                  La baja ya está en efecto. Puede cancelarla para reactivar al
-                  afiliado.
-                </Alert>
-              )}
+              <Alert severity="info" sx={{ mt: 2, mb: 2 }}>
+                Puede cancelar la baja programada o modificar la fecha.
+              </Alert>
 
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="body2" color="textSecondary" gutterBottom>
-                  Programar nueva fecha de baja:
-                </Typography>
-
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      color="secondary"
-                      checked={esBajaInmediata}
-                      onChange={(e) => setEsBajaInmediata(e.target.checked)}
-                    />
-                  }
-                  label="Baja inmediata (hoy)"
-                  sx={{ mb: 2 }}
-                />
-
-                {!esBajaInmediata && (
-                  <TextField
-                    fullWidth
-                    label="Nueva fecha de baja"
-                    type="date"
-                    value={fechaBaja}
-                    onChange={(e) => setFechaBaja(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    color="secondary"
+                    checked={esBajaInmediata}
+                    onChange={(e) => setEsBajaInmediata(e.target.checked)}
                   />
-                )}
-              </Box>
+                }
+                label="Baja inmediata (hoy)"
+                sx={{ mb: 2 }}
+              />
+
+              {!esBajaInmediata && (
+                <TextField
+                  fullWidth
+                  label="Nueva fecha de baja"
+                  type="date"
+                  value={fechaBaja}
+                  onChange={(e) => setFechaBaja(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  error={esFechaPasada}
+                  helperText={
+                    esFechaPasada
+                      ? "La fecha de baja no puede ser anterior a hoy"
+                      : esFechaFutura
+                      ? "La baja se programará para esta fecha futura"
+                      : "Seleccione la fecha de baja"
+                  }
+                />
+              )}
             </>
           ) : (
             <>
@@ -169,7 +168,12 @@ export default function BajaDialog({
               {esFechaFutura && (
                 <Alert severity="info" sx={{ mt: 2 }}>
                   El afiliado permanecerá activo hasta el{" "}
-                  {new Date(fechaBaja).toLocaleDateString("es-AR")}.
+                  {new Date(fechaBaja)
+                    .toISOString()
+                    .slice(0, 10)
+                    .split("-")
+                    .reverse()
+                    .join("/")}
                 </Alert>
               )}
               {esBajaInmediata && (
@@ -187,9 +191,16 @@ export default function BajaDialog({
           Cancelar
         </Button>
 
-        {afiliadoTieneBaja && (
-          <Button variant="outlined" color="success" onClick={handleCancelBaja}>
-            Cancelar Baja
+        {bajaEsFutura && (
+          <Button
+            variant="outlined"
+            color="warning"
+            onClick={() => {
+              onCancelBaja(afiliado);
+              onClose();
+            }}
+          >
+            Cancelar Baja Programada
           </Button>
         )}
 
@@ -199,7 +210,11 @@ export default function BajaDialog({
           onClick={handleConfirm}
           disabled={!esBajaInmediata && (!fechaBaja || esFechaPasada)}
         >
-          {afiliadoTieneBaja ? "Modificar Baja" : "Confirmar Baja"}
+          {bajaEsFutura
+            ? "Modificar Baja"
+            : afiliado?.baja
+            ? "Programar Baja"
+            : "Confirmar Baja"}
         </Button>
       </DialogActions>
     </Dialog>

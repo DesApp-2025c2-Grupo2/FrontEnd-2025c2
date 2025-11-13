@@ -98,20 +98,27 @@ export default function AfiliadoFormDialog({
 
   const handleAddTelefono = () => {
     if (!newTelefono.trim()) return;
-    onEditTelefonosChange([...(editTelefonos || []), newTelefono.trim()]);
+    onEditTelefonosChange([
+      ...(editTelefonos || []),
+      { numero: newTelefono.trim() },
+    ]);
     setNewTelefono("");
   };
+
   const handleRemoveTelefono = (index) =>
     onEditTelefonosChange((editTelefonos || []).filter((_, i) => i !== index));
+
   const handleAddEmail = () => {
     if (!newEmail.trim()) return;
-    onEditEmailsChange([...(editEmails || []), newEmail.trim()]);
+    onEditEmailsChange([...(editEmails || []), { correo: newEmail.trim() }]);
     setNewEmail("");
   };
+
   const handleRemoveEmail = (index) =>
     onEditEmailsChange((editEmails || []).filter((_, i) => i !== index));
 
   const handleAddDireccion = (direccion) => {
+    if (!direccion || !direccion.calle?.trim()) return;
     onEditDireccionesChange([...(editDirecciones || []), direccion]);
   };
 
