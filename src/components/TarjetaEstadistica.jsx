@@ -40,9 +40,9 @@ const TarjetaEstadistica = ({ title, icon, value, changeValue, positive }) => {
           {value}
         </Typography>
         <Box display="flex" alignItems="center" gap={0.5}>
-          <Typography variant="body2" color="text.secondary">
+          {/*<Typography variant="body2" color="text.secondary">
             vs. mes anterior
-          </Typography>
+          </Typography>*/}
         </Box>
       </CardContent>
     </Card>

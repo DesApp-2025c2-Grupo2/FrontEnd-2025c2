@@ -107,23 +107,12 @@ export const AfiliadosService = {
   },
   // En el método toggleStatus, asegurar que las fechas tengan hora
   toggleStatus: async (afiliadoID, activo, fecha) => {
-    // Si la fecha viene sin hora, agregar hora específica
-    let fechaConHora = fecha;
-    if (fecha && !fecha.includes("T")) {
-      // Para altas: usar inicio del día (00:00:00)
-      // Para bajas: usar fin del día (23:59:59) según la lógica de negocio
-      if (activo) {
-        fechaConHora = fecha + "T00:00:00";
-      } else {
-        fechaConHora = fecha + "T23:59:59";
-      }
-    }
-
     console.log("AfiliadosService.toggleStatus payload:");
-
-    const res = await WebAPI.Instance().patch(
-      `${ENDPOINT}/toggleStatus/${afiliadoID}?activo=${activo}&fecha=${fecha}`
-    );
+    let query = `${ENDPOINT}/toggleStatus/${afiliadoID}?activo=${activo}`;
+    if (fecha) query += `&fecha=${fecha}`;
+    //Imprimir el query en consola para mostrar como queda
+    console.log(query);
+    const res = await WebAPI.Instance().patch(query);
 
     const a = res.data || {};
     return {

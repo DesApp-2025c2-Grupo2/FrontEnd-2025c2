@@ -23,16 +23,15 @@ export default function PersonaListItem({
   getParentescoColor,
   getParentescoNombre,
 }) {
-  const hoy = startOfDay(new Date());
   const tieneBaja = Boolean(persona?.baja);
-  const bajaEsFutura = tieneBaja && startOfDay(new Date(persona.baja)) > hoy;
+  const estaActivo = tieneBaja && startOfDay(new Date(persona.baja)) < persona.baja;
 
   return (
     <Card
       sx={{
         p: 2,
         backgroundColor: "#f8f9fa",
-        opacity: !tieneBaja || bajaEsFutura ? 1 : 0.6,
+        opacity: !estaActivo ? 1 : 0.6,
       }}
     >
       <Box

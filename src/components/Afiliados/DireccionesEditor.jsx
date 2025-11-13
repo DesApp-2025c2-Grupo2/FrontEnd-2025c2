@@ -29,8 +29,17 @@ export default function DireccionesEditor({
   const list = Array.isArray(items) ? items : [];
 
   const handleAdd = () => {
-    if (newValue.calle.trim()) {
-      onAdd(newValue);
+    const calle = newValue?.calle?.trim?.();
+    if (calle && calle.length > 0) {
+      onAdd({
+        ...newValue,
+        calle,
+        altura: newValue?.altura?.trim?.() || "",
+        piso: newValue?.piso?.trim?.() || "",
+        departamento: newValue?.departamento?.trim?.() || "",
+        provinciaCiudad: newValue?.provinciaCiudad?.trim?.() || "",
+      });
+
       onNewValueChange({
         calle: "",
         altura: "",
@@ -134,7 +143,7 @@ export default function DireccionesEditor({
               onClick={handleAdd}
               color="secondary"
               aria-label="Agregar dirección"
-              disabled={disabled || !newValue.calle.trim()}
+              disabled={disabled || !newValue?.calle?.trim?.()}
             >
               <AddIcon />
             </IconButton>

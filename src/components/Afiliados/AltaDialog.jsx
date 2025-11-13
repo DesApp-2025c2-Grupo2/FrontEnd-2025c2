@@ -27,7 +27,6 @@ export default function AltaDialog({
   onClose,
   onConfirm,
   onCancelAlta,
-  onReactivar,
 }) {
   const [fechaAlta, setFechaAlta] = useState("");
   const [esAltaInmediata, setEsAltaInmediata] = useState(true);
@@ -43,20 +42,16 @@ export default function AltaDialog({
     let fechaAltaFinal;
 
     if (esAltaInmediata) {
-      // Para alta inmediata, usar fecha y hora actual
-      fechaAltaFinal = new Date().toISOString();
+      // Para alta inmediata, usar fecha y hora actual, con calculo de zona horaria
+      const fechaAux = new Date().getTime() - 3 * 60 * 60 * 1000;
+      fechaAltaFinal = new Date(fechaAux).toISOString();
     } else {
       // Para alta programada, usar inicio del día seleccionado
       fechaAltaFinal = fechaAlta + "T00:00:00";
     }
 
     if (!fechaAltaFinal) return;
-
-    if (esAltaInmediata && afiliado?.baja) {
-      onReactivar(afiliado);
-    } else {
-      onConfirm(afiliado, fechaAltaFinal);
-    }
+    onConfirm(afiliado, fechaAltaFinal);
     onClose();
   };
 
@@ -85,7 +80,12 @@ export default function AltaDialog({
               <Typography variant="body1" gutterBottom>
                 Este afiliado tiene una alta programada para el{" "}
                 <strong>
-                  {new Date(afiliado.alta).toLocaleDateString("es-AR")}
+                  {new Date(afiliado.alta)
+                    .toISOString()
+                    .slice(0, 10)
+                    .split("-")
+                    .reverse()
+                    .join("/")}
                 </strong>
                 .
               </Typography>
@@ -168,8 +168,13 @@ export default function AltaDialog({
               {esFechaFutura && (
                 <Alert severity="info" sx={{ mt: 2 }}>
                   El afiliado se activará el{" "}
-                  {new Date(fechaAlta).toLocaleDateString("es-AR")}. La baja
-                  existente será cancelada.
+                  {new Date(fechaAlta)
+                    .toISOString()
+                    .slice(0, 10)
+                    .split("-")
+                    .reverse()
+                    .join("/")}
+                  . La baja existente será cancelada.
                 </Alert>
               )}
               {esAltaInmediata && (
@@ -219,7 +224,12 @@ export default function AltaDialog({
               {esFechaFutura && (
                 <Alert severity="info" sx={{ mt: 2 }}>
                   El afiliado se activará el{" "}
-                  {new Date(fechaAlta).toLocaleDateString("es-AR")}.
+                  {new Date(fechaAlta)
+                    .toISOString()
+                    .slice(0, 10)
+                    .split("-")
+                    .reverse()
+                    .join("/")}
                 </Alert>
               )}
               {esAltaInmediata && (

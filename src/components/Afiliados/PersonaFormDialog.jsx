@@ -22,6 +22,7 @@ import {
   Home as HomeIcon,
 } from "@mui/icons-material";
 import ContactInfoEditor from "../ContactInfoEditor";
+import DireccionesEditor from "./DireccionesEditor";
 import SituacionesSelector from "./SituacionesSelector";
 import { selectSituaciones } from "../../store/situacionesTerapeuticasSlice";
 import { useSelector } from "react-redux";
@@ -60,7 +61,13 @@ export default function PersonaFormDialog({
 
   const [newTelefono, setNewTelefono] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [newDireccion, setNewDireccion] = useState("");
+  const [newDireccion, setNewDireccion] = useState({
+    calle: "",
+    altura: "",
+    piso: "",
+    departamento: "",
+    provinciaCiudad: "",
+  });
 
   const isViewMode = !!selectedFamiliar && !isEditing;
 
@@ -225,37 +232,40 @@ export default function PersonaFormDialog({
 
   const handleAddTelefono = () => {
     if (!newTelefono.trim()) return;
-    onEditTelefonosChange([...(editTelefonos || []), newTelefono.trim()]);
+    onEditTelefonosChange([
+      ...(editTelefonos || []),
+      { numero: newTelefono.trim() },
+    ]);
     setNewTelefono("");
   };
 
   const handleRemoveTelefono = (index) =>
     onEditTelefonosChange((editTelefonos || []).filter((_, i) => i !== index));
 
+
   const handleAddEmail = () => {
     if (!newEmail.trim()) return;
-    onEditEmailsChange([...(editEmails || []), newEmail.trim()]);
+    onEditEmailsChange([
+      ...(editEmails || []),
+      { correo: newEmail.trim() },
+    ]);
     setNewEmail("");
   };
 
   const handleRemoveEmail = (index) =>
     onEditEmailsChange((editEmails || []).filter((_, i) => i !== index));
 
-  const handleAddDireccion = () => {
-    if (!newDireccion.trim()) return;
-    // Si el caller ya maneja objetos, permitimos pasar strings o objetos.
-    const parsed =
-      typeof newDireccion === "string"
-        ? {
-            calle: newDireccion.trim(),
-            altura: "0",
-            piso: "",
-            departamento: "",
-            provinciaCiudad: "Bs As",
-          }
-        : newDireccion;
-    onEditDireccionesChange([...(editDirecciones || []), parsed]);
-    setNewDireccion("");
+
+  const handleAddDireccion = (direccion) => {
+    if (!direccion || !direccion.calle?.trim()) return;
+    onEditDireccionesChange([...(editDirecciones || []), direccion]);
+    setNewDireccion({
+      calle: "",
+      altura: "",
+      piso: "",
+      departamento: "",
+      provinciaCiudad: "",
+    });
   };
 
   const handleRemoveDireccion = (index) =>
@@ -282,19 +292,28 @@ export default function PersonaFormDialog({
   const handleAddSituacion = (nueva) => {
     const nuevas = [...(editSituaciones || []), nueva];
     onEditSituacionesChange(nuevas);
-    onFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
+    onFormChange(
+      "situacionesTerapeuticas",
+      convertirASituacionesDiccionario(nuevas)
+    );
   };
-  
+
   const handleRemoveSituacion = (idx) => {
     const nuevas = (editSituaciones || []).filter((_, i) => i !== idx);
     onEditSituacionesChange(nuevas);
-    onFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
+    onFormChange(
+      "situacionesTerapeuticas",
+      convertirASituacionesDiccionario(nuevas)
+    );
   };
   const handleUpdateSituacion = (idx, nuevaSituacion) => {
     const nuevas = [...(editSituaciones || [])];
     nuevas[idx] = nuevaSituacion;
     onEditSituacionesChange(nuevas);
-    onFormChange("situacionesTerapeuticas", convertirASituacionesDiccionario(nuevas));
+    onFormChange(
+      "situacionesTerapeuticas",
+      convertirASituacionesDiccionario(nuevas)
+    );
   };
 
   // Validación mínima local
@@ -626,7 +645,7 @@ export default function PersonaFormDialog({
                   >
                     <MenuItem value="">Seleccione</MenuItem>
                     {parentescos
-                      .filter((p) => p.id !== 1) // Excluir Titular
+                      .filter((p) => p.id !== 0) // Excluir Titular
                       .map((parentesco) => (
                         <MenuItem key={parentesco.id} value={parentesco.id}>
                           {parentesco.nombre}
@@ -670,15 +689,13 @@ export default function PersonaFormDialog({
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={12}>
-                <ContactInfoEditor
-                  icon={<HomeIcon sx={{ mr: 1, color: "#1976d2" }} />}
-                  title="Direcciones"
-                  items={(editDirecciones || []).map(direccionToString)}
+                <DireccionesEditor
+                  items={editDirecciones || []}
                   newValue={newDireccion}
-                  placeholder="Agregar dirección"
                   onNewValueChange={setNewDireccion}
                   onAdd={handleAddDireccion}
                   onRemove={handleRemoveDireccion}
+                  disabled={isViewMode}
                 />
               </Grid>
             </Grid>
