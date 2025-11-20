@@ -83,6 +83,16 @@ export default function AfiliadoFormDialog({
         departamento: "",
         provinciaCiudad: "",
       });
+          // ---- NUEVO: tipo de documento por defecto ----
+    if (!isEditing && !selectedAfiliado) {
+      const primerTipo = Object.keys(tiposDocumento)[0];
+      onFormChange("tipoDocumento", primerTipo);
+    }
+
+    // ---- NUEVO: plan médico por defecto ----
+    if (!isEditing && !selectedAfiliado && planesMedicos.length > 0) {
+      onFormChange("planMedicoId", String(planesMedicos[0].id));
+    }
     }
   }, [open]);
 
@@ -464,8 +474,8 @@ export default function AfiliadoFormDialog({
               </Grid>
             </Grid>
 
-            <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={12}>
+            <Grid container spacing={2} sx={{ mb: 3 }} width="300px">
+              <Grid item xs={12} fullWidth>
                 <FormControl fullWidth>
                   <InputLabel>Plan Médico</InputLabel>
                   <Select

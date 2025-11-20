@@ -334,9 +334,9 @@ export default function Afiliados() {
       showSnackbar("Complete los campos del familiar", "error");
       return;
     }
-
+  
     try {
-      // Función helper para convertir situaciones a objeto
+      // Convierte situaciones en { idSituacion : fechaFin | null }
       const convertirSituacionesAObjeto = (situacionesArray) => {
         const obj = {};
         situacionesArray.forEach((sit) => {
@@ -346,45 +346,98 @@ export default function Afiliados() {
         });
         return obj;
       };
-
-      // Construcción segura de campos de contacto y dirección
+  
+      // ----------------------------
+      // NORMALIZACIÓN PUNTUAL 100% COMPATIBLE CON TU BACKEND
+      // ----------------------------
+  
+      // Telefónos: soporta objeto {id, numero}, string, MUI {value}
       const telefonosNormalizados = (formFamiliar.telefonos || [])
-        .filter((t) => t && (t.numero || t.trim?.()))
-        .map((t) => ({
-          id: t.id || 0,
-          numero: typeof t === "string" ? t.trim() : (t.numero || "").trim(),
-        }));
-
+        .map((t) => {
+          if (!t) return null;
+  
+          // Si viene como string
+          if (typeof t === "string") {
+            const v = t.trim();
+            return v ? { id: 0, numero: v } : null;
+          }
+  
+          // Si viene como objeto con "numero"
+          if (t.numero) {
+            return { id: t.id ?? 0, numero: t.numero.trim() };
+          }
+  
+          // Si viene como objeto con "value" típico de MUI
+          if (t.value) {
+            const v = t.value.trim();
+            return v ? { id: t.id ?? 0, numero: v } : null;
+          }
+  
+          return null;
+        })
+        .filter(Boolean);
+  
+      // Emails: soporta {id, correo}, string, MUI {value}
       const emailsNormalizados = (formFamiliar.emails || [])
-        .filter((e) => e && (e.correo || e.trim?.()))
-        .map((e) => ({
-          id: e.id || 0,
-          correo: typeof e === "string" ? e.trim() : (e.correo || "").trim(),
-        }));
-
+        .map((e) => {
+          if (!e) return null;
+  
+          if (typeof e === "string") {
+            const v = e.trim();
+            return v ? { id: 0, correo: v } : null;
+          }
+  
+          if (e.correo) {
+            return { id: e.id ?? 0, correo: e.correo.trim() };
+          }
+  
+          if (e.value) {
+            const v = e.value.trim();
+            return v ? { id: e.id ?? 0, correo: v } : null;
+          }
+  
+          return null;
+        })
+        .filter(Boolean);
+  
+      // Direcciones: soporta string y estructura del backend
       const direccionesNormalizadas = (formFamiliar.direcciones || [])
-        .filter((d) => d && (d.calle || typeof d === "string"))
-        .map((d) =>
-          typeof d === "string"
-            ? {
-                id: 0,
-                calle: d,
-                altura: "",
-                piso: "",
-                departamento: "",
-                provinciaCiudad: "",
-              }
-            : {
-                id: d.id || 0,
-                calle: d.calle || "",
-                altura: d.altura || "",
-                piso: d.piso || "",
-                departamento: d.departamento || "",
-                provinciaCiudad: d.provinciaCiudad || "",
-              }
-        );
-
-      // Payload base
+        .map((d) => {
+          if (!d) return null;
+  
+          // Si viene como string
+          if (typeof d === "string") {
+            const v = d.trim();
+            if (!v) return null;
+            return {
+              id: 0,
+              calle: v,
+              altura: "",
+              piso: "",
+              departamento: "",
+              provinciaCiudad: "",
+            };
+          }
+  
+          // Si viene como objeto del backend
+          if (d.calle) {
+            return {
+              id: d.id ?? 0,
+              calle: d.calle ?? "",
+              altura: d.altura ?? "",
+              piso: d.piso ?? "",
+              departamento: d.departamento ?? "",
+              provinciaCiudad: d.provinciaCiudad ?? "",
+            };
+          }
+  
+          return null;
+        })
+        .filter(Boolean);
+  
+      // ---------------------------------------------
+      // PAYLOAD FINAL
+      // ---------------------------------------------
       const payloadBase = {
         numeroIntegrante: formFamiliar.numeroIntegrante,
         nombre: formFamiliar.nombre.trim(),
@@ -400,60 +453,67 @@ export default function Afiliados() {
         baja: formFamiliar.baja
           ? new Date(formFamiliar.baja).toISOString()
           : null,
+  
         documentacion: {
           id: formFamiliar.documentacion?.id || 0,
           tipoDocumento: parseInt(formFamiliar.tipoDocumento) || 1,
           numero: (formFamiliar.numeroDocumento || "").toString(),
         },
-
-        // 🔧 Normalizados y filtrados
+  
         telefonos: telefonosNormalizados,
         emails: emailsNormalizados,
         direcciones: direccionesNormalizadas,
-
+  
         situacionesTerapeuticas: convertirSituacionesAObjeto(
           formFamiliar.situacionesTerapeuticasIds || []
         ),
       };
-
+  
       let result;
-
+  
+      // ---------------------------------------------
+      // UPDATE EXISTENTE
+      // ---------------------------------------------
       if (isEditingFamiliar && formFamiliar.id) {
         const updatePayload = {
           ...payloadBase,
-          id: formFamiliar.id, // ID existente del familiar
+          id: formFamiliar.id,
         };
-
+  
         console.log(
           "🎯 [EDIT FAMILIAR] Payload a enviar:",
           JSON.stringify(updatePayload, null, 2)
         );
-
+  
         result = await dispatch(updatePersona(updatePayload)).unwrap();
         showSnackbar("Familiar actualizado correctamente");
-      } else {
+      }
+  
+      // ---------------------------------------------
+      // CREATE NUEVO
+      // ---------------------------------------------
+      else {
         const createPayload = {
           ...payloadBase,
-          id: 0, // Nuevo registro
+          id: 0,
         };
-
+  
         console.log(
           "🎯 [ADD FAMILIAR] Payload a enviar:",
           JSON.stringify(createPayload, null, 2)
         );
-
+  
         result = await dispatch(
           createMember({
             afiliadoID: selectedAfiliado.id,
             memberData: createPayload,
           })
         ).unwrap();
+  
         showSnackbar("Familiar agregado correctamente");
       }
-
-      // Recargar los afiliados para reflejar los cambios
+  
       await dispatch(fetchAfiliados()).unwrap();
-
       setOpenFamiliarDialog(false);
       setSelectedFamiliar(null);
       setIsEditingFamiliar(false);
@@ -467,6 +527,7 @@ export default function Afiliados() {
       );
     }
   }, [formFamiliar, selectedAfiliado, isEditingFamiliar, dispatch]);
+  
 
   // ---------- Construcción payload afiliado ----------
   const buildAfiliadoPayload = useCallback(
@@ -500,7 +561,6 @@ export default function Afiliados() {
           ? new Date(formAfiliado.fechaNacimiento).toISOString().split("T")[0]
           : new Date().toISOString().split("T")[0],
         parentesco: 0, // Titular
-        afiliadoId: selectedAfiliado.id, // ID del afiliado
         alta: formAfiliado.alta
           ? new Date(formAfiliado.alta).toISOString().split("T")[0]
           : new Date().toISOString().split("T")[0],
@@ -728,7 +788,6 @@ export default function Afiliados() {
             ? new Date(formAfiliado.fechaNacimiento).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
           parentesco: 0, // Titular
-          afiliadoId: selectedAfiliado.id, // ID del afiliado
           alta: formAfiliado.alta
             ? new Date(formAfiliado.alta).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
