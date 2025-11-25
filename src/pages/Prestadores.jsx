@@ -41,6 +41,7 @@ import {
   actualizarDireccionesPrestador
 } from '../store/prestadoresSlice';
 import { cargarEspecialidades } from '../store/especialidadesSlice';
+import { selectPrestadores } from '../store/prestadoresSlice';
 
 function Prestadores() {
   const dispatch = useDispatch();
@@ -69,6 +70,7 @@ function Prestadores() {
   const prestadoresFiltrados = useSelector(selectPrestadoresFiltrados(searchTerm));
   const loading = useSelector(selectPrestadoresLoading);
   const error = useSelector(selectPrestadoresError);
+  const prestadoresTodos = useSelector(selectPrestadores);
 
   // Cargar prestadores y especialidades al montar el componente
   useEffect(() => {
@@ -222,9 +224,52 @@ function Prestadores() {
   // Handlers para los diálogos
   const handleGuardarNuevo = async (nuevoPrestador) => {
     try {
-      await dispatch(crearPrestador(nuevoPrestador)).unwrap();
-      // Re-cargar lista desde backend para asegurar estado consistente
-      dispatch(cargarPrestadores());
+      const creado = await dispatch(crearPrestador(nuevoPrestador)).unwrap();
+
+      // Si se trata de un Centro Médico y vienen asociaciones, sincronizarlas
+      if (nuevoPrestador?.tipo === 'Centro Médico' && Array.isArray(nuevoPrestador?.profesionalesAsociadosIds)) {
+        // Resolver ID del centro creado
+        let centroId = (creado && !Array.isArray(creado) && typeof creado?.id === 'number') ? creado.id : null;
+        if (!centroId && Array.isArray(creado)) {
+          const match = creado.find(p => String(p?.cuilCuit || '').toLowerCase() === String(nuevoPrestador?.cuilCuit || '').toLowerCase());
+          if (match && typeof match.id === 'number') centroId = match.id;
+        }
+        // Intento adicional: si no lo pudimos obtener, cargar y buscar por CUIT
+        if (!centroId) {
+          await dispatch(cargarPrestadores());
+          const lista = (Array.isArray(prestadoresTodos) ? prestadoresTodos : []);
+          const match = lista.find(p => String(p?.cuilCuit || '').toLowerCase() === String(nuevoPrestador?.cuilCuit || '').toLowerCase());
+          if (match && typeof match.id === 'number') centroId = match.id;
+        }
+        if (centroId) {
+          // Profesionales actualmente asociados a este centro (en estado actual)
+          const actualesIds = (Array.isArray(prestadoresTodos) ? prestadoresTodos : [])
+            .filter(p => p?.integraCentroMedicoId === centroId)
+            .map(p => p.id);
+          const seleccionados = new Set(nuevoPrestador.profesionalesAsociadosIds);
+          const actuales = new Set(actualesIds);
+          const toAdd = [...seleccionados].filter(id => !actuales.has(id));
+          const toRemove = [...actuales].filter(id => !seleccionados.has(id));
+          // Aplicar cambios
+          await Promise.allSettled([
+            ...toAdd.map(id => dispatch(editarPrestador({ id, integraCentroMedicoId: centroId })).unwrap()),
+            ...toRemove.map(id => dispatch(editarPrestador({ id, integraCentroMedicoId: null })).unwrap()),
+          ]);
+          // Enviar profesionalesIds al centro para reflejar asociaciones
+          try {
+            const asociadosIds = (Array.isArray(prestadoresTodos) ? prestadoresTodos : [])
+              .filter(p => p?.integraCentroMedicoId === centroId)
+              .map(p => p.id);
+            await dispatch(editarPrestador({ id: centroId, profesionalesIds: asociadosIds })).unwrap();
+          } catch (_) {}
+        }
+      }
+
+      // Si el create devolvió lista, recargamos.
+      // Si devolvió objeto sin id (fallback), intentamos recargar para reflejar desde backend.
+      if (Array.isArray(creado) || (creado && typeof creado === 'object' && creado.id == null)) {
+        dispatch(cargarPrestadores());
+      }
       setDialogoAgregar(false);
       setSnackbar({
         open: true,
@@ -244,6 +289,31 @@ function Prestadores() {
     try {
       // Incluir direcciones en el PUT de edición
       const actualizado = await dispatch(actualizarDireccionesPrestador(prestadorEditado)).unwrap();
+
+      // Si es Centro Médico y vienen asociaciones, sincronizarlas
+      if (prestadorEditado?.tipo === 'Centro Médico' && Array.isArray(prestadorEditado?.profesionalesAsociadosIds)) {
+        const centroId = actualizado?.id || prestadorEditado?.id;
+        if (centroId) {
+          const actualesIds = (Array.isArray(prestadoresTodos) ? prestadoresTodos : [])
+            .filter(p => p?.integraCentroMedicoId === centroId)
+            .map(p => p.id);
+          const seleccionados = new Set(prestadorEditado.profesionalesAsociadosIds);
+          const actuales = new Set(actualesIds);
+          const toAdd = [...seleccionados].filter(id => !actuales.has(id));
+          const toRemove = [...actuales].filter(id => !seleccionados.has(id));
+          await Promise.allSettled([
+            ...toAdd.map(id => dispatch(editarPrestador({ id, integraCentroMedicoId: centroId })).unwrap()),
+            ...toRemove.map(id => dispatch(editarPrestador({ id, integraCentroMedicoId: null })).unwrap()),
+          ]);
+          // Actualizar profesionalesIds en el centro
+          try {
+            const asociadosIds = (Array.isArray(prestadoresTodos) ? prestadoresTodos : [])
+              .filter(p => p?.integraCentroMedicoId === centroId)
+              .map(p => p.id);
+            await dispatch(editarPrestador({ id: centroId, profesionalesIds: asociadosIds })).unwrap();
+          } catch (_) {}
+        }
+      }
       // Refrescar cache local inmediatamente
       setPrestadoresConAgenda((prev) => {
         if (!actualizado || !actualizado.id) return prev;
@@ -410,94 +480,103 @@ function Prestadores() {
           }}
           onGuardar={async (prestadorActualizado) => {
             try {
-              const id = prestadorSeleccionado?.id || prestadorActualizado?.id;
-              const lugaresAtencion = prestadorActualizado?.lugaresAtencion || [];
-              if (!id) throw new Error('ID de prestador no disponible');
-              // Pre-borrado de horarios que desaparecieron (maneja multi-día)
-              try {
-                const originalLugares = Array.isArray(prestadorSeleccionado?.lugaresAtencion) ? prestadorSeleccionado.lugaresAtencion : [];
-                const normalizar = (s) => String(s || '').trim().toLowerCase();
-                const keyLugar = (l) => (l && l.id != null) ? `id:${l.id}` : `dir:${normalizar(l?.direccion)}`;
-                const mapOriginal = new Map();
-                originalLugares.forEach((l) => {
-                  const key = keyLugar(l);
-                  const lugarId = (l && l.id != null) ? l.id : null;
-                  const ids = new Set((Array.isArray(l?.horarios) ? l.horarios : [])
-                    .map((h) => h?.id)
-                    .filter((x) => typeof x === 'number'));
-                  mapOriginal.set(key, { lugarId, ids });
-                });
-                const mapActual = new Map();
-                (Array.isArray(lugaresAtencion) ? lugaresAtencion : []).forEach((l) => {
-                  const key = keyLugar(l);
-                  const lugarId = (l && l.id != null) ? l.id : null;
-                  const ids = new Set((Array.isArray(l?.horarios) ? l.horarios : [])
-                    .map((h) => h?.id)
-                    .filter((x) => typeof x === 'number'));
-                  mapActual.set(key, { lugarId, ids });
-                });
-                const deletions = [];
-                mapOriginal.forEach((orig, key) => {
-                  const upd = mapActual.get(key);
-                  const updIds = upd ? upd.ids : new Set();
-                  orig.ids.forEach((hid) => {
-                    if (!updIds.has(hid)) {
-                      const lugarId = (typeof orig.lugarId === 'number') ? orig.lugarId : (upd && typeof upd.lugarId === 'number' ? upd.lugarId : null);
-                      if (typeof lugarId === 'number') {
-                        deletions.push({ lugarId, horarioId: hid });
-                      }
-                    }
+              if (prestadorActualizado && prestadorActualizado.isCentro && prestadorActualizado.actualizacionesPorProfesional) {
+                const entries = Object.entries(prestadorActualizado.actualizacionesPorProfesional);
+                if (entries.length === 0) throw new Error('Debe asignar al menos un horario a un profesional');
+                await Promise.all(entries.map(([pid, lugares]) => {
+                  const profId = Number(pid);
+                  return dispatch(actualizarHorariosPrestador({ id: profId, lugaresAtencion: Array.isArray(lugares) ? lugares : [] })).unwrap();
+                }));
+              } else {
+                // Preferir el ID del prestadorActualizado (modo profesional)
+                const id = prestadorActualizado?.id || prestadorSeleccionado?.id;
+                const lugaresAtencion = prestadorActualizado?.lugaresAtencion || [];
+                if (!id) throw new Error('ID de prestador no disponible');
+                // Pre-borrado de horarios que desaparecieron (maneja multi-día)
+                try {
+                  const originalLugares = Array.isArray(prestadorSeleccionado?.lugaresAtencion) ? prestadorSeleccionado.lugaresAtencion : [];
+                  const normalizar = (s) => String(s || '').trim().toLowerCase();
+                  const keyLugar = (l) => (l && l.id != null) ? `id:${l.id}` : `dir:${normalizar(l?.direccion)}`;
+                  const mapOriginal = new Map();
+                  originalLugares.forEach((l) => {
+                    const key = keyLugar(l);
+                    const lugarId = (l && l.id != null) ? l.id : null;
+                    const ids = new Set((Array.isArray(l?.horarios) ? l.horarios : [])
+                      .map((h) => h?.id)
+                      .filter((x) => typeof x === 'number'));
+                    mapOriginal.set(key, { lugarId, ids });
                   });
-                });
-                if (deletions.length > 0) {
-                  await Promise.allSettled(
-                    deletions.map((d) => agendasService.deleteHorario(id, d.lugarId, d.horarioId))
-                  );
+                  const mapActual = new Map();
+                  (Array.isArray(lugaresAtencion) ? lugaresAtencion : []).forEach((l) => {
+                    const key = keyLugar(l);
+                    const lugarId = (l && l.id != null) ? l.id : null;
+                    const ids = new Set((Array.isArray(l?.horarios) ? l.horarios : [])
+                      .map((h) => h?.id)
+                      .filter((x) => typeof x === 'number'));
+                    mapActual.set(key, { lugarId, ids });
+                  });
+                  const deletions = [];
+                  mapOriginal.forEach((orig, key) => {
+                    const upd = mapActual.get(key);
+                    const updIds = upd ? upd.ids : new Set();
+                    orig.ids.forEach((hid) => {
+                      if (!updIds.has(hid)) {
+                        const lugarId = (typeof orig.lugarId === 'number') ? orig.lugarId : (upd && typeof upd.lugarId === 'number' ? upd.lugarId : null);
+                        if (typeof lugarId === 'number') {
+                          deletions.push({ lugarId, horarioId: hid });
+                        }
+                      }
+                    });
+                  });
+                  if (deletions.length > 0) {
+                    await Promise.allSettled(
+                      deletions.map((d) => agendasService.deleteHorario(id, d.lugarId, d.horarioId))
+                    );
+                  }
+                } catch (_) {
+                  // si falla borrado granular, continuamos con PUT en bloque
                 }
-              } catch (_) {
-                // si falla borrado granular, continuamos con PUT en bloque
+                await dispatch(actualizarHorariosPrestador({ id, lugaresAtencion })).unwrap();
               }
-              await dispatch(actualizarHorariosPrestador({ id, lugaresAtencion })).unwrap();
               // Refrescar cache local consultando agendas reales (para reflejar ids/direcciones definitivos)
               try {
-        setRefreshingHorarios((prev) => ({ ...prev, [id]: true }));
-                const ags = await agendasService.getByProfesional(id);
-                const agendaById = new Map((Array.isArray(ags) ? ags : []).map((a) => [a.id, a]));
-                const agendaByDir = new Map((Array.isArray(ags) ? ags : []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
-                const lugaresBase = JSON.parse(JSON.stringify(lugaresAtencion));
-                const matchedKeys = new Set();
-                const lugaresMergeados = lugaresBase.map((l) => {
-                  const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
-                  if (a) {
+                const refreshIds = (prestadorActualizado && prestadorActualizado.isCentro && prestadorActualizado.actualizacionesPorProfesional)
+                  ? Object.keys(prestadorActualizado.actualizacionesPorProfesional).map(x => Number(x)).filter(x => !isNaN(x))
+                  : [prestadorActualizado?.id || prestadorSeleccionado?.id].filter(Boolean);
+                await Promise.all(refreshIds.map(async (rid) => {
+                  setRefreshingHorarios((prev) => ({ ...prev, [rid]: true }));
+                  const ags = await agendasService.getByProfesional(rid);
+                  const agendaById = new Map((Array.isArray(ags) ? ags : []).map((a) => [a.id, a]));
+                  const agendaByDir = new Map((Array.isArray(ags) ? ags : []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
+                  const basePrev = prestadoresConAgenda[rid] || {};
+                  const lugaresBase = JSON.parse(JSON.stringify(basePrev?.lugaresAtencion || []));
+                  const matchedKeys = new Set();
+                  const lugaresMergeados = lugaresBase.map((l) => {
+                    const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
+                    if (a) {
+                      const key = (a?.id != null) ? `id:${a.id}` : `dir:${String(a?.direccion || '').trim().toLowerCase()}`;
+                      matchedKeys.add(key);
+                      return { ...l, horarios: a.horarios || a.horariosAtencion || [] };
+                    }
+                    return l;
+                  });
+                  const extras = (Array.isArray(ags) ? ags : []).filter((a) => {
                     const key = (a?.id != null) ? `id:${a.id}` : `dir:${String(a?.direccion || '').trim().toLowerCase()}`;
-                    matchedKeys.add(key);
-                    return { ...l, horarios: a.horarios || a.horariosAtencion || [] };
-                  }
-                  return l;
-                });
-                // Agregar agendas que no matchearon ningún lugar base
-                const extras = (Array.isArray(ags) ? ags : []).filter((a) => {
-                  const key = (a?.id != null) ? `id:${a.id}` : `dir:${String(a?.direccion || '').trim().toLowerCase()}`;
-                  return !matchedKeys.has(key);
-                }).map((a) => ({
-                  id: a?.id ?? null,
-                  direccion: a?.direccion || '',
-                  horarios: a?.horarios || a?.horariosAtencion || []
+                    return !matchedKeys.has(key);
+                  }).map((a) => ({
+                    id: a?.id ?? null,
+                    direccion: a?.direccion || '',
+                    horarios: a?.horarios || a?.horariosAtencion || []
+                  }));
+                  const lugaresFinal = [...lugaresMergeados, ...extras];
+                  setPrestadoresConAgenda((prev) => {
+                    const base = prev[rid] || {};
+                    return { ...prev, [rid]: { ...base, id: rid, lugaresAtencion: lugaresFinal } };
+                  });
+                  setRefreshingHorarios((prev) => ({ ...prev, [rid]: false }));
                 }));
-                const lugaresFinal = [...lugaresMergeados, ...extras];
-                setPrestadoresConAgenda((prev) => {
-                  const base = prev[id] || prestadorSeleccionado || prestadorActualizado || {};
-                  return { ...prev, [id]: { ...base, id, lugaresAtencion: lugaresFinal } };
-                });
               } catch (_) {
-                // fallback a actualizar con lo que tenemos
-                setPrestadoresConAgenda((prev) => {
-                  const base = prev[id] || prestadorSeleccionado || prestadorActualizado || {};
-                  const actualizado = { ...base, id, lugaresAtencion: JSON.parse(JSON.stringify(lugaresAtencion)) };
-                  return { ...prev, [id]: actualizado };
-                });
-      } finally {
-        setRefreshingHorarios((prev) => ({ ...prev, [id]: false }));
+                // sin refresh
               }
               setDialogoHorarios(false);
               setPrestadorSeleccionado(null);

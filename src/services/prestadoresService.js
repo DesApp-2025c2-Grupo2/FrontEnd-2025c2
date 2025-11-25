@@ -238,11 +238,17 @@ function toBackendPayload(prestador, options = {}) {
     centroMedico: prestador?.centroMedico || '',
     centroMedicoId: (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined,
     integraCentroMedicoId: (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined,
+    // Compat: si el backend publica CentroId, lo incluimos también
+    centroId: (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined,
     especialidadesIds: idsFromEspecialidades,
     documentacion: prestador?.cuilCuit || '',
     telefonos: Array.isArray(prestador?.telefonos) ? prestador.telefonos.map(t => t?.numero).filter(Boolean) : [],
     emails: Array.isArray(prestador?.emails) ? prestador.emails.map(e => e?.email).filter(Boolean) : [],
   };
+  // Si es Centro Médico y el front envía asociaciones directas, incluirlas
+  if (prestador?.tipo === 'Centro Médico' && Array.isArray(prestador?.profesionalesIds)) {
+    base.profesionalesIds = prestador.profesionalesIds.filter((id) => typeof id === 'number');
+  }
   if (includeDirecciones) {
     const dirs = Array.isArray(prestador?.lugaresAtencion)
       ? prestador.lugaresAtencion
@@ -374,6 +380,8 @@ function normalizeFromBackend(p, idToNombre) {
     telefonos: Array.isArray(p?.telefonos) ? p.telefonos.map(t => ({ numero: t?.numero || t })) : [],
     emails: Array.isArray(p?.emails) ? p.emails.map(e => ({ email: e?.correo || e })) : [],
     lugaresAtencion,
+    // Campo opcional del backend para Centros: listado de profesionales asociados
+    profesionalesIds: Array.isArray(p?.profesionalesIds) ? p.profesionalesIds.filter((x) => typeof x === 'number') : undefined,
     activo: activoCalc,
   };
 }
@@ -417,7 +425,8 @@ export async function ensureSeed() {
 
 export async function create(prestador) {
   try {
-    const payload = toBackendPayload(prestador, { includeLugares: true });
+    // En creación, enviamos datos base + direcciones. Los horarios se actualizan luego vía endpoint de agendas.
+    const payload = toBackendPayload(prestador, { includeLugares: false, includeDirecciones: true });
     // Nuevo endpoint principal
     let res = await WebAPI.Instance().post(`${ENDPOINT}`, payload);
     if (!res || !res.data) {
@@ -429,13 +438,35 @@ export async function create(prestador) {
     const catalogo = await especialidadesService.getAll().catch(() => []);
     const idToNombre = new Map((catalogo || []).map(e => [e.id, e.nombre]));
     if (creado && typeof creado === 'object' && creado.id) {
-      return normalizeFromBackend(creado, idToNombre);
+      const normal = normalizeFromBackend(creado, idToNombre);
+      // Si se enviaron horarios inicialmente, intentar persistirlos ahora
+      if (Array.isArray(prestador?.lugaresAtencion) && prestador.lugaresAtencion.some(l => Array.isArray(l?.horarios) && l.horarios.length > 0)) {
+        try {
+          await updateHorarios(normal.id, prestador.lugaresAtencion);
+          const refreshed = await getById(normal.id);
+          return refreshed || normal;
+        } catch {
+          // si falla horario, devolvemos el creado base igualmente
+          return normal;
+        }
+      }
+      return normal;
     }
     // 2) Si devuelve solo un ID numérico
     if (typeof creado === 'number') {
       // Volver a cargar lista y devolver ese ítem
       const todos = await getAll();
       const match = todos.find(p => p.id === creado);
+      // Actualizar horarios si correspondía
+      if (match && Array.isArray(prestador?.lugaresAtencion) && prestador.lugaresAtencion.some(l => Array.isArray(l?.horarios) && l.horarios.length > 0)) {
+        try {
+          await updateHorarios(match.id, prestador.lugaresAtencion);
+          const refreshed = await getById(match.id);
+          return refreshed || match || todos;
+        } catch {
+          return match || todos;
+        }
+      }
       return match || todos;
     }
     // 3) Si devuelve true/OK o sin body pero status 2xx, recargar
@@ -444,7 +475,8 @@ export async function create(prestador) {
       // Buscar por CUIL/CUIT
       const cuilLower = String(prestador.cuilCuit || '').toLowerCase();
       const match = todos.find(p => String(p.cuilCuit || '').toLowerCase() === cuilLower);
-      return match || todos;
+      // Si el backend todavía no refleja el nuevo, devolver el objeto local (evita pisar la UI).
+      return match || { ...prestador };
     }
   } catch (_) {
     // fallback a mock local
@@ -566,7 +598,9 @@ function toHorariosUpdatePayload(lugaresAtencion) {
           horaInicio: h?.horaInicio || '',
           horaFin: h?.horaFin || '',
           duracionMinutos: (typeof h?.duracionMinutos === 'number') ? h.duracionMinutos : 30,
-          especialidades: (typeof h?.especialidadId === 'number') ? [h.especialidadId] : [],
+        especialidades: (typeof h?.especialidadId === 'number') ? [h.especialidadId] : [],
+        // En caso de Centros: algunos backends requieren el profesional en cada horario
+        profesionalId: (typeof h?.profesionalId === 'number') ? h.profesionalId : undefined,
         }))
       : [],
   }));

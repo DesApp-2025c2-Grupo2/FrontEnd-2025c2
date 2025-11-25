@@ -63,9 +63,10 @@ export const actualizarHorariosPrestador = createAsyncThunk(
   'prestadores/actualizarHorarios',
   async ({ id, lugaresAtencion }, { rejectWithValue }) => {
     try {
-      const normalizados = await agendasService.updateLugares(id, lugaresAtencion);
-      // normalizados: [{ id, direccion, horarios: [...] }]
-      return { id, lugaresAtencion: Array.isArray(normalizados) ? normalizados : lugaresAtencion };
+      // Usar endpoint de Prestador para maximizar compatibilidad con backend
+      const res = await prestadoresService.updateHorarios(id, lugaresAtencion);
+      const updated = Array.isArray(res?.lugaresAtencion) ? res.lugaresAtencion : (Array.isArray(res) ? res : lugaresAtencion);
+      return { id, lugaresAtencion: updated };
     } catch (error) {
       return rejectWithValue(error.message || 'Error al actualizar horarios');
     }
