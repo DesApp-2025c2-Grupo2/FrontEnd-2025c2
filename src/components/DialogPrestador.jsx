@@ -8,9 +8,6 @@ import {
   Button,
   TextField,
   FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Box,
   Typography,
   IconButton,
@@ -24,6 +21,8 @@ import {
   Autocomplete,
   FormControlLabel,
   Switch,
+  Radio,
+  RadioGroup,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -627,32 +626,23 @@ export default function DialogPrestador({
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <FormControl fullWidth>
-                    <InputLabel>Tipo</InputLabel>
-                    <Select
+                    <Typography variant="caption" sx={{ color: 'text.secondary', mb: 0.5, display: 'block' }}>Tipo</Typography>
+                    <RadioGroup
+                      row
                       value={form.tipo}
                       onChange={(e) => {
                         const nuevoTipo = e.target.value;
                         setForm((prev) => ({
                           ...prev,
                           tipo: nuevoTipo,
-                          // reset center link if becomes Centro Médico
-                          vinculaCentro:
-                            nuevoTipo === "Profesional Independiente"
-                              ? prev.vinculaCentro
-                              : false,
-                          integraCentroMedicoId:
-                            nuevoTipo === "Profesional Independiente"
-                              ? prev.integraCentroMedicoId
-                              : null,
+                          vinculaCentro: nuevoTipo === "Profesional Independiente" ? prev.vinculaCentro : false,
+                          integraCentroMedicoId: nuevoTipo === "Profesional Independiente" ? prev.integraCentroMedicoId : null,
                         }));
                       }}
-                      label="Tipo"
                     >
-                      <MenuItem value="Profesional Independiente">
-                        Profesional Independiente
-                      </MenuItem>
-                      <MenuItem value="Centro Médico">Centro Médico</MenuItem>
-                    </Select>
+                      <FormControlLabel value="Profesional Independiente" control={<Radio size="small" color="secondary" />} label="Profesional Independiente" />
+                      <FormControlLabel value="Centro Médico" control={<Radio size="small" color="secondary" />} label="Centro Médico" />
+                    </RadioGroup>
                   </FormControl>
                 </Grid>
 

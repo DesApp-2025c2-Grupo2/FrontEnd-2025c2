@@ -205,8 +205,16 @@ function Prestadores() {
                 direccion: a?.direccion || '',
                 horarios: a?.horarios || a?.horariosAtencion || []
               }));
-              const lugaresFinal = [...lugaresMergeados, ...extras];
-              actuales[p.id] = { ...p, lugaresAtencion: lugaresFinal };
+              const dedup = [];
+              const seen = new Set();
+              [...lugaresMergeados, ...extras].forEach((l) => {
+                const key = (l && l.id != null) ? `id:${l.id}` : `dir:${normalizar(l?.direccion)}`;
+                if (key && !seen.has(key)) {
+                  seen.add(key);
+                  dedup.push(l);
+                }
+              });
+              actuales[p.id] = { ...p, lugaresAtencion: dedup };
             }).catch(() => {})
           );
         }
@@ -433,16 +441,17 @@ function Prestadores() {
           ),
         }}
         sx={{
-          mb: { xs: 3, sm: 4 },
+          mb: { xs: 2, sm: 4 },
           '& .MuiOutlinedInput-root': {
             borderRadius: 2,
-            fontSize: { xs: '0.875rem', sm: '1rem' }
+            fontSize: { xs: '0.95rem', sm: '1rem' },
+            py: { xs: 0.5, sm: 1 }
           }
         }}
       />
 
       {/* Lista de prestadores */}
-      <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <Box sx={{ mb: 4, display: 'flex', flexDirection: 'column', gap: 2, width: '100%' }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <CircularProgress />
@@ -595,7 +604,18 @@ function Prestadores() {
                           const key = (a?.id != null) ? `id:${a.id}` : `dir:${String(a?.direccion || '').trim().toLowerCase()}`;
                           return !matchedKeys.has(key);
                         }).map((a) => ({ id: a?.id ?? null, direccion: a?.direccion || '', horarios: a?.horarios || a?.horariosAtencion || [] }));
-                        n[rid] = { ...(base || {}), id: rid, lugaresAtencion: [...lugaresMergeados, ...extras] };
+                        const dedup = [];
+                        const seen = new Set();
+                        [...lugaresMergeados, ...extras].forEach((l) => {
+                          const key = (l && l.id != null)
+                            ? `id:${l.id}`
+                            : `dir:${String(l?.direccion || '').trim().toLowerCase()}`;
+                          if (key && !seen.has(key)) {
+                            seen.add(key);
+                            dedup.push(l);
+                          }
+                        });
+                        n[rid] = { ...(base || {}), id: rid, lugaresAtencion: dedup };
                       });
                       return n;
                     });
@@ -716,10 +736,20 @@ function Prestadores() {
                     direccion: a?.direccion || '',
                     horarios: a?.horarios || a?.horariosAtencion || []
                   }));
-                  const lugaresFinal = [...lugaresMergeados, ...extras];
+                  const dedup = [];
+                  const seen = new Set();
+                  [...lugaresMergeados, ...extras].forEach((l) => {
+                    const key = (l && l.id != null)
+                      ? `id:${l.id}`
+                      : `dir:${String(l?.direccion || '').trim().toLowerCase()}`;
+                    if (key && !seen.has(key)) {
+                      seen.add(key);
+                      dedup.push(l);
+                    }
+                  });
                   setPrestadoresConAgenda((prev) => {
                     const base = prev[rid] || {};
-                    return { ...prev, [rid]: { ...base, id: rid, lugaresAtencion: lugaresFinal } };
+                    return { ...prev, [rid]: { ...base, id: rid, lugaresAtencion: dedup } };
                   });
                   setRefreshingHorarios((prev) => ({ ...prev, [rid]: false }));
                 }));

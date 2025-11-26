@@ -62,9 +62,24 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
     return map;
   }, [todosPrestadores]);
 
+  const lugaresUnicos = React.useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    const normalizar = (s) => String(s || '').trim().toLowerCase();
+    (Array.isArray(prestador.lugaresAtencion) ? prestador.lugaresAtencion : []).forEach((l) => {
+      const key = (l && l.id != null) ? `id:${l.id}` : `dir:${normalizar(l?.direccion)}`;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        out.push(l);
+      }
+    });
+    return out;
+  }, [prestador.lugaresAtencion]);
+
   return (
     <Card
       sx={{
+        width: '100%',
         p: 2,
         mb: 2, 
         border: prestador.activo ? '1px solid #e0e0e0' : '1px solid #d1d5db',
@@ -75,7 +90,12 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
         transition: 'background-color 200ms ease, box-shadow 200ms ease, border-color 200ms ease',
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'flex-start' }}>
+      <Box sx={{
+        display: 'flex',
+        alignItems: { xs: 'stretch', md: 'flex-start' },
+        flexDirection: { xs: 'column', md: 'row' },
+        gap: { xs: 1.5, md: 0 }
+      }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
           <PersonIcon sx={{ fontSize: 40, color: '#1976d2' }} />
         </Box>
@@ -124,7 +144,19 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
           {/* Lugares de atención movidos fuera de la fila principal para ocupar ancho completo */}
         </Box>
 
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, ml: 3, minWidth: 140 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'row', md: 'column' },
+            gap: 1.5,
+            ml: { xs: 0, md: 3 },
+            minWidth: { md: 140 },
+            width: { xs: '100%', md: 'auto' },
+            '& > .MuiButton-root': {
+              flexGrow: { xs: 1, md: 0 }
+            }
+          }}
+        >
             <Button
             size="small"
               onClick={(e) => { 
@@ -166,11 +198,11 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
           </Button>
         </Box>
       </Box>
-      {prestador.lugaresAtencion && prestador.lugaresAtencion.length > 0 && (
+      {lugaresUnicos && lugaresUnicos.length > 0 && (
         <Accordion sx={{ mt: 2 }}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Typography variant="subtitle2">
-              Lugares de Atención ({prestador.lugaresAtencion.length})
+              Lugares de Atención ({lugaresUnicos.length})
             </Typography>
             {isRefreshing && (
               <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
@@ -181,7 +213,7 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
           </AccordionSummary>
           <AccordionDetails>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {prestador.lugaresAtencion.map((lugar, idx) => (
+              {lugaresUnicos.map((lugar, idx) => (
                 <Card key={idx} variant="outlined" sx={{ p: 1.5, borderColor: '#e0e0e0' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, gap: 1, flexWrap: 'wrap' }}>
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>

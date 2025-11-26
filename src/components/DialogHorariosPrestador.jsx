@@ -322,13 +322,9 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
 
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {(lugarActual.horarios || []).map((h, hIdx) => (
-                  <Card key={hIdx} variant="outlined" sx={{ p: 1.5, borderColor: selectedHorarioIndex === hIdx ? '#1976d2' : undefined, boxShadow: selectedHorarioIndex === hIdx ? 2 : 0 }}>
+                  <Card key={hIdx} variant="outlined" sx={{ p: 1.25, borderColor: selectedHorarioIndex === hIdx ? '#1976d2' : undefined, boxShadow: selectedHorarioIndex === hIdx ? 2 : 0 }}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
-                      {/* Botón eliminar siempre visible al principio de la fila */}
-                      <IconButton color="error" onClick={() => eliminarHorario(hIdx)} aria-label="Eliminar horario">
-                        <DeleteIcon />
-                      </IconButton>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, minWidth: 220 }}>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, minWidth: 220, '& .MuiFormControlLabel-label': { fontSize: '0.85rem' } }}>
                         {diasSemana.map((d) => (
                           <FormControlLabel
                             key={d}
@@ -344,7 +340,7 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
                                 }}
                               />
                             }
-                            label={d}
+                            label={<Typography variant="body2" sx={{ fontSize: '0.85rem' }}>{d}</Typography>}
                           />
                         ))}
                       </Box>
@@ -364,7 +360,7 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
                               InputLabelProps={{ shrink: true }}
                               inputProps={{ step: 300 }}
                             />
-                            <Typography variant="body2" color="text.secondary">a</Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>a</Typography>
                             <TextField
                               label="Hasta"
                               type="time"
@@ -451,6 +447,12 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
                           )}
                         </Box>
                       )}
+                      {/* Botón eliminar al extremo derecho */}
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flex: 1 }}>
+                        <IconButton color="error" onClick={() => eliminarHorario(hIdx)} aria-label="Eliminar horario" sx={{ ml: 'auto' }}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
                     </Stack>
                   </Card>
                 ))}

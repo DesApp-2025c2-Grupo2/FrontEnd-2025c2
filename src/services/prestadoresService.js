@@ -268,19 +268,25 @@ function toBackendPayload(prestador, options = {}) {
     base.profesionalesIds = prestador.profesionalesIds.filter((id) => typeof id === 'number');
   }
   if (includeDirecciones) {
-    const dirs = Array.isArray(prestador?.lugaresAtencion)
-      ? prestador.lugaresAtencion
-          .map(l => (typeof l === 'string' ? l : (l?.direccion || '')))
-          .map(s => String(s).trim())
-          .filter(s => s !== '')
-      : [];
+    // Contrato del backend: direcciones es array de strings
+    const raw = Array.isArray(prestador?.lugaresAtencion) ? prestador.lugaresAtencion : [];
     const seen = new Set();
-    base.direcciones = dirs.filter((d) => {
-      const k = d.toLowerCase();
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
+    base.direcciones = raw.map((l) => {
+      if (typeof l === 'string') return String(l).trim();
+      const calle = String(l?.calle || '').trim();
+      const altura = String(l?.altura || '').trim();
+      const direccion = String(l?.direccion || '').trim();
+      // Prioridad: calle + altura, si no direccion
+      const composed = (calle || altura) ? `${calle}${calle && altura ? ' ' : ''}${altura || ''}`.trim() : direccion;
+      return composed;
+    }).map((s) => String(s || '').trim())
+      .filter((s) => s !== '')
+      .filter((s) => {
+        const k = s.toLowerCase();
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
   }
   if (!includeLugares) return base;
   return {
@@ -289,6 +295,11 @@ function toBackendPayload(prestador, options = {}) {
     lugaresAtencion: Array.isArray(prestador?.lugaresAtencion)
       ? prestador.lugaresAtencion.map((l) => ({
           direccion: l?.direccion || '',
+          calle: l?.calle || undefined,
+          altura: l?.altura || undefined,
+          piso: l?.piso ?? undefined,
+          departamento: l?.departamento ?? undefined,
+          provinciaCiudad: l?.provinciaCiudad || undefined,
           horarios: Array.isArray(l?.horarios)
             ? l.horarios.map((h) => ({
                 dias: Array.isArray(h?.dias) ? h.dias : [],
@@ -356,6 +367,11 @@ function normalizeFromBackend(p, idToNombre) {
       return {
         id: l?.id ?? null,
         direccion,
+        calle: calle || undefined,
+        altura: alturaRaw || (alturaEsSN ? 'S/N' : undefined),
+        piso: l?.piso ?? null,
+        departamento: l?.departamento ?? null,
+        provinciaCiudad: l?.provinciaCiudad || undefined,
         horarios: buildHorarios(l),
       };
     });
@@ -371,6 +387,11 @@ function normalizeFromBackend(p, idToNombre) {
       return {
         id: d?.id || null,
         direccion,
+        calle: calle || undefined,
+        altura: alturaRaw || (alturaEsSN ? 'S/N' : undefined),
+        piso: d?.piso ?? null,
+        departamento: d?.departamento ?? null,
+        provinciaCiudad: d?.provinciaCiudad || undefined,
         horarios: buildHorarios(d),
       };
     });
@@ -459,6 +480,12 @@ export async function create(prestador) {
     const idToNombre = new Map((catalogo || []).map(e => [e.id, e.nombre]));
     if (creado && typeof creado === 'object' && creado.id) {
       const normal = normalizeFromBackend(creado, idToNombre);
+      // Persistir direcciones con contrato de Afiliados si el create no las tomó
+      if (Array.isArray(prestador?.lugaresAtencion) && prestador.lugaresAtencion.length > 0) {
+        try {
+          await update({ id: normal.id, lugaresAtencion: prestador.lugaresAtencion }, { includeDirecciones: true });
+        } catch (_) {}
+      }
       // Si se enviaron horarios inicialmente, intentar persistirlos ahora
       if (Array.isArray(prestador?.lugaresAtencion) && prestador.lugaresAtencion.some(l => Array.isArray(l?.horarios) && l.horarios.length > 0)) {
         try {
@@ -477,6 +504,12 @@ export async function create(prestador) {
       // Volver a cargar lista y devolver ese ítem
       const todos = await getAll();
       const match = todos.find(p => p.id === creado);
+      // Persistir direcciones si corresponde
+      if (match && Array.isArray(prestador?.lugaresAtencion) && prestador.lugaresAtencion.length > 0) {
+        try {
+          await update({ id: match.id, lugaresAtencion: prestador.lugaresAtencion }, { includeDirecciones: true });
+        } catch (_) {}
+      }
       // Actualizar horarios si correspondía
       if (match && Array.isArray(prestador?.lugaresAtencion) && prestador.lugaresAtencion.some(l => Array.isArray(l?.horarios) && l.horarios.length > 0)) {
         try {
