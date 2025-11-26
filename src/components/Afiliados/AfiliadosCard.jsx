@@ -73,7 +73,7 @@ export default function AfiliadosCard({
           : "white",
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "center" }}>
+      <Box sx={{ display: "flex",  flexDirection: { xs: "column", md: "row" }, alignItems: { xs: "stretch", md: "center" }}}>
         <Box sx={{ display: "flex", alignItems: "center", mr: 2 }}>
           <PersonIcon sx={{ fontSize: 40, color: "#1976d2" }} />
         </Box>
@@ -211,8 +211,10 @@ export default function AfiliadosCard({
             display: "flex",
             flexDirection: "column",
             gap: 1.5,
-            ml: 3,
-            minWidth: 140,
+            ml: { xs: 0, md: 3 },
+            mt: { xs: 2, md: 0 },
+            minWidth: { xs: "100%", md: 140 },
+            width: { xs: "100%", md: "auto" }
           }}
         >
           <Button
