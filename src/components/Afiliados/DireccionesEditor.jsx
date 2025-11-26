@@ -20,6 +20,7 @@ export default function DireccionesEditor({
     piso: "",
     departamento: "",
     provinciaCiudad: "",
+    codigoPostal: "",
   },
   onNewValueChange = () => {},
   onAdd = () => {},
@@ -30,6 +31,7 @@ export default function DireccionesEditor({
 
   const handleAdd = () => {
     const calle = newValue?.calle?.trim?.();
+    const codigoPostal = newValue?.codigoPostal?.trim?.();
     if (calle && calle.length > 0) {
       onAdd({
         ...newValue,
@@ -38,6 +40,7 @@ export default function DireccionesEditor({
         piso: newValue?.piso?.trim?.() || "",
         departamento: newValue?.departamento?.trim?.() || "",
         provinciaCiudad: newValue?.provinciaCiudad?.trim?.() || "",
+        codigoPostal: codigoPostal,
       });
 
       onNewValueChange({
@@ -46,6 +49,7 @@ export default function DireccionesEditor({
         piso: "",
         departamento: "",
         provinciaCiudad: "",
+        codigoPostal: "",
       });
     }
   };
@@ -81,6 +85,7 @@ export default function DireccionesEditor({
               }
               onKeyDown={handleKeyDown}
               disabled={disabled}
+              required
             />
           </Grid>
           <Grid item xs={12} sm={2}>
@@ -94,6 +99,7 @@ export default function DireccionesEditor({
               }
               onKeyDown={handleKeyDown}
               disabled={disabled}
+              required
             />
           </Grid>
           <Grid item xs={12} sm={2}>
@@ -136,6 +142,22 @@ export default function DireccionesEditor({
               }
               onKeyDown={handleKeyDown}
               disabled={disabled}
+              required
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Código Postal"
+              value={newValue.codigoPostal || ""}
+              onChange={(e) =>
+                onNewValueChange({ ...newValue, codigoPostal: e.target.value })
+              }
+              onKeyDown={handleKeyDown}
+              disabled={disabled}
+              required
+              inputProps={{ maxLength: 10 }} // Limitar longitud máxima
             />
           </Grid>
           <Grid item xs={12}>
@@ -143,7 +165,11 @@ export default function DireccionesEditor({
               onClick={handleAdd}
               color="secondary"
               aria-label="Agregar dirección"
-              disabled={disabled || !newValue?.calle?.trim?.()}
+              disabled={
+                disabled ||
+                !newValue?.calle?.trim?.() ||
+                !newValue?.codigoPostal?.trim?.()
+              }
             >
               <AddIcon />
             </IconButton>
@@ -185,6 +211,7 @@ export default function DireccionesEditor({
                     direccion.piso && `Piso ${direccion.piso}`,
                     direccion.departamento && `Dpto ${direccion.departamento}`,
                     direccion.provinciaCiudad,
+                    direccion.codigoPostal && `CP ${direccion.codigoPostal}`,
                   ]
                     .filter(Boolean)
                     .join(" - ")}

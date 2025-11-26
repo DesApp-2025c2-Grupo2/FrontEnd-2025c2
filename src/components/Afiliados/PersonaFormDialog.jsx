@@ -67,6 +67,7 @@ export default function PersonaFormDialog({
     piso: "",
     departamento: "",
     provinciaCiudad: "",
+    codigoPostal: "",
   });
 
   const isViewMode = !!selectedFamiliar && !isEditing;
@@ -91,10 +92,11 @@ export default function PersonaFormDialog({
       const piso = d.piso ? `, Piso ${d.piso}` : "";
       const dept = d.departamento ? `, Dept ${d.departamento}` : "";
       const provincia = d.provinciaCiudad ?? "";
+      const codigoPostal = d.codigoPostal ?? "";
       const calle = d.calle ?? "";
       return `${calle}${altura}${piso}${dept}${
         provincia ? `, ${provincia}` : ""
-      }`.trim();
+      }${codigoPostal}`.trim();
     }
     return String(d);
   };

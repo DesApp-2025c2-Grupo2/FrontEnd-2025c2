@@ -28,7 +28,10 @@ import { personasService } from "../services/personasService";
 import { parentescos } from "../utilidades/parentesco";
 import { updatePersona, createMember } from "../store/personasSlice";
 
-const hoyISO = () => new Date().toISOString().split("T")[0];
+const hoyISO = () => {
+  const aux = new Date().getTime() - 3 * 60 * 60 * 1000;
+  return new Date(aux).toISOString();
+};
 
 // Reemplazar la función actual por esta versión que compara fecha y hora completa
 const estaActivo = (alta, baja) => {
@@ -373,6 +376,7 @@ export default function Afiliados() {
                 piso: "",
                 departamento: "",
                 provinciaCiudad: "",
+                codigoPostal: "",
               }
             : {
                 id: d.id || 0,
@@ -381,6 +385,7 @@ export default function Afiliados() {
                 piso: d.piso || "",
                 departamento: d.departamento || "",
                 provinciaCiudad: d.provinciaCiudad || "",
+                codigoPostal: d.codigoPostal || "",
               }
         );
 
@@ -396,7 +401,7 @@ export default function Afiliados() {
         afiliadoId: selectedAfiliado.id,
         alta: formFamiliar.alta
           ? new Date(formFamiliar.alta).toISOString()
-          : new Date().toISOString(),
+          : hoyISO(),
         baja: formFamiliar.baja
           ? new Date(formFamiliar.baja).toISOString()
           : null,
@@ -485,12 +490,6 @@ export default function Afiliados() {
         return obj;
       };
 
-      // Asegurar que el tipo de documento sea numérico
-      const tipoDocumentoNumerico =
-        formAfiliado.tipoDocumento && !isNaN(formAfiliado.tipoDocumento)
-          ? formAfiliado.tipoDocumento
-          : 1; // Default a DNI si no es numérico
-
       // 1. Construir el TITULAR desde formAfiliado
       const titularPayload = {
         numeroIntegrante: 1,
@@ -503,7 +502,7 @@ export default function Afiliados() {
         afiliadoId: selectedAfiliado.id, // ID del afiliado
         alta: formAfiliado.alta
           ? new Date(formAfiliado.alta).toISOString().split("T")[0]
-          : new Date().toISOString().split("T")[0],
+          : hoyISO(),
         baja: null,
         documentacion: {
           tipoDocumento: parseInt(formAfiliado.tipoDocumento) || 1,
@@ -552,14 +551,16 @@ export default function Afiliados() {
                   altura: "",
                   piso: "",
                   departamento: "",
-                  provinciaCiudad: "Bs As",
+                  provinciaCiudad: "",
+                  codigoPostal: "",
                 }
               : {
                   calle: d.calle || "",
                   altura: d.altura || "",
                   piso: d.piso || "",
                   departamento: d.departamento || "",
-                  provinciaCiudad: d.provinciaCiudad || "Bs As",
+                  provinciaCiudad: d.provinciaCiudad || "",
+                  codigoPostal: d.codigoPostal || "",
                 }
           ),
 
@@ -581,9 +582,7 @@ export default function Afiliados() {
             ? new Date(i.fechaNacimiento).toISOString()
             : new Date().toISOString(),
           parentesco: parseInt(i.parentesco) || 2,
-          alta: i.alta
-            ? new Date(i.alta).toISOString()
-            : new Date().toISOString(),
+          alta: i.alta ? new Date(i.alta).toISOString() : hoyISO(),
           baja: i.baja ? new Date(i.baja).toISOString() : null,
           documentacion:
             i.tipoDocumento || i.numeroDocumento
@@ -621,6 +620,7 @@ export default function Afiliados() {
                     piso: "",
                     departamento: "",
                     provinciaCiudad: "",
+                    codigoPostal: "",
                   }
                 : {
                     calle: d.calle || "",
@@ -628,6 +628,7 @@ export default function Afiliados() {
                     piso: d.piso || "",
                     departamento: d.departamento || "",
                     provinciaCiudad: d.provinciaCiudad || "",
+                    codigoPostal: d.codigoPostal || "",
                   }
             ),
 
@@ -731,7 +732,7 @@ export default function Afiliados() {
           afiliadoId: selectedAfiliado.id, // ID del afiliado
           alta: formAfiliado.alta
             ? new Date(formAfiliado.alta).toISOString().split("T")[0]
-            : new Date().toISOString().split("T")[0],
+            : hoyISO(),
           baja: null,
           documentacion: {
             tipoDocumento: parseInt(formAfiliado.tipoDocumento) || 1,
@@ -772,7 +773,8 @@ export default function Afiliados() {
               altura: d.altura || "",
               piso: d.piso || "",
               departamento: d.departamento || "",
-              provinciaCiudad: d.provinciaCiudad || "Bs As",
+              provinciaCiudad: d.provinciaCiudad || "",
+              codigoPostal: d.codigoPostal || "",
             })),
           situacionesTerapeuticas: convertirSituacionesAObjeto(
             formAfiliado.situacionesTerapeuticasIds || []
@@ -939,7 +941,7 @@ export default function Afiliados() {
   // colores memoizados
   const getParentescoColor = useCallback(
     (parentescoId) =>
-      ({ 1: "#1976d2", 2: "#2e7d32", 3: "#f57c00", 4: "#757575" }[
+      ({ 0: "#1976d2", 1: "#2e7d32", 2: "#f57c00", 3: "#757575" }[
         parentescoId
       ] || "#757575"),
     []
@@ -947,7 +949,7 @@ export default function Afiliados() {
 
   const getPlanColor = useCallback(
     (planMedicoId) =>
-      ({ 1: "#cd7f32", 2: "#c0c0c0", 3: "#ffd700", 4: "#e5e4e2" }[
+      ({ 0: "#cd7f32", 1: "#c0c0c0", 2: "#ffd700", 3: "#e5e4e2" }[
         planMedicoId
       ] || "#757575"),
     []
