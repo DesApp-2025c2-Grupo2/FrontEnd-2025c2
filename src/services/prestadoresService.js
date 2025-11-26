@@ -251,16 +251,29 @@ function toBackendPayload(prestador, options = {}) {
     base.centroId = cmId; // compat
   }
   if (!partialUpdate || (Array.isArray(prestador?.especialidades))) {
-    base.especialidadesIds = idsFromEspecialidades;
+    base.especialidades = idsFromEspecialidades;
   }
-  if (!partialUpdate || prestador?.cuilCuit !== undefined) {
-    base.documentacion = prestador?.cuilCuit || '';
+  if (!partialUpdate || (prestador?.cuilCuit !== undefined || prestador?.documentacion !== undefined)) {
+    const doc = prestador?.documentacion || {};
+    base.documentacion = {
+      id: (typeof doc?.id === 'number') ? doc.id : 0,
+      tipoDocumento: (typeof doc?.tipoDocumento === 'number') ? doc.tipoDocumento : 0,
+      numero: (doc?.numero || prestador?.cuilCuit || '').toString()
+    };
   }
   if (!partialUpdate || Array.isArray(prestador?.telefonos)) {
-    base.telefonos = Array.isArray(prestador?.telefonos) ? prestador.telefonos.map(t => t?.numero).filter(Boolean) : [];
+    base.telefonos = Array.isArray(prestador?.telefonos)
+      ? prestador.telefonos
+          .map(t => (t ? { id: (typeof t.id === 'number') ? t.id : 0, numero: t?.numero || '' } : null))
+          .filter(x => x && x.numero)
+      : [];
   }
   if (!partialUpdate || Array.isArray(prestador?.emails)) {
-    base.emails = Array.isArray(prestador?.emails) ? prestador.emails.map(e => e?.email).filter(Boolean) : [];
+    base.emails = Array.isArray(prestador?.emails)
+      ? prestador.emails
+          .map(e => (e ? { id: (typeof e.id === 'number') ? e.id : 0, correo: e?.email || e?.correo || '' } : null))
+          .filter(x => x && x.correo)
+      : [];
   }
   // Campo opcional: listado de profesionales asociados al centro
   // Incluir siempre que venga, aunque no se envíe el tipo en este update parcial
@@ -268,25 +281,36 @@ function toBackendPayload(prestador, options = {}) {
     base.profesionalesIds = prestador.profesionalesIds.filter((id) => typeof id === 'number');
   }
   if (includeDirecciones) {
-    // Contrato del backend: direcciones es array de strings
+    // Contrato: direcciones es array de objetos
     const raw = Array.isArray(prestador?.lugaresAtencion) ? prestador.lugaresAtencion : [];
     const seen = new Set();
     base.direcciones = raw.map((l) => {
-      if (typeof l === 'string') return String(l).trim();
-      const calle = String(l?.calle || '').trim();
-      const altura = String(l?.altura || '').trim();
-      const direccion = String(l?.direccion || '').trim();
-      // Prioridad: calle + altura, si no direccion
-      const composed = (calle || altura) ? `${calle}${calle && altura ? ' ' : ''}${altura || ''}`.trim() : direccion;
-      return composed;
-    }).map((s) => String(s || '').trim())
-      .filter((s) => s !== '')
-      .filter((s) => {
-        const k = s.toLowerCase();
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      });
+      if (!l) return null;
+      const calle = (typeof l?.calle === 'string' && l.calle) ? l.calle : (l?.direccion || '');
+      const altura = typeof l?.altura === 'string' ? l.altura : '';
+      const piso = typeof l?.piso === 'string' ? l.piso : '';
+      const departamento = typeof l?.departamento === 'string' ? l.departamento : '';
+      const provinciaCiudad = typeof l?.provinciaCiudad === 'string' ? l.provinciaCiudad : '';
+      return {
+        id: (typeof l?.id === 'number') ? l.id : 0,
+        calle: String(calle || '').trim(),
+        altura: String(altura || '').trim(),
+        piso: String(piso || '').trim(),
+        departamento: String(departamento || '').trim(),
+        provinciaCiudad: String(provinciaCiudad || '').trim()
+      };
+    }).filter(Boolean).filter((d) => {
+      const key = `${(d.calle || '').toLowerCase()}|${(d.altura || '').toLowerCase()}`;
+      if (!d.calle) return false;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+  if (!partialUpdate) {
+    base.activo = prestador?.activo !== false;
+    base.alta = prestador?.alta || null;
+    base.baja = prestador?.baja || null;
   }
   if (!includeLugares) return base;
   return {

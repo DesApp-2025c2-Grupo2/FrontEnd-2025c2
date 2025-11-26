@@ -324,8 +324,13 @@ export default function DialogPrestador({
       lugaresAtencion: [
         ...prev.lugaresAtencion,
         {
-          id: Date.now(),
+          id: 0,
           direccion: "",
+          calle: "",
+          altura: "",
+          piso: "",
+          departamento: "",
+          provinciaCiudad: "",
           horarios: [],
         },
       ],
@@ -413,7 +418,8 @@ export default function DialogPrestador({
       errores.nombreCompleto = "Nombre completo requerido";
     }
 
-    if (form.especialidades.length === 0) {
+    // Especialidades obligatorias solo para Profesional Independiente
+    if (form.tipo === "Profesional Independiente" && form.especialidades.length === 0) {
       errores.especialidades = "Debe agregar al menos una especialidad";
     }
 
@@ -508,11 +514,16 @@ export default function DialogPrestador({
           }));
         return {
           id: l.id,
-          direccion: (l.direccion || "").trim(),
+          direccion: (l.direccion || `${String(l.calle || '').trim()} ${String(l.altura || '').trim()}`).trim(),
+          calle: (l.calle || '').trim(),
+          altura: (l.altura ?? '').trim(),
+          piso: (l.piso ?? '').trim(),
+          departamento: (l.departamento ?? '').trim(),
+          provinciaCiudad: (l.provinciaCiudad ?? '').trim(),
           horarios: horariosLimpios,
         };
       })
-      .filter((l) => isValidDireccion(l.direccion));
+      .filter((l) => isValidDireccion(l.calle || l.direccion));
 
     const integraCentroMedicoNormalizado =
       form.tipo === "Profesional Independiente" && form.vinculaCentro
@@ -687,6 +698,7 @@ export default function DialogPrestador({
                                   isOptionEqualToValue={(o, v) => o?.id === v?.id}
                                   value={valorCentro}
                                   disableClearable
+                                  openOnFocus
                                   onChange={(e, newValue) => {
                                     setForm((prev) => ({
                                       ...prev,
@@ -699,7 +711,7 @@ export default function DialogPrestador({
                                       {...params}
                                       label="Centro Médico"
                                       placeholder="Seleccionar centro"
-                                      inputProps={{ ...params.inputProps, readOnly: true }}
+                                      inputProps={{ ...params.inputProps }}
                                     />
                                   )}
                                   noOptionsText="No hay centros disponibles"
@@ -915,21 +927,61 @@ export default function DialogPrestador({
                     </Box>
 
                     <Grid container spacing={2}>
-                      <Grid item xs={12} sm={8}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
-                          label="Dirección"
-                          value={lugar.direccion}
-                          onChange={(e) =>
-                            actualizarLugarAtencion(
-                              lugarIndex,
-                              "direccion",
-                              e.target.value
-                            )
-                          }
+                          label="Calle"
+                          value={lugar.calle || ""}
+                          onChange={(e) => {
+                            const nuevaCalle = e.target.value;
+                            const nuevaDir = `${String(nuevaCalle || "").trim()} ${String(lugar.altura || "").trim()}`.trim();
+                            actualizarLugarAtencion(lugarIndex, "calle", nuevaCalle);
+                            actualizarLugarAtencion(lugarIndex, "direccion", nuevaDir);
+                          }}
                           fullWidth
-                          placeholder="Avenida Vergara 1908, CABA"
-                          error={intentoGuardar && !isValidDireccion(lugar.direccion)}
-                          helperText={intentoGuardar && !isValidDireccion(lugar.direccion) ? "Ingrese una dirección válida (calle y número/barrio)" : ""}
+                          placeholder="Avenida Vergara"
+                          error={intentoGuardar && !isValidDireccion(lugar.calle)}
+                          helperText={intentoGuardar && !isValidDireccion(lugar.calle) ? "Ingrese una calle válida" : ""}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          label="Altura"
+                          value={lugar.altura || ""}
+                          onChange={(e) => {
+                            const nuevaAltura = e.target.value;
+                            const nuevaDir = `${String(lugar.calle || "").trim()} ${String(nuevaAltura || "").trim()}`.trim();
+                            actualizarLugarAtencion(lugarIndex, "altura", nuevaAltura);
+                            actualizarLugarAtencion(lugarIndex, "direccion", nuevaDir);
+                          }}
+                          fullWidth
+                          placeholder="1234 o S/N"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          label="Piso"
+                          value={lugar.piso || ""}
+                          onChange={(e) => actualizarLugarAtencion(lugarIndex, "piso", e.target.value)}
+                          fullWidth
+                          placeholder="(opcional)"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          label="Depto"
+                          value={lugar.departamento || ""}
+                          onChange={(e) => actualizarLugarAtencion(lugarIndex, "departamento", e.target.value)}
+                          fullWidth
+                          placeholder="(opcional)"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Provincia/Ciudad"
+                          value={lugar.provinciaCiudad || ""}
+                          onChange={(e) => actualizarLugarAtencion(lugarIndex, "provinciaCiudad", e.target.value)}
+                          fullWidth
+                          placeholder="CABA / Buenos Aires ..."
                         />
                       </Grid>
                     </Grid>

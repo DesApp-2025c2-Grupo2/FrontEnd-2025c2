@@ -65,9 +65,15 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
   const lugaresUnicos = React.useMemo(() => {
     const seen = new Set();
     const out = [];
-    const normalizar = (s) => String(s || '').trim().toLowerCase();
+    const canonDir = (s) => String(s || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/\b(s\/?n|s\/?d)\b/gi, '')
+      .replace(/[,.;\-–—]+$/g, '')
+      .trim()
+      .toLowerCase();
     (Array.isArray(prestador.lugaresAtencion) ? prestador.lugaresAtencion : []).forEach((l) => {
-      const key = (l && l.id != null) ? `id:${l.id}` : `dir:${normalizar(l?.direccion)}`;
+      const key = (l && l.id != null) ? `id:${l.id}` : `dir:${canonDir(l?.direccion)}`;
       if (key && !seen.has(key)) {
         seen.add(key);
         out.push(l);
@@ -284,8 +290,9 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                             ? h.especialidades[0]
                             : ((typeof h.especialidadId === 'number' && h.especialidadId > 0) ? h.especialidadId : null);
                           const espNombre = (espId != null) ? especialidadIdToNombre.get(espId) : null;
-                          const profNombre = (prestador.tipo === 'Centro Médico' && typeof h.profesionalId === 'number')
-                            ? profesionalIdToNombre.get(h.profesionalId) : null;
+                          const pid = (typeof h.profesionalId === 'number') ? h.profesionalId : (typeof h.prestadorId === 'number' ? h.prestadorId : null);
+                          const profNombre = (prestador.tipo === 'Centro Médico' && typeof pid === 'number')
+                            ? profesionalIdToNombre.get(pid) : null;
                           return (
                             <Box
                               key={i}

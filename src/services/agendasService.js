@@ -57,7 +57,9 @@ function normalizeAgendaLugar(item) {
       especialidades = [espLugar];
     }
     const especialidadId = Array.isArray(especialidades) && especialidades.length > 0 ? especialidades[0] : null;
-    const profesionalId = (typeof h?.profesionalId === 'number' && h.profesionalId > 0) ? h.profesionalId : null;
+    // Backend ahora puede devolver prestadorId; mapearlo a profesionalId para la UI
+    const pid = (typeof h?.profesionalId === 'number') ? h.profesionalId : (typeof h?.prestadorId === 'number' ? h.prestadorId : null);
+    const profesionalId = (typeof pid === 'number' && pid > 0) ? pid : null;
     return { id: h?.id ?? null, dias, horaInicio, horaFin, duracionMinutos, especialidades, especialidadId, profesionalId };
   });
   return {
