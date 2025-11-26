@@ -226,27 +226,45 @@ export async function getById(id) {
 }
 
 function toBackendPayload(prestador, options = {}) {
-  const { includeLugares = true, includeDirecciones = true } = options;
+  const { includeLugares = true, includeDirecciones = true, partialUpdate = false } = options;
   const idsFromEspecialidades = Array.isArray(prestador?.especialidades)
     ? prestador.especialidades
         .map((e) => (typeof e === 'number' ? e : (e && e.id)))
         .filter((id) => typeof id === 'number')
     : [];
-  const base = {
-    nombreCompleto: prestador?.nombreCompleto || '',
-    rol: prestador?.tipo === 'Centro Médico' ? 2 : 1,
-    centroMedico: prestador?.centroMedico || '',
-    centroMedicoId: (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined,
-    integraCentroMedicoId: (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined,
-    // Compat: si el backend publica CentroId, lo incluimos también
-    centroId: (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined,
-    especialidadesIds: idsFromEspecialidades,
-    documentacion: prestador?.cuilCuit || '',
-    telefonos: Array.isArray(prestador?.telefonos) ? prestador.telefonos.map(t => t?.numero).filter(Boolean) : [],
-    emails: Array.isArray(prestador?.emails) ? prestador.emails.map(e => e?.email).filter(Boolean) : [],
-  };
-  // Si es Centro Médico y el front envía asociaciones directas, incluirlas
-  if (prestador?.tipo === 'Centro Médico' && Array.isArray(prestador?.profesionalesIds)) {
+  const base = {};
+  // Para updates parciales, solo incluir campos presentes para no sobreescribir con nulls/''
+  if (!partialUpdate || prestador?.nombreCompleto !== undefined) {
+    base.nombreCompleto = prestador?.nombreCompleto || '';
+  }
+  if (!partialUpdate || prestador?.tipo !== undefined) {
+    base.rol = prestador?.tipo === 'Centro Médico' ? 0 : 1;
+  }
+  if (!partialUpdate || prestador?.centroMedico !== undefined) {
+    base.centroMedico = prestador?.centroMedico || '';
+  }
+  const cmId =
+    (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined;
+  if (!partialUpdate || cmId !== undefined) {
+    base.centroMedicoId = cmId;
+    base.integraCentroMedicoId = cmId;
+    base.centroId = cmId; // compat
+  }
+  if (!partialUpdate || (Array.isArray(prestador?.especialidades))) {
+    base.especialidadesIds = idsFromEspecialidades;
+  }
+  if (!partialUpdate || prestador?.cuilCuit !== undefined) {
+    base.documentacion = prestador?.cuilCuit || '';
+  }
+  if (!partialUpdate || Array.isArray(prestador?.telefonos)) {
+    base.telefonos = Array.isArray(prestador?.telefonos) ? prestador.telefonos.map(t => t?.numero).filter(Boolean) : [];
+  }
+  if (!partialUpdate || Array.isArray(prestador?.emails)) {
+    base.emails = Array.isArray(prestador?.emails) ? prestador.emails.map(e => e?.email).filter(Boolean) : [];
+  }
+  // Campo opcional: listado de profesionales asociados al centro
+  // Incluir siempre que venga, aunque no se envíe el tipo en este update parcial
+  if (Array.isArray(prestador?.profesionalesIds)) {
     base.profesionalesIds = prestador.profesionalesIds.filter((id) => typeof id === 'number');
   }
   if (includeDirecciones) {
@@ -370,11 +388,13 @@ function normalizeFromBackend(p, idToNombre) {
     id: p.id,
     cuilCuit: p?.documentacion?.numero || p?.documentacion || '',
     nombreCompleto: p?.nombreCompleto || '',
-    tipo: (p?.rol === 2 ? 'Centro Médico' : 'Profesional Independiente'),
-    rol: (typeof p?.rol === 'number') ? p.rol : (p?.tipo === 'Centro Médico' ? 2 : 1),
+    tipo: (p?.rol === 0 ? 'Centro Médico' : 'Profesional Independiente'),
+    rol: (typeof p?.rol === 'number') ? p.rol : (p?.tipo === 'Centro Médico' ? 0 : 1),
     integraCentroMedicoId: (typeof p?.integraCentroMedicoId === 'number')
       ? p.integraCentroMedicoId
-      : (typeof p?.centroMedicoId === 'number' ? p.centroMedicoId : null),
+      : (typeof p?.centroMedicoId === 'number')
+        ? p.centroMedicoId
+        : (typeof p?.centroId === 'number' ? p.centroId : null),
     centroMedicoNombre: typeof p?.centroMedico === 'string' ? p.centroMedico : undefined,
     especialidades,
     telefonos: Array.isArray(p?.telefonos) ? p.telefonos.map(t => ({ numero: t?.numero || t })) : [],
@@ -498,7 +518,7 @@ export async function create(prestador) {
 export async function update(partial, options = {}) {
   try {
     const includeDirecciones = !!options.includeDirecciones;
-    const payload = toBackendPayload(partial, { includeLugares: false, includeDirecciones });
+    const payload = toBackendPayload(partial, { includeLugares: false, includeDirecciones, partialUpdate: true });
     // Preferir PUT /Prestador/{id}
     let res = null;
     if (partial && partial.id != null) {

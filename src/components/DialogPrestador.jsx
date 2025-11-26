@@ -188,7 +188,7 @@ export default function DialogPrestador({
   const todosPrestadores = useSelector(selectPrestadores);
 
   const centrosMedicos = (todosPrestadores || []).filter(
-    (p) => p?.rol === 2 || p?.tipo === "Centro Médico"
+    (p) => p?.rol === 0 || p?.tipo === "Centro Médico"
   );
 
   // Si el prestador viene con nombre de centro pero sin ID, intentar resolver solo una vez

@@ -27,6 +27,7 @@ import {
 import TarjetaPrestadorSimple from '../components/TarjetaPrestadorSimple';
 import DialogPrestador from '../components/DialogPrestador';
 import DialogVerPrestador from '../components/DialogVerPrestador';
+import DialogVerCentroAgendas from '../components/DialogVerCentroAgendas.jsx';
 import DialogHorariosPrestador from '../components/DialogHorariosPrestador';
 import * as agendasService from '../services/agendasService';
 import {
@@ -52,6 +53,7 @@ function Prestadores() {
   const [dialogoAgregar, setDialogoAgregar] = useState(false);
   const [dialogoEditar, setDialogoEditar] = useState(false);
   const [dialogoVer, setDialogoVer] = useState(false);
+  const [dialogoVerCentro, setDialogoVerCentro] = useState(false);
   const [dialogoHorarios, setDialogoHorarios] = useState(false);
   const [prestadoresConAgenda, setPrestadoresConAgenda] = useState({}); // id -> prestador mergeado
   const [horariosContext, setHorariosContext] = useState({ lugarIndex: 0, horarioIndex: null });
@@ -93,51 +95,121 @@ function Prestadores() {
           return;
         }
         // Si no hay cache, cargar agendas y mergear
-        promises.push(
-          agendasService.getByProfesional(p.id).then((agendas) => {
-            if (cancelado) return;
-            const listaAgendas = Array.isArray(agendas) ? agendas : [];
-            const normalizar = (s) => String(s || '').trim().toLowerCase();
-            const lugaresBase = Array.isArray(p.lugaresAtencion) ? JSON.parse(JSON.stringify(p.lugaresAtencion)) : [];
-            const matchedKeys = new Set();
-            const lugaresMergeados = lugaresBase.map((l) => {
-              const lid = l?.id;
-              const dirNorm = normalizar(l?.direccion);
-              // Tomar todas las agendas que correspondan por id de lugar (lugarId/id) o por dirección normalizada
-              const matches = listaAgendas.filter((a) => {
-                const aLugarId = a?.lugarId ?? a?.lugarAtencionId ?? a?.id;
-                const aDirNorm = normalizar(a?.direccion);
-                const matchId = lid != null && (String(aLugarId) === String(lid));
-                const matchDir = !!dirNorm && aDirNorm === dirNorm;
-                return matchId || matchDir;
-              });
-              if (matches.length > 0) {
-                const primera = matches[0];
-                const horarios = matches.flatMap((m) => m.horarios || m.horariosAtencion || []);
-                const nuevoId = lid != null ? lid : (primera?.lugarId ?? primera?.lugarAtencionId ?? primera?.id ?? null);
-                const nuevaDir = l.direccion || primera?.direccion || '';
-                // Marcar como matcheadas todas las agendas usadas
-                matches.forEach((m) => {
-                  const key = (m?.id != null) ? `id:${m.id}` : `dir:${normalizar(m?.direccion)}`;
-                  matchedKeys.add(key);
+        if (p.tipo === 'Centro Médico') {
+          // Preferir endpoint del backend para centros; fallback a fan-out
+          promises.push(
+            agendasService.getByCentro(p.id).then(async (profList) => {
+              if (cancelado) return;
+              const canonDir = (s) => {
+                return String(s || '')
+                  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                  .replace(/\s+/g, ' ')
+                  .replace(/\b(s\/?n|s\/?d)\b/gi, '')
+                  .replace(/[,.;\-–—]+$/g, '')
+                  .trim()
+                  .toLowerCase();
+              };
+              const lugares = [];
+              const keyMap = new Map(); // key -> index
+              const addHorario = (lugarId, dir, horario, pid) => {
+                const key = (typeof lugarId === 'number') ? `id:${lugarId}` : `dir:${canonDir(dir)}`;
+                let idx = keyMap.get(key);
+                if (idx === undefined) {
+                  idx = lugares.length;
+                  keyMap.set(key, idx);
+                  lugares.push({ id: (typeof lugarId === 'number' ? lugarId : null), direccion: dir, horarios: [] });
+                }
+                const lista = lugares[idx].horarios;
+                // evitar duplicados exactos
+                const dias = Array.isArray(horario?.dias) ? horario.dias : (Array.isArray(horario?.diasDeLaSemana) ? horario.diasDeLaSemana : []);
+                const espId = (Array.isArray(horario?.especialidades) && horario.especialidades.length > 0)
+                  ? horario.especialidades[0]
+                  : ((typeof horario?.especialidadId === 'number') ? horario.especialidadId : null);
+                const dupKey = JSON.stringify({
+                  d: [...dias].sort(),
+                  hi: horario?.horaInicio || horario?.desde,
+                  hf: horario?.horaFin || horario?.hasta,
+                  pid,
+                  esp: espId
                 });
-                return { ...l, id: nuevoId, direccion: nuevaDir, horarios };
+                const exists = lista.some(x => {
+                  const xd = Array.isArray(x?.dias) ? x.dias : (Array.isArray(x?.diasDeLaSemana) ? x.diasDeLaSemana : []);
+                  const xEsp = (Array.isArray(x?.especialidades) && x.especialidades.length > 0) ? x.especialidades[0] : ((typeof x?.especialidadId === 'number') ? x.especialidadId : null);
+                  const xKey = JSON.stringify({ d: [...xd].sort(), hi: x?.horaInicio || x?.desde, hf: x?.horaFin || x?.hasta, pid: x?.profesionalId, esp: xEsp });
+                  return xKey === dupKey;
+                });
+                if (!exists) lista.push({ ...horario, profesionalId: pid });
+              };
+              if (Array.isArray(profList) && profList.length > 0) {
+                profList.forEach(pr => {
+                  (pr?.direcciones || []).forEach(l => {
+                    const horarios = Array.isArray(l?.horarios) ? l.horarios : (Array.isArray(l?.horariosAtencion) ? l.horariosAtencion : []);
+                    horarios.forEach(h => addHorario(l?.id ?? l?.lugarId ?? null, l?.direccion || '', h, pr.profesionalId));
+                  });
+                });
+                actuales[p.id] = { ...p, lugaresAtencion: lugares };
+                return;
               }
-              return l;
-            });
-            // Agregar agendas que no matchearon ningún lugar base (union)
-            const extras = listaAgendas.filter((a) => {
-              const key = (a?.id != null) ? `id:${a.id}` : `dir:${normalizar(a?.direccion)}`;
-              return !matchedKeys.has(key);
-            }).map((a) => ({
-              id: a?.id ?? null,
-              direccion: a?.direccion || '',
-              horarios: a?.horarios || a?.horariosAtencion || []
-            }));
-            const lugaresFinal = [...lugaresMergeados, ...extras];
-            actuales[p.id] = { ...p, lugaresAtencion: lugaresFinal };
-          }).catch(() => {})
-        );
+              // Fallback: usar profesionales asociados
+              const asociados = (prestadoresTodos || []).filter(x => (x?.tipo === 'Profesional Independiente' || x?.rol === 1) && x?.integraCentroMedicoId === p.id);
+              const reqs = asociados.map(ap => agendasService.getByProfesional(ap.id).then((ags) => ({ ap, ags })).catch(() => ({ ap, ags: [] })));
+              const arr = await Promise.all(reqs);
+              arr.forEach(({ ap, ags }) => {
+                (Array.isArray(ags) ? ags : []).forEach((l) => {
+                  const horarios = Array.isArray(l?.horarios) ? l.horarios : (Array.isArray(l?.horariosAtencion) ? l.horariosAtencion : []);
+                  horarios.forEach((h) => addHorario(l?.id ?? l?.lugarId ?? null, l?.direccion || '', h, ap.id));
+                });
+              });
+              actuales[p.id] = { ...p, lugaresAtencion: lugares };
+            })
+          );
+        } else {
+          promises.push(
+            agendasService.getByProfesional(p.id).then((agendas) => {
+              if (cancelado) return;
+              const listaAgendas = Array.isArray(agendas) ? agendas : [];
+              const normalizar = (s) => String(s || '').trim().toLowerCase();
+              const lugaresBase = Array.isArray(p.lugaresAtencion) ? JSON.parse(JSON.stringify(p.lugaresAtencion)) : [];
+              const matchedKeys = new Set();
+              const lugaresMergeados = lugaresBase.map((l) => {
+                const lid = l?.id;
+                const dirNorm = normalizar(l?.direccion);
+                // Tomar todas las agendas que correspondan por id de lugar (lugarId/id) o por dirección normalizada
+                const matches = listaAgendas.filter((a) => {
+                  const aLugarId = a?.lugarId ?? a?.lugarAtencionId ?? a?.id;
+                  const aDirNorm = normalizar(a?.direccion);
+                  const matchId = lid != null && (String(aLugarId) === String(lid));
+                  const matchDir = !!dirNorm && aDirNorm === dirNorm;
+                  return matchId || matchDir;
+                });
+                if (matches.length > 0) {
+                  const primera = matches[0];
+                  const horarios = matches.flatMap((m) => m.horarios || m.horariosAtencion || []);
+                  const nuevoId = lid != null ? lid : (primera?.lugarId ?? primera?.lugarAtencionId ?? primera?.id ?? null);
+                  const nuevaDir = l.direccion || primera?.direccion || '';
+                  // Marcar como matcheadas todas las agendas usadas
+                  matches.forEach((m) => {
+                    const key = (m?.id != null) ? `id:${m.id}` : `dir:${normalizar(m?.direccion)}`;
+                    matchedKeys.add(key);
+                  });
+                  return { ...l, id: nuevoId, direccion: nuevaDir, horarios };
+                }
+                return l;
+              });
+              // Agregar agendas que no matchearon ningún lugar base (union)
+              const extras = listaAgendas.filter((a) => {
+                const key = (a?.id != null) ? `id:${a.id}` : `dir:${normalizar(a?.direccion)}`;
+                return !matchedKeys.has(key);
+              }).map((a) => ({
+                id: a?.id ?? null,
+                direccion: a?.direccion || '',
+                horarios: a?.horarios || a?.horariosAtencion || []
+              }));
+              const lugaresFinal = [...lugaresMergeados, ...extras];
+              actuales[p.id] = { ...p, lugaresAtencion: lugaresFinal };
+            }).catch(() => {})
+          );
+        }
       });
       if (promises.length > 0) {
         await Promise.all(promises);
@@ -164,7 +236,11 @@ function Prestadores() {
   // Handlers para los botones
   const handleVer = (prestador) => {
     setPrestadorSeleccionado(prestador);
-    setDialogoVer(true);
+    if (prestador?.tipo === 'Centro Médico' || prestador?.rol === 0) {
+      setDialogoVerCentro(true);
+    } else {
+      setDialogoVer(true);
+    }
   };
 
   const handleEditar = (prestador) => {
@@ -255,13 +331,8 @@ function Prestadores() {
             ...toAdd.map(id => dispatch(editarPrestador({ id, integraCentroMedicoId: centroId })).unwrap()),
             ...toRemove.map(id => dispatch(editarPrestador({ id, integraCentroMedicoId: null })).unwrap()),
           ]);
-          // Enviar profesionalesIds al centro para reflejar asociaciones
-          try {
-            const asociadosIds = (Array.isArray(prestadoresTodos) ? prestadoresTodos : [])
-              .filter(p => p?.integraCentroMedicoId === centroId)
-              .map(p => p.id);
-            await dispatch(editarPrestador({ id: centroId, profesionalesIds: asociadosIds })).unwrap();
-          } catch (_) {}
+          // Evitar actualizar el centro con profesionalesIds si el backend exige payload completo
+          // La asociación se refleja vía integraCentroMedicoId en cada profesional
         }
       }
 
@@ -305,13 +376,6 @@ function Prestadores() {
             ...toAdd.map(id => dispatch(editarPrestador({ id, integraCentroMedicoId: centroId })).unwrap()),
             ...toRemove.map(id => dispatch(editarPrestador({ id, integraCentroMedicoId: null })).unwrap()),
           ]);
-          // Actualizar profesionalesIds en el centro
-          try {
-            const asociadosIds = (Array.isArray(prestadoresTodos) ? prestadoresTodos : [])
-              .filter(p => p?.integraCentroMedicoId === centroId)
-              .map(p => p.id);
-            await dispatch(editarPrestador({ id: centroId, profesionalesIds: asociadosIds })).unwrap();
-          } catch (_) {}
         }
       }
       // Refrescar cache local inmediatamente
@@ -465,6 +529,18 @@ function Prestadores() {
         }}
       />
 
+      {/* Diálogo Ver Agendas de Centro */}
+      {dialogoVerCentro && prestadorSeleccionado && (
+        <DialogVerCentroAgendas
+          abierto={dialogoVerCentro}
+          centro={prestadorSeleccionado}
+          onCerrar={() => {
+            setDialogoVerCentro(false);
+            setPrestadorSeleccionado(null);
+          }}
+        />
+      )}
+
       {/* Gestión de horarios por dirección (CRUD de disponibilidad + duración) */}
       {dialogoHorarios && prestadorSeleccionado && (
         <DialogHorariosPrestador
@@ -480,13 +556,85 @@ function Prestadores() {
           }}
           onGuardar={async (prestadorActualizado) => {
             try {
-              if (prestadorActualizado && prestadorActualizado.isCentro && prestadorActualizado.actualizacionesPorProfesional) {
-                const entries = Object.entries(prestadorActualizado.actualizacionesPorProfesional);
-                if (entries.length === 0) throw new Error('Debe asignar al menos un horario a un profesional');
-                await Promise.all(entries.map(([pid, lugares]) => {
-                  const profId = Number(pid);
-                  return dispatch(actualizarHorariosPrestador({ id: profId, lugaresAtencion: Array.isArray(lugares) ? lugares : [] })).unwrap();
-                }));
+              if (prestadorActualizado && prestadorActualizado.isCentro) {
+                const centroId = prestadorActualizado.id || prestadorSeleccionado?.id;
+                if (!centroId) throw new Error('ID de centro no disponible');
+                // Dos caminos: múltiples updates por profesional o una estructura completa
+                if (prestadorActualizado.actualizacionesPorProfesional) {
+                  const entries = Object.entries(prestadorActualizado.actualizacionesPorProfesional);
+                  if (entries.length === 0) throw new Error('Debe asignar al menos un horario a un profesional');
+                  await Promise.all(entries.map(([pid, lugares]) => {
+                    const profId = Number(pid);
+                    return dispatch(actualizarHorariosPrestador({ id: profId, lugaresAtencion: Array.isArray(lugares) ? lugares : [] })).unwrap();
+                  }));
+                  // Refresco en caliente la cache local de cada profesional afectado
+                  try {
+                    const idsToRefresh = entries.map(([pid]) => Number(pid)).filter((x) => !isNaN(x));
+                    const reqs = idsToRefresh.map((rid) =>
+                      agendasService.getByProfesional(rid).then((ags) => ({ rid, ags: Array.isArray(ags) ? ags : [] })).catch(() => ({ rid, ags: [] }))
+                    );
+                    const arr = await Promise.all(reqs);
+                    setPrestadoresConAgenda((prev) => {
+                      const n = { ...prev };
+                      arr.forEach(({ rid, ags }) => {
+                        const agendaById = new Map((ags || []).map((a) => [a.id, a]));
+                        const agendaByDir = new Map((ags || []).map((a) => [String(a.direccion || '').trim().toLowerCase(), a]));
+                        const base = n[rid] || {};
+                        const lugaresBase = JSON.parse(JSON.stringify(base?.lugaresAtencion || []));
+                        const matchedKeys = new Set();
+                        const lugaresMergeados = lugaresBase.map((l) => {
+                          const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(String(l.direccion || '').trim().toLowerCase());
+                          if (a) {
+                            const key = (a?.id != null) ? `id:${a.id}` : `dir:${String(a?.direccion || '').trim().toLowerCase()}`;
+                            matchedKeys.add(key);
+                            return { ...l, horarios: a.horarios || a.horariosAtencion || [] };
+                          }
+                          return l;
+                        });
+                        const extras = (ags || []).filter((a) => {
+                          const key = (a?.id != null) ? `id:${a.id}` : `dir:${String(a?.direccion || '').trim().toLowerCase()}`;
+                          return !matchedKeys.has(key);
+                        }).map((a) => ({ id: a?.id ?? null, direccion: a?.direccion || '', horarios: a?.horarios || a?.horariosAtencion || [] }));
+                        n[rid] = { ...(base || {}), id: rid, lugaresAtencion: [...lugaresMergeados, ...extras] };
+                      });
+                      return n;
+                    });
+                  } catch (_) {}
+                } else {
+                  const lugaresAtencion = prestadorActualizado.lugaresAtencion || [];
+                  // Vincular profesionales referenciados
+                  const usados = new Set();
+                  (Array.isArray(lugaresAtencion) ? lugaresAtencion : []).forEach((l) => {
+                    (Array.isArray(l?.horarios) ? l.horarios : []).forEach((h) => {
+                      if (typeof h?.profesionalId === 'number') usados.add(h.profesionalId);
+                    });
+                  });
+                  const todos = (Array.isArray(prestadoresTodos) ? prestadoresTodos : []);
+                  const actualesIds = new Set(todos.filter(p => p?.integraCentroMedicoId === centroId).map(p => p.id));
+                  const toLink = [...usados].filter(id => !actualesIds.has(id));
+                  if (toLink.length > 0) {
+                    await Promise.allSettled(toLink.map(id => dispatch(editarPrestador({ id, integraCentroMedicoId: centroId })).unwrap()));
+                  }
+                  await dispatch(actualizarHorariosPrestador({ id: centroId, lugaresAtencion, isCentro: true })).unwrap();
+                  // Refresco en caliente profesionales usados
+                  try {
+                    const idsToRefresh = [...usados];
+                    const reqs = idsToRefresh.map((rid) =>
+                      agendasService.getByProfesional(rid).then((ags) => ({ rid, ags: Array.isArray(ags) ? ags : [] })).catch(() => ({ rid, ags: [] }))
+                    );
+                    const arr = await Promise.all(reqs);
+                    setPrestadoresConAgenda((prev) => {
+                      const n = { ...prev };
+                      arr.forEach(({ rid, ags }) => {
+                        const base = n[rid] || {};
+                        n[rid] = { ...(base || {}), id: rid, lugaresAtencion: (Array.isArray(ags) ? ags : []).map(a => ({ id: a?.id ?? null, direccion: a?.direccion || '', horarios: a?.horarios || a?.horariosAtencion || [] })) };
+                      });
+                      return n;
+                    });
+                  } catch (_) {}
+                }
+                // Refrescar cache base y UI
+                dispatch(cargarPrestadores());
               } else {
                 // Preferir el ID del prestadorActualizado (modo profesional)
                 const id = prestadorActualizado?.id || prestadorSeleccionado?.id;

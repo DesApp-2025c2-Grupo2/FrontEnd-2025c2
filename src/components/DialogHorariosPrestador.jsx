@@ -18,7 +18,9 @@ import {
   IconButton,
   TextField,
   Alert,
-  Autocomplete
+  Autocomplete,
+  Checkbox,
+  FormControlLabel
 } from '@mui/material';
 import {
   Schedule as ScheduleIcon,
@@ -35,7 +37,6 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
   const [lugarIndex, setLugarIndex] = useState(0);
   const [selectedHorarioIndex, setSelectedHorarioIndex] = useState(null);
   const [local, setLocal] = useState(null);
-  const [selectedProfesionalId, setSelectedProfesionalId] = useState(null); // usado solo para modo "cargar desde prof" si quisiéramos
   const prestadores = useSelector(selectPrestadores);
   const profesionalesDelCentro = useMemo(() => {
     if (!prestador || prestador?.tipo !== 'Centro Médico') return [];
@@ -64,9 +65,77 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
         ? Number(initialHorarioIndex)
         : null
     );
-    // En todos los casos partimos del prestador recibido como base (centro o profesional)
-    setLocal(JSON.parse(JSON.stringify(prestador)));
-  }, [abierto, prestador, initialLugarIndex, initialHorarioIndex]);
+
+    async function init() {
+      // profesional independiente
+      if (prestador?.tipo !== 'Centro Médico') {
+        setLocal(JSON.parse(JSON.stringify(prestador)));
+        return;
+      }
+      // Centro: cargar todas las agendas y unificarlas por dirección
+      try {
+        const profList = await agendasService.getByCentro(prestador.id);
+        const lugares = [];
+        const canonDir = (s) => {
+          return String(s || '')
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ')
+            .replace(/\b(s\/?n|s\/?d)\b/gi, '')
+            .replace(/[,.;\-–—]+$/g, '')
+            .trim()
+            .toLowerCase();
+        };
+        const keyMap = new Map(); // key -> index
+        const add = (dir, h, pid, lugarId) => {
+          const key = (typeof lugarId === 'number') ? `id:${lugarId}` : `dir:${canonDir(dir)}`;
+          let idx = keyMap.get(key);
+          if (idx === undefined) {
+            idx = lugares.length;
+            keyMap.set(key, idx);
+            lugares.push({ id: (typeof lugarId === 'number' ? lugarId : null), direccion: dir, horarios: [] });
+          }
+          const lista = lugares[idx].horarios;
+          const dias = Array.isArray(h?.dias) ? h.dias : (Array.isArray(h?.diasDeLaSemana) ? h.diasDeLaSemana : []);
+          const espId = (Array.isArray(h?.especialidades) && h.especialidades.length > 0)
+            ? h.especialidades[0]
+            : ((typeof h?.especialidadId === 'number') ? h.especialidadId : null);
+          const dupKey = JSON.stringify({ d: [...dias].sort(), hi: h?.horaInicio || h?.desde, hf: h?.horaFin || h?.hasta, pid, esp: espId });
+          const exists = lista.some(x => {
+            const xd = Array.isArray(x?.dias) ? x.dias : (Array.isArray(x?.diasDeLaSemana) ? x.diasDeLaSemana : []);
+            const xEsp = (Array.isArray(x?.especialidades) && x.especialidades.length > 0) ? x.especialidades[0] : ((typeof x?.especialidadId === 'number') ? x.especialidadId : null);
+            const xKey = JSON.stringify({ d: [...xd].sort(), hi: x?.horaInicio || x?.desde, hf: x?.horaFin || x?.hasta, pid: x?.profesionalId, esp: xEsp });
+            return xKey === dupKey;
+          });
+        if (!exists) lista.push({ ...h, profesionalId: pid, lugarId: (typeof lugarId === 'number' ? lugarId : (typeof h?.lugarId === 'number' ? h.lugarId : null)) });
+        };
+        if (Array.isArray(profList) && profList.length > 0) {
+          profList.forEach(pr => {
+            (pr?.direcciones || []).forEach(l => {
+              const hs = Array.isArray(l?.horarios) ? l.horarios : (Array.isArray(l?.horariosAtencion) ? l.horariosAtencion : []);
+              hs.forEach(h => add(l?.direccion || '', h, pr.profesionalId, l?.id ?? l?.lugarId ?? null));
+            });
+          });
+        } else {
+          // Fallback fan-out
+          const reqs = (profesionalesDelCentro || []).map(p =>
+            agendasService.getByProfesional(p.id).then((dirs) => ({ p, dirs: Array.isArray(dirs) ? dirs : [] })).catch(() => ({ p, dirs: [] }))
+          );
+          const arr = await Promise.all(reqs);
+          arr.forEach(({ p, dirs }) => {
+            (dirs || []).forEach(l => {
+              const hs = Array.isArray(l?.horarios) ? l.horarios : (Array.isArray(l?.horariosAtencion) ? l.horariosAtencion : []);
+              hs.forEach(h => add(l?.direccion || '', h, p.id, l?.id ?? l?.lugarId ?? null));
+            });
+          });
+        }
+        setLocal({ ...prestador, lugaresAtencion: lugares });
+        setLugarIndex(0);
+      } catch {
+        setLocal({ ...prestador, lugaresAtencion: [] });
+      }
+    }
+    init();
+  }, [abierto, prestador, initialLugarIndex, initialHorarioIndex, profesionalesDelCentro]);
 
   // No preseleccionar especialidad; el usuario debe elegirla explícitamente
 
@@ -77,7 +146,7 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
     setLugarIndex(idx);
   };
 
-  // Para centro, la asignación de profesional será por-horario (h.profesionalId).
+  // Para centro: se ven todos los horarios por dirección; el profesional solo se elige al crear uno nuevo
 
   const agregarHorario = () => {
     const copia = JSON.parse(JSON.stringify(local));
@@ -93,10 +162,28 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
     setLocal(copia);
   };
 
-  const eliminarHorario = (hIndex) => {
+  const eliminarHorario = async (hIndex) => {
+    const h = local?.lugaresAtencion?.[lugarIndex]?.horarios?.[hIndex];
+    const l = local?.lugaresAtencion?.[lugarIndex];
+    // Intentar eliminación inmediata en backend si hay ids
+    try {
+      if (h && typeof h?.id === 'number') {
+        if (prestador?.tipo === 'Centro Médico') {
+          const profId = h?.profesionalId;
+          const lugarId = (typeof h?.lugarId === 'number') ? h.lugarId : (typeof l?.id === 'number' ? l.id : null);
+          if (typeof profId === 'number' && typeof lugarId === 'number') {
+            await agendasService.deleteHorario(profId, lugarId, h.id);
+          }
+        } else if (typeof prestador?.id === 'number' && typeof l?.id === 'number') {
+          await agendasService.deleteHorario(prestador.id, l.id, h.id);
+        }
+      }
+    } catch (_) {
+      // si falla, igualmente removemos local y que el PUT corrija
+    }
     const copia = JSON.parse(JSON.stringify(local));
-    const l = copia.lugaresAtencion[lugarIndex];
-    l.horarios = (l.horarios || []).filter((_, i) => i !== hIndex);
+    const l2 = copia.lugaresAtencion[lugarIndex];
+    l2.horarios = (l2.horarios || []).filter((_, i) => i !== hIndex);
     setLocal(copia);
   };
 
@@ -112,22 +199,25 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
         const hi = String(h.horaInicio || '').trim();
         const hf = String(h.horaFin || '').trim();
         const horasOK = hi !== '' && hf !== '' && hf > hi; // comparaciones de HH:mm funcionan como strings
-        const profOK = (prestador?.tipo === 'Centro Médico') ? (typeof h.profesionalId === 'number') : true;
-        return diasOK && horasOK && profOK;
+        return diasOK && horasOK;
       }).map((h) => {
         // Preferir la edición actual (especialidadId) sobre cualquier array previo
         const ids = (typeof h.especialidadId === 'number')
           ? [h.especialidadId]
           : (Array.isArray(h.especialidades) ? h.especialidades : []);
-        return {
+        const item = {
           id: h?.id ?? null,
           dias: h.dias,
           horaInicio: h.horaInicio,
           horaFin: h.horaFin,
           duracionMinutos: typeof h.duracionMinutos === 'number' && h.duracionMinutos > 0 ? h.duracionMinutos : 30,
-          especialidades: ids,
-          profesionalId: (prestador?.tipo === 'Centro Médico') ? h.profesionalId : undefined
+          especialidades: ids
         };
+        // Para centros necesitamos conservar profesionalId para poder agrupar por profesional al guardar
+        if (prestador?.tipo === 'Centro Médico') {
+          item.profesionalId = (typeof h?.profesionalId === 'number') ? h.profesionalId : null;
+        }
+        return item;
       });
       totalValidos += validos.length;
       return { ...l, horarios: validos };
@@ -138,42 +228,35 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
       return;
     }
 
-    // Si es centro, agrupar por profesional y retornar estructura especial para que el caller haga múltiples updates
+    // Si es centro, agrupar por profesional y retornar estructura para múltiples updates
     if (prestador?.tipo === 'Centro Médico') {
       const porProfesional = new Map();
       (copia.lugaresAtencion || []).forEach((l) => {
-        const porLugar = (Array.isArray(l.horarios) ? l.horarios : []);
-        porLugar.forEach((h) => {
-          const pid = h.profesionalId;
+        const hs = Array.isArray(l?.horarios) ? l.horarios : [];
+        hs.forEach((h) => {
+          const pid = h?.profesionalId;
           if (typeof pid !== 'number') return;
-          const entrada = porProfesional.get(pid) || [];
-          // Agrupar por dirección dentro del profesional
-          let lugar = entrada.find(x => (String(x.direccion || '').trim().toLowerCase() === String(l.direccion || '').trim().toLowerCase()));
+          const arr = porProfesional.get(pid) || [];
+          // agrupar por dirección
+          let lugar = arr.find(x => String(x.direccion || '').trim().toLowerCase() === String(l.direccion || '').trim().toLowerCase());
           if (!lugar) {
-            lugar = { id: l.id ?? null, direccion: l.direccion || '', horarios: [] };
-            entrada.push(lugar);
+            lugar = { id: l?.id ?? null, direccion: l?.direccion || '', horarios: [] };
+            arr.push(lugar);
           }
           lugar.horarios.push({
-            id: h.id ?? null,
+            id: h?.id ?? null,
             dias: h.dias,
             horaInicio: h.horaInicio,
             horaFin: h.horaFin,
             duracionMinutos: h.duracionMinutos,
-            especialidadId: (Array.isArray(h.especialidades) && h.especialidades.length > 0) ? h.especialidades[0] : (h.especialidadId ?? null),
-            profesionalId: pid
+            especialidadId: (Array.isArray(h.especialidades) && h.especialidades.length > 0) ? h.especialidades[0] : (h.especialidadId ?? null)
           });
-          porProfesional.set(pid, entrada);
+          porProfesional.set(pid, arr);
         });
       });
       const actualizacionesPorProfesional = {};
-      porProfesional.forEach((value, key) => {
-        actualizacionesPorProfesional[key] = value;
-      });
-      onGuardar?.({
-        id: prestador.id,
-        isCentro: true,
-        actualizacionesPorProfesional
-      });
+      porProfesional.forEach((value, key) => { actualizacionesPorProfesional[key] = value; });
+      onGuardar?.({ id: prestador.id, isCentro: true, actualizacionesPorProfesional });
       return;
     }
 
@@ -200,7 +283,7 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
       </DialogTitle>
       <DialogContent dividers sx={{ flex: 1, overflowY: 'auto' }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {/* Para Centro Médico, la selección de profesional es por cada horario */}
+          {/* Para Centro Médico, no mostramos selector global de profesional */}
           <Box>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
               <LocationOnIcon color="action" />
@@ -241,36 +324,30 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
                 {(lugarActual.horarios || []).map((h, hIdx) => (
                   <Card key={hIdx} variant="outlined" sx={{ p: 1.5, borderColor: selectedHorarioIndex === hIdx ? '#1976d2' : undefined, boxShadow: selectedHorarioIndex === hIdx ? 2 : 0 }}>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ xs: 'stretch', sm: 'center' }}>
-                      {prestador?.tipo === 'Centro Médico' && (
-                        <Autocomplete
-                          size="small"
-                          options={profesionalesDelCentro}
-                          getOptionLabel={(o) => o?.nombreCompleto || ''}
-                          isOptionEqualToValue={(o, v) => o?.id === v?.id}
-                          value={profesionalesDelCentro.find(p => p.id === h.profesionalId) || null}
-                          onChange={(e, newValue) => {
-                            const copia = JSON.parse(JSON.stringify(local));
-                            const pid = newValue ? newValue.id : null;
-                            copia.lugaresAtencion[lugarIndex].horarios[hIdx].profesionalId = pid;
-                            setLocal(copia);
-                          }}
-                          renderInput={(params) => (
-                            <TextField {...params} label="Profesional" placeholder="Elegir profesional" />
-                          )}
-                          sx={{ minWidth: 220 }}
-                          noOptionsText="No hay profesionales asociados al centro"
-                        />
-                      )}
-                      <Autocomplete
-                        multiple
-                        options={diasSemana}
-                        value={h.dias || []}
-                        onChange={(e, newValue) => actualizarHorario(hIdx, 'dias', newValue)}
-                        renderInput={(params) => (
-                          <TextField {...params} label="Días" size="small" placeholder="Seleccione días" />
-                        )}
-                        sx={{ flex: 2, minWidth: 220 }}
-                      />
+                      {/* Botón eliminar siempre visible al principio de la fila */}
+                      <IconButton color="error" onClick={() => eliminarHorario(hIdx)} aria-label="Eliminar horario">
+                        <DeleteIcon />
+                      </IconButton>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.25, minWidth: 220 }}>
+                        {diasSemana.map((d) => (
+                          <FormControlLabel
+                            key={d}
+                            control={
+                              <Checkbox
+                                size="small"
+                                checked={Array.isArray(h.dias) ? h.dias.includes(d) : false}
+                                onChange={() => {
+                                  const arr = Array.isArray(h.dias) ? [...h.dias] : [];
+                                  const i = arr.indexOf(d);
+                                  if (i >= 0) arr.splice(i, 1); else arr.push(d);
+                                  actualizarHorario(hIdx, 'dias', arr);
+                                }}
+                              />
+                            }
+                            label={d}
+                          />
+                        ))}
+                      </Box>
                       {(() => {
                         const inicio = h.horaInicio || '';
                         const fin = h.horaFin || '';
@@ -330,9 +407,50 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
                           ))}
                         </Select>
                       </FormControl>
-                      <IconButton color="error" onClick={() => eliminarHorario(hIdx)} aria-label="Eliminar horario">
-                        <DeleteIcon />
-                      </IconButton>
+                      {prestador?.tipo === 'Centro Médico' && (
+                        <Box sx={{ minWidth: 220 }}>
+                          {/* Selección de profesional SOLO cuando es nuevo (sin id) */}
+                          {h.id == null ? (
+                            <Autocomplete
+                              size="small"
+                              options={(() => {
+                                const espSel = h?.especialidadId;
+                                const base = profesionalesDelCentro || [];
+                                if (typeof espSel === 'number') {
+                                  return base.filter(p =>
+                                    Array.isArray(p?.especialidades) && p.especialidades.some(e => e && e.id === espSel)
+                                  );
+                                }
+                                return base;
+                              })()}
+                              getOptionLabel={(o) => o?.nombreCompleto || ''}
+                              isOptionEqualToValue={(o, v) => o?.id === v?.id}
+                              value={profesionalesDelCentro.find(p => p.id === h.profesionalId) || null}
+                              onChange={(e, newValue) => {
+                                const copia = JSON.parse(JSON.stringify(local));
+                                copia.lugaresAtencion[lugarIndex].horarios[hIdx].profesionalId = newValue ? newValue.id : null;
+                                setLocal(copia);
+                              }}
+                              renderInput={(params) => (
+                                <TextField
+                                  {...params}
+                                  label="Profesional (nuevo)"
+                                  placeholder={h?.especialidadId ? 'Elegir profesional' : 'Elegí una especialidad primero'}
+                                  disabled={!(typeof h?.especialidadId === 'number')}
+                                />
+                              )}
+                              noOptionsText="No hay profesionales asociados al centro"
+                            />
+                          ) : (
+                            <TextField
+                              size="small"
+                              label="Profesional"
+                              value={(profesionalesDelCentro.find(p => p.id === h.profesionalId)?.nombreCompleto) || '—'}
+                              inputProps={{ readOnly: true }}
+                            />
+                          )}
+                        </Box>
+                      )}
                     </Stack>
                   </Card>
                 ))}

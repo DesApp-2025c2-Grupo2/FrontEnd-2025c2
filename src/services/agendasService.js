@@ -57,7 +57,8 @@ function normalizeAgendaLugar(item) {
       especialidades = [espLugar];
     }
     const especialidadId = Array.isArray(especialidades) && especialidades.length > 0 ? especialidades[0] : null;
-    return { id: h?.id ?? null, dias, horaInicio, horaFin, duracionMinutos, especialidades, especialidadId };
+    const profesionalId = (typeof h?.profesionalId === 'number' && h.profesionalId > 0) ? h.profesionalId : null;
+    return { id: h?.id ?? null, dias, horaInicio, horaFin, duracionMinutos, especialidades, especialidadId, profesionalId };
   });
   return {
     id: item?.id ?? item?.lugarId ?? item?.lugarAtencionId ?? null, // id del lugar/agenda
@@ -106,8 +107,30 @@ export async function getByProfesional(profesionalId) {
   }
 }
 
-// Construir payload para PUT /Agenda/{profesionalId}/lugares
-function mapLugaresForAPI(lugaresAtencion) {
+// GET /Agenda/getByCentro/{centroId}
+export async function getByCentro(centroId) {
+  try {
+    const res = await WebAPI.Instance().get(`${ENDPOINT}/getByCentro/${centroId}`);
+    const raw = res?.data;
+    // Esperado: { centroId, profesionales: [{ profesionalId, nombreCompleto, direcciones: [...] }] }
+    const profesionales = Array.isArray(raw?.profesionales) ? raw.profesionales : [];
+    return profesionales.map((p) => {
+      const dirsRaw = Array.isArray(p?.direcciones) ? p.direcciones : [];
+      const dirsNorm = dirsRaw.map(normalizeAgendaLugar);
+      return {
+        profesionalId: p?.profesionalId ?? p?.id,
+        nombreCompleto: p?.nombreCompleto || '',
+        direcciones: dirsNorm
+      };
+    });
+  } catch (_) {
+    return [];
+  }
+}
+
+// Construir payload para PUT /Agenda/{id}/direcciones
+function mapLugaresForAPI(lugaresAtencion, options = {}) {
+  const { isCentro = false } = options;
   const result = [];
   (Array.isArray(lugaresAtencion) ? lugaresAtencion : []).forEach((l) => {
     const direccion = String(l?.direccion || '').trim();
@@ -118,53 +141,111 @@ function mapLugaresForAPI(lugaresAtencion) {
         const dias = Array.isArray(h?.dias) ? h.dias : [];
         const hi = String(h?.horaInicio || '').trim();
         const hf = String(h?.horaFin || '').trim();
-        return dias.length > 0 && hi !== '' && hf !== '' && hf > hi;
+        const profOK = isCentro ? (typeof h?.profesionalId === 'number') : true;
+        return dias.length > 0 && hi !== '' && hf !== '' && hf > hi && profOK;
       })
       .map((h) => {
         const ids = Array.isArray(h?.especialidades)
           ? h.especialidades.filter((x) => typeof x === 'number')
           : ((typeof h?.especialidadId === 'number') ? [h.especialidadId] : []);
-        return {
+        const out = {
           id: h?.id ?? null,
           diasDeLaSemana: Array.isArray(h?.dias) ? h.dias.map(canonDia).filter(Boolean) : [],
           horaInicio: h?.horaInicio || '',
           horaFin: h?.horaFin || '',
-          duracionMinutos: (typeof h?.duracionMinutos === 'number' && h.duracionMinutos > 0) ? h.duracionMinutos : 30,
-          especialidades: ids
+          duracionConsulta: (typeof h?.duracionMinutos === 'number' && h.duracionMinutos > 0) ? h.duracionMinutos : 30,
+          especialidades: ids,
+          ...(ids.length > 0 ? { especialidadId: ids[0] } : {})
         };
+        if (isCentro && typeof h?.profesionalId === 'number') {
+          out.profesionalId = h.profesionalId;
+        }
+        return out;
       });
+    // Derivar duración base del lugar (opcional) usando la del primer horario
+    const durLugar = horariosAtencion.length > 0 ? (horariosAtencion[0]?.duracionConsulta || 30) : undefined;
     // Incluir también direcciones con horarios vacíos, para que el backend pueda limpiar todos los horarios de ese lugar
-    result.push({ id: l?.id ?? null, direccion, horariosAtencion });
+    result.push({ lugarId: l?.id ?? null, direccion, ...(typeof durLugar === 'number' ? { duracionConsulta: durLugar } : {}), horariosAtencion });
   });
   return result;
 }
 
-// Actualiza lugares y horarios del profesional (reemplazo completo)
-export async function updateLugares(profesionalId, lugaresAtencion) {
+// Actualiza lugares y horarios (Centro o Profesional) usando /Agenda/{id}/direcciones
+export async function updateLugares(id, lugaresAtencion, options = {}) {
+  const { isCentro = false, strategy = 'merge' } = options;
+  const direcciones = mapLugaresForAPI(lugaresAtencion, { isCentro });
   try {
-    const asArray = mapLugaresForAPI(lugaresAtencion);
-    // 1) Ruta preferida y root preferido: /direcciones con array directo
-    let res = await WebAPI.Instance().put(`${ENDPOINT}/${profesionalId}/direcciones`, asArray);
-    if (!res || !res.data) {
-      // 2) Wrapper alternativo
-      res = await WebAPI.Instance().put(`${ENDPOINT}/${profesionalId}/direcciones`, { direcciones: asArray });
-    }
-    if (!res || !res.data) {
-      // 3) Compat: /lugares array directo
-      res = await WebAPI.Instance().put(`${ENDPOINT}/${profesionalId}/lugares`, asArray);
-      if (!res || !res.data) {
-        // 4) Compat: /lugares con wrapper
-        res = await WebAPI.Instance().put(`${ENDPOINT}/${profesionalId}/lugares`, { lugares: asArray });
-      }
-    }
+    // 1) Contract principal: PUT /Agenda/{id}/direcciones con wrapper { direcciones: [...] }
+    const url = `${ENDPOINT}/${id}/direcciones${strategy ? `?strategy=${encodeURIComponent(strategy)}` : ''}`;
+    const body = { direcciones };
+    let res = await WebAPI.Instance().put(url, body);
     const raw = res?.data;
-    const data = Array.isArray(raw)
+    let data = Array.isArray(raw)
       ? raw
       : (Array.isArray(raw?.direcciones) ? raw.direcciones : (Array.isArray(raw?.lugares) ? raw.lugares : []));
-    return data.map(normalizeAgendaLugar);
-  } catch (e) {
-    // No mockear para no desincronizar
-    throw e;
+    if (Array.isArray(data) && data.length >= 0) {
+      return data.map(normalizeAgendaLugar);
+    }
+    // 2) Mismo endpoint, sin wrapper
+    try {
+      res = await WebAPI.Instance().put(url, direcciones);
+      const raw2 = res?.data;
+      data = Array.isArray(raw2)
+        ? raw2
+        : (Array.isArray(raw2?.direcciones) ? raw2.direcciones : (Array.isArray(raw2?.lugares) ? raw2.lugares : []));
+      if (Array.isArray(data)) {
+        return data.map(normalizeAgendaLugar);
+      }
+    } catch {}
+    // 3) Fallbacks por tipo
+    if (isCentro) {
+      // Para centro: POST por lugar -> /Agenda/{centroId}/lugares/{lugarId}/horarios
+      const resultados = [];
+      for (const d of direcciones) {
+        const lugarId = d?.lugarId ?? d?.id ?? null;
+        const arr = Array.isArray(d?.horariosAtencion) ? d.horariosAtencion : [];
+        if (arr.length === 0) continue;
+        const postUrl = `${ENDPOINT}/${id}/lugares/${lugarId != null ? lugarId : ''}/horarios`;
+        try {
+          // Algunos backends aceptan array, otros objeto simple; probamos array primero
+          let r = await WebAPI.Instance().post(postUrl, arr);
+          if (!r || !(r.status >= 200 && r.status < 300)) {
+            // intentar objeto único si hay uno
+            if (arr.length === 1) {
+              r = await WebAPI.Instance().post(postUrl, arr[0]);
+            }
+          }
+          resultados.push({ direccion: d?.direccion || '', horariosAtencion: arr });
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('Fallo POST horarios centro', { postUrl, body: arr, error: e?.response?.data || e?.message || e });
+          throw e;
+        }
+      }
+      return resultados.map((r) => normalizeAgendaLugar({ direccion: r.direccion, horariosAtencion: r.horariosAtencion }));
+    } else {
+      // Profesional: probar /lugares variantes
+      let res2 = await WebAPI.Instance().put(`${ENDPOINT}/${id}/lugares`, direcciones);
+      let raw3 = res2?.data;
+      let data3 = Array.isArray(raw3)
+        ? raw3
+        : (Array.isArray(raw3?.direcciones) ? raw3.direcciones : (Array.isArray(raw3?.lugares) ? raw3.lugares : []));
+      if (Array.isArray(data3)) return data3.map(normalizeAgendaLugar);
+      // Con wrapper
+      res2 = await WebAPI.Instance().put(`${ENDPOINT}/${id}/lugares`, { lugares: direcciones });
+      raw3 = res2?.data;
+      data3 = Array.isArray(raw3)
+        ? raw3
+        : (Array.isArray(raw3?.direcciones) ? raw3.direcciones : (Array.isArray(raw3?.lugares) ? raw3.lugares : []));
+      if (Array.isArray(data3)) return data3.map(normalizeAgendaLugar);
+    }
+    // Último recurso: devolver normalizado local
+    return direcciones.map((d) => normalizeAgendaLugar({ direccion: d?.direccion || '', horariosAtencion: d?.horariosAtencion || [] }));
+  } catch (err) {
+    // Log de diagnóstico para backend/contrato
+    // eslint-disable-next-line no-console
+    console.error('Fallo updateLugares', { id, isCentro, direcciones, error: err?.response?.data || err?.message || err });
+    throw err;
   }
 }
 

@@ -54,6 +54,14 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
     return map;
   }, [catalogoEspecialidades, prestador.especialidades]);
 
+  const profesionalIdToNombre = React.useMemo(() => {
+    const map = new Map();
+    (todosPrestadores || []).forEach((p) => {
+      if (p && typeof p.id === 'number' && p.nombreCompleto) map.set(p.id, p.nombreCompleto);
+    });
+    return map;
+  }, [todosPrestadores]);
+
   return (
     <Card
       sx={{
@@ -222,17 +230,30 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                         Horarios de Atención
                       </Typography>
                     </Stack>
-                    {Array.isArray(lugar.horarios) && lugar.horarios.length > 0 ? (
+                    {(() => {
+                      const horariosSrc = Array.isArray(lugar.horarios)
+                        ? lugar.horarios
+                        : (Array.isArray(lugar.horariosAtencion) ? lugar.horariosAtencion : []);
+                      return Array.isArray(horariosSrc) && horariosSrc.length > 0;
+                    })() ? (
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                        {(lugar.horarios || []).map((h, i) => {
+                        {(() => {
+                          const horariosSrc = Array.isArray(lugar.horarios)
+                            ? lugar.horarios
+                            : (Array.isArray(lugar.horariosAtencion) ? lugar.horariosAtencion : []);
+                          return horariosSrc.map((h, i) => {
                           const dias = Array.isArray(h.dias) ? h.dias.map(canonDia).filter(Boolean) : [];
                           const inicio = h.horaInicio || h.desde || '';
                           const fin = h.horaFin || h.hasta || '';
-                          const dur = (typeof h.duracionMinutos === 'number' && h.duracionMinutos > 0) ? h.duracionMinutos : undefined;
+                            const dur = (typeof h.duracionMinutos === 'number' && h.duracionMinutos > 0)
+                              ? h.duracionMinutos
+                              : (typeof h.duracionConsulta === 'number' && h.duracionConsulta > 0 ? h.duracionConsulta : undefined);
                           const espId = (Array.isArray(h.especialidades) && h.especialidades.length > 0)
                             ? h.especialidades[0]
                             : ((typeof h.especialidadId === 'number' && h.especialidadId > 0) ? h.especialidadId : null);
                           const espNombre = (espId != null) ? especialidadIdToNombre.get(espId) : null;
+                          const profNombre = (prestador.tipo === 'Centro Médico' && typeof h.profesionalId === 'number')
+                            ? profesionalIdToNombre.get(h.profesionalId) : null;
                           return (
                             <Box
                               key={i}
@@ -247,13 +268,15 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                                 {dias.length > 0 ? dias.join(', ') : 'Horario'}
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
+                                {profNombre ? `${profNombre} • ` : ''}
                                 {espNombre ? `${espNombre} • ` : ''}
                                 {inicio} - {fin}
                                 {dur ? ` • ${dur} min` : ''}
                               </Typography>
                             </Box>
                           );
-                        })}
+                          });
+                        })()}
                       </Box>
                     ) : (
                       <Typography variant="body2" color="text.secondary">No hay horarios cargados.</Typography>
