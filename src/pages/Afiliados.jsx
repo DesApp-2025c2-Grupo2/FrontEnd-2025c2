@@ -131,7 +131,12 @@ export default function Afiliados() {
     fechaNacimiento: "",
     planMedicoId: "1",
     alta: hoyISO(),
+    telefonos: [],
+    emails: [],
+    direcciones: [],
+    situacionesTerapeuticasIds: [],
   });
+
   // fetch inicial
   useEffect(() => {
     dispatch(fetchAfiliados());
@@ -171,6 +176,10 @@ export default function Afiliados() {
       fechaNacimiento: "",
       planMedicoId: "",
       alta: hoyISO(),
+      telefonos: [],
+      emails: [],
+      direcciones: [],
+      situacionesTerapeuticasIds: [],
     });
     setIntegrantes([]);
     setOpenDialog(true);
@@ -183,6 +192,7 @@ export default function Afiliados() {
 
     const titular = getTitularDelAfiliado(afiliado) ?? null;
 
+    // Mantener objetos completos (con id) para telefonos/emails/direcciones
     setFormAfiliado({
       nombre: titular?.nombre ?? "",
       apellido: titular?.apellido ?? "",
@@ -195,17 +205,10 @@ export default function Afiliados() {
       fechaNacimiento: titular?.fechaNacimiento ?? "",
       planMedicoId: afiliado.planMedicoId ?? 1,
       alta: afiliado.alta ?? hoyISO(),
-      telefonos: titular?.telefonos?.map((t) => t.numero) ?? [],
-      emails: titular?.emails?.map((e) => e.correo) ?? [],
-      // CAMBIO: Mantener direcciones como objetos, no como strings
-      direcciones:
-        titular?.direcciones?.map((d) => ({
-          calle: d.calle ?? "",
-          altura: d.altura ?? "",
-          piso: d.piso ?? "",
-          departamento: d.departamento ?? "",
-          provinciaCiudad: d.provinciaCiudad ?? "",
-        })) ?? [],
+      telefonos: titular?.telefonos ?? [],
+      emails: titular?.emails ?? [],
+      // Mantener direcciones como objetos, no como strings
+      direcciones: titular?.direcciones ?? [],
       situacionesTerapeuticasIds: Array.isArray(
         titular?.situacionesTerapeuticas
       )
@@ -243,19 +246,14 @@ export default function Afiliados() {
       fechaNacimiento: titular?.fechaNacimiento ?? "",
       planMedicoId: afiliado.planMedicoId ?? 1,
       alta: afiliado.alta ?? hoyISO(),
-      telefonos: titular?.telefonos?.map((t) => t.numero) ?? [],
-      emails: titular?.emails?.map((e) => e.correo) ?? [],
-      // CAMBIO: Mantener direcciones como objetos, no como strings
-      direcciones:
-        titular?.direcciones?.map((d) => ({
-          calle: d.calle ?? "",
-          altura: d.altura ?? "",
-          piso: d.piso ?? "",
-          departamento: d.departamento ?? "",
-          provinciaCiudad: d.provinciaCiudad ?? "",
-        })) ?? [],
+      telefonos: titular?.telefonos ?? [],
+      emails: titular?.emails ?? [],
+      // Mantener direcciones como objetos, no como strings
+      direcciones: titular?.direcciones ?? [],
       situacionesTerapeuticasIds:
-        titular?.situacionesTerapeuticas?.map((s) => s.id ?? s) ?? [],
+        titular?.situacionesTerapeuticas?.map((s) =>
+          typeof s === "object" ? s : { id: s, nombre: "", fechaFin: null }
+        ) ?? [],
     });
 
     setIntegrantes(
@@ -268,12 +266,6 @@ export default function Afiliados() {
   const handleViewFamiliar = useCallback(async (afiliado, fam) => {
     try {
       const familiarCompleto = await personasService.getPersona(fam.id);
-      {
-        console.log("fam", fam, fam.id);
-      }
-      {
-        console.log("afiliado", afiliado, afiliado.id);
-      }
       setSelectedAfiliado(afiliado);
       setSelectedFamiliar(familiarCompleto); // solo vista
       setIsEditingFamiliar(false);
@@ -288,6 +280,7 @@ export default function Afiliados() {
     try {
       const familiarCompleto = await personasService.getPersona(fam.id);
       setSelectedAfiliado(afiliado);
+      // Aquí mantenemos la estructura completa (incluye id en telefonos/emails/direcciones)
       setFormFamiliar(familiarCompleto);
       setSelectedFamiliar(familiarCompleto);
       setIsEditingFamiliar(true);
@@ -336,7 +329,7 @@ export default function Afiliados() {
     }
 
     try {
-      // Función helper para convertir situaciones a objeto
+      // Convierte situaciones en { idSituacion : fechaFin | null }
       const convertirSituacionesAObjeto = (situacionesArray) => {
         const obj = {};
         situacionesArray.forEach((sit) => {
@@ -347,44 +340,103 @@ export default function Afiliados() {
         return obj;
       };
 
-      // Construcción segura de campos de contacto y dirección
+      // ----------------------------
+      // NORMALIZACIÓN PUNTUAL 100% COMPATIBLE CON TU BACKEND
+      // ----------------------------
+
+      // Telefónos: soporta objeto {id, numero}, string, MUI {value}
       const telefonosNormalizados = (formFamiliar.telefonos || [])
-        .filter((t) => t && (t.numero || t.trim?.()))
-        .map((t) => ({
-          id: t.id || 0,
-          numero: typeof t === "string" ? t.trim() : (t.numero || "").trim(),
-        }));
+        .map((t) => {
+          if (!t) return null;
 
+          // Si viene como string
+          if (typeof t === "string") {
+            const v = t.trim();
+            return v ? { id: 0, numero: v } : null;
+          }
+
+          // Si viene como objeto con "numero"
+          if (t.numero) {
+            return {
+              id: t.id ?? 0,
+              numero: (t.numero || "").toString().trim(),
+            };
+          }
+
+          // Si viene como objeto con "value" típico de MUI
+          if (t.value) {
+            const v = t.value.trim();
+            return v ? { id: t.id ?? 0, numero: v } : null;
+          }
+
+          return null;
+        })
+        .filter(Boolean);
+
+      // Emails: soporta {id, correo}, string, MUI {value}
       const emailsNormalizados = (formFamiliar.emails || [])
-        .filter((e) => e && (e.correo || e.trim?.()))
-        .map((e) => ({
-          id: e.id || 0,
-          correo: typeof e === "string" ? e.trim() : (e.correo || "").trim(),
-        }));
+        .map((e) => {
+          if (!e) return null;
 
+          if (typeof e === "string") {
+            const v = e.trim();
+            return v ? { id: 0, correo: v } : null;
+          }
+
+          if (e.correo) {
+            return {
+              id: e.id ?? 0,
+              correo: (e.correo || "").toString().trim(),
+            };
+          }
+
+          if (e.value) {
+            const v = e.value.trim();
+            return v ? { id: e.id ?? 0, correo: v } : null;
+          }
+
+          return null;
+        })
+        .filter(Boolean);
+
+      // Direcciones: soporta string y estructura del backend
       const direccionesNormalizadas = (formFamiliar.direcciones || [])
-        .filter((d) => d && (d.calle || typeof d === "string"))
-        .map((d) =>
-          typeof d === "string"
-            ? {
-                id: 0,
-                calle: d,
-                altura: "",
-                piso: "",
-                departamento: "",
-                provinciaCiudad: "",
-              }
-            : {
-                id: d.id || 0,
-                calle: d.calle || "",
-                altura: d.altura || "",
-                piso: d.piso || "",
-                departamento: d.departamento || "",
-                provinciaCiudad: d.provinciaCiudad || "",
-              }
-        );
+        .map((d) => {
+          if (!d) return null;
 
-      // Payload base
+          // Si viene como string
+          if (typeof d === "string") {
+            const v = d.trim();
+            if (!v) return null;
+            return {
+              id: 0,
+              calle: v,
+              altura: "",
+              piso: "",
+              departamento: "",
+              provinciaCiudad: "",
+            };
+          }
+
+          // Si viene como objeto del backend
+          if (d.calle) {
+            return {
+              id: d.id ?? 0,
+              calle: d.calle ?? "",
+              altura: d.altura ?? "",
+              piso: d.piso ?? "",
+              departamento: d.departamento ?? "",
+              provinciaCiudad: d.provinciaCiudad ?? "",
+            };
+          }
+
+          return null;
+        })
+        .filter(Boolean);
+
+      // ---------------------------------------------
+      // PAYLOAD FINAL
+      // ---------------------------------------------
       const payloadBase = {
         numeroIntegrante: formFamiliar.numeroIntegrante,
         nombre: formFamiliar.nombre.trim(),
@@ -400,13 +452,13 @@ export default function Afiliados() {
         baja: formFamiliar.baja
           ? new Date(formFamiliar.baja).toISOString()
           : null,
+
         documentacion: {
           id: formFamiliar.documentacion?.id || 0,
           tipoDocumento: parseInt(formFamiliar.tipoDocumento) || 1,
           numero: (formFamiliar.numeroDocumento || "").toString(),
         },
 
-        // 🔧 Normalizados y filtrados
         telefonos: telefonosNormalizados,
         emails: emailsNormalizados,
         direcciones: direccionesNormalizadas,
@@ -418,10 +470,13 @@ export default function Afiliados() {
 
       let result;
 
+      // ---------------------------------------------
+      // UPDATE EXISTENTE
+      // ---------------------------------------------
       if (isEditingFamiliar && formFamiliar.id) {
         const updatePayload = {
           ...payloadBase,
-          id: formFamiliar.id, // ID existente del familiar
+          id: formFamiliar.id,
         };
 
         console.log(
@@ -431,10 +486,15 @@ export default function Afiliados() {
 
         result = await dispatch(updatePersona(updatePayload)).unwrap();
         showSnackbar("Familiar actualizado correctamente");
-      } else {
+      }
+
+      // ---------------------------------------------
+      // CREATE NUEVO
+      // ---------------------------------------------
+      else {
         const createPayload = {
           ...payloadBase,
-          id: 0, // Nuevo registro
+          id: 0,
         };
 
         console.log(
@@ -448,12 +508,11 @@ export default function Afiliados() {
             memberData: createPayload,
           })
         ).unwrap();
+
         showSnackbar("Familiar agregado correctamente");
       }
 
-      // Recargar los afiliados para reflejar los cambios
       await dispatch(fetchAfiliados()).unwrap();
-
       setOpenFamiliarDialog(false);
       setSelectedFamiliar(null);
       setIsEditingFamiliar(false);
@@ -475,7 +534,7 @@ export default function Afiliados() {
       console.log("🔧 [DEBUG] formAfiliado:", formAfiliado);
 
       // Función helper para convertir situaciones a objeto
-      const convertirSituacionesAObjeto = (situacionesArray) => {
+      const convertirSituacionesAObjetoLocal = (situacionesArray) => {
         const obj = {};
         situacionesArray.forEach((sit) => {
           obj[sit.id] = sit.fechaFin
@@ -493,6 +552,7 @@ export default function Afiliados() {
 
       // 1. Construir el TITULAR desde formAfiliado
       const titularPayload = {
+        id: formAfiliado.id ?? 0,
         numeroIntegrante: 1,
         nombre: formAfiliado.nombre?.trim() || "",
         apellido: formAfiliado.apellido?.trim() || "",
@@ -500,7 +560,6 @@ export default function Afiliados() {
           ? new Date(formAfiliado.fechaNacimiento).toISOString().split("T")[0]
           : new Date().toISOString().split("T")[0],
         parentesco: 0, // Titular
-        afiliadoId: selectedAfiliado.id, // ID del afiliado
         alta: formAfiliado.alta
           ? new Date(formAfiliado.alta).toISOString().split("T")[0]
           : new Date().toISOString().split("T")[0],
@@ -518,6 +577,7 @@ export default function Afiliados() {
                 (t.numero && String(t.numero).trim()))
           )
           .map((t) => ({
+            id: typeof t === "object" ? t.id ?? 0 : 0,
             numero:
               typeof t === "string"
                 ? t.trim()
@@ -532,6 +592,7 @@ export default function Afiliados() {
                 (e.correo && String(e.correo).trim()))
           )
           .map((e) => ({
+            id: typeof e === "object" ? e.id ?? 0 : 0,
             correo:
               typeof e === "string"
                 ? e.trim()
@@ -548,6 +609,7 @@ export default function Afiliados() {
           .map((d) =>
             typeof d === "string"
               ? {
+                  id: 0,
                   calle: d,
                   altura: "",
                   piso: "",
@@ -555,7 +617,8 @@ export default function Afiliados() {
                   provinciaCiudad: "Bs As",
                 }
               : {
-                  calle: d.calle || "",
+                  id: d.id ?? 0,
+                  calle: (d.calle || "").substring(0, 100),
                   altura: d.altura || "",
                   piso: d.piso || "",
                   departamento: d.departamento || "",
@@ -563,7 +626,7 @@ export default function Afiliados() {
                 }
           ),
 
-        situacionesTerapeuticas: convertirSituacionesAObjeto(
+        situacionesTerapeuticas: convertirSituacionesAObjetoLocal(
           formAfiliado.situacionesTerapeuticasIds || []
         ),
       };
@@ -574,6 +637,7 @@ export default function Afiliados() {
       const otrosIntegrantesPayload = (integrantes || [])
         .filter((i) => i && i.numeroIntegrante !== 1)
         .map((i, index) => ({
+          id: i.id ?? 0,
           numeroIntegrante: i.numeroIntegrante || index + 2,
           nombre: i.nombre?.trim() || "",
           apellido: i.apellido?.trim() || "",
@@ -596,17 +660,22 @@ export default function Afiliados() {
                 }
               : null,
 
-          // 🔧 Igual corrección que en titular
           telefonos: (i.telefonos || [])
-            .filter((t) => t && (t.numero || t.trim?.()))
+            .filter(
+              (t) => t && (t.numero || (typeof t === "string" && t.trim?.()))
+            )
             .map((t) => ({
+              id: typeof t === "object" ? t.id ?? 0 : 0,
               numero:
                 typeof t === "string" ? t.trim() : (t.numero || "").trim(),
             })),
 
           emails: (i.emails || [])
-            .filter((e) => e && (e.correo || e.trim?.()))
+            .filter(
+              (e) => e && (e.correo || (typeof e === "string" && e.trim?.()))
+            )
             .map((e) => ({
+              id: typeof e === "object" ? e.id ?? 0 : 0,
               correo:
                 typeof e === "string" ? e.trim() : (e.correo || "").trim(),
             })),
@@ -616,6 +685,7 @@ export default function Afiliados() {
             .map((d) =>
               typeof d === "string"
                 ? {
+                    id: 0,
                     calle: d,
                     altura: "",
                     piso: "",
@@ -623,6 +693,7 @@ export default function Afiliados() {
                     provinciaCiudad: "",
                   }
                 : {
+                    id: d.id ?? 0,
                     calle: d.calle || "",
                     altura: d.altura || "",
                     piso: d.piso || "",
@@ -631,7 +702,7 @@ export default function Afiliados() {
                   }
             ),
 
-          situacionesTerapeuticas: convertirSituacionesAObjeto(
+          situacionesTerapeuticas: convertirSituacionesAObjetoLocal(
             i.situacionesTerapeuticasIds || []
           ),
         }));
@@ -680,7 +751,6 @@ export default function Afiliados() {
   );
 
   // ---------- Guardar afiliado ----------
-  // En Afiliados.jsx - handleSaveAfiliado
   const handleSaveAfiliado = useCallback(async () => {
     if (
       !formAfiliado.nombre ||
@@ -710,7 +780,6 @@ export default function Afiliados() {
           alta: formAfiliado.alta
             ? new Date(formAfiliado.alta).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
-
           baja: null,
           // Mantener el TitularID original
           titularID: selectedAfiliado.titularID || selectedAfiliado.titularId,
@@ -724,11 +793,11 @@ export default function Afiliados() {
           numeroIntegrante: 1,
           nombre: formAfiliado.nombre?.trim() || "",
           apellido: formAfiliado.apellido?.trim() || "",
+          afiliadoId: selectedAfiliado.id,
           fechaNacimiento: formAfiliado.fechaNacimiento
             ? new Date(formAfiliado.fechaNacimiento).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
           parentesco: 0, // Titular
-          afiliadoId: selectedAfiliado.id, // ID del afiliado
           alta: formAfiliado.alta
             ? new Date(formAfiliado.alta).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
@@ -745,6 +814,7 @@ export default function Afiliados() {
                   (t.numero && String(t.numero).trim()))
             )
             .map((t) => ({
+              id: typeof t === "object" ? t.id ?? 0 : 0,
               numero:
                 typeof t === "string"
                   ? t.trim()
@@ -759,6 +829,7 @@ export default function Afiliados() {
                   (e.correo && String(e.correo).trim()))
             )
             .map((e) => ({
+              id: typeof e === "object" ? e.id ?? 0 : 0,
               correo:
                 typeof e === "string"
                   ? e.trim()
@@ -766,14 +837,26 @@ export default function Afiliados() {
             })),
 
           direcciones: (formAfiliado.direcciones || [])
-            .filter((d) => d && d.calle) // Solo direcciones con calle
-            .map((d) => ({
-              calle: (d.calle || "").substring(0, 100),
-              altura: d.altura || "",
-              piso: d.piso || "",
-              departamento: d.departamento || "",
-              provinciaCiudad: d.provinciaCiudad || "Bs As",
-            })),
+            .filter((d) => d && (d.calle || typeof d === "string"))
+            .map((d) =>
+              typeof d === "string"
+                ? {
+                    id: 0,
+                    calle: d,
+                    altura: "",
+                    piso: "",
+                    departamento: "",
+                    provinciaCiudad: "Bs As",
+                  }
+                : {
+                    id: d.id ?? 0,
+                    calle: (d.calle || "").substring(0, 100),
+                    altura: d.altura || "",
+                    piso: d.piso || "",
+                    departamento: d.departamento || "",
+                    provinciaCiudad: d.provinciaCiudad || "Bs As",
+                  }
+            ),
           situacionesTerapeuticas: convertirSituacionesAObjeto(
             formAfiliado.situacionesTerapeuticasIds || []
           ),
@@ -781,7 +864,7 @@ export default function Afiliados() {
 
         console.log("🎯 [TITULAR] Payload a enviar:", titularPayload);
 
-        // 4. Ejecutar ambas actualizaciones en paralelo
+        // 4. Ejecutar ambas actualizaciones en paralelo (afiliado + titular)
         await Promise.all([
           dispatch(
             updateAfiliado({
@@ -794,21 +877,20 @@ export default function Afiliados() {
 
         showSnackbar("Afiliado actualizado correctamente");
 
-        // 5. ACTUALIZACIÓN CRÍTICA: Refrescar los datos del afiliado
-        await dispatch(fetchAfiliados()).unwrap();
-
-        // Obtener el afiliado actualizado de la lista
+        // 5. REFRESCAR los datos del afiliado una sola vez
         const afiliadosActualizados = await dispatch(fetchAfiliados()).unwrap();
         const afiliadoActualizado =
-          afiliadosActualizados.payload?.find(
-            (a) => a.id === selectedAfiliado.id
-          ) || afiliadosActualizados.find((a) => a.id === selectedAfiliado.id);
+          (afiliadosActualizados.payload &&
+            afiliadosActualizados.payload.find(
+              (a) => a.id === selectedAfiliado.id
+            )) ||
+          afiliadosActualizados.find((a) => a.id === selectedAfiliado.id);
 
         if (afiliadoActualizado) {
           setSelectedAfiliado(afiliadoActualizado);
         }
       } else {
-        // ===== CREACIÓN NUEVA (se mantiene igual) =====
+        // ===== CREACIÓN NUEVA =====
         const payload = buildAfiliadoPayload(selectedAfiliado);
         console.log(
           "🎯 [CREACIÓN] Payload a enviar:",
