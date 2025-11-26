@@ -30,7 +30,7 @@ import {
 } from '@mui/icons-material';
 import { selectPrestadores } from '../store/prestadoresSlice';
 import * as agendasService from '../services/agendasService';
-import * as prestadoresService from '../services/prestadoresService';
+
 
 const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -38,8 +38,6 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
   const [lugarIndex, setLugarIndex] = useState(0);
   const [selectedHorarioIndex, setSelectedHorarioIndex] = useState(null);
   const [local, setLocal] = useState(null);
-  const [nuevaDireccion, setNuevaDireccion] = useState('');
-  const [profesionalesCentroAll, setProfesionalesCentroAll] = useState([]);
   const prestadores = useSelector(selectPrestadores);
   const profesionalesDelCentro = useMemo(() => {
     if (!prestador || prestador?.tipo !== 'Centro Médico') return [];
@@ -50,15 +48,11 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
     const byIds = (prestadores || []).filter(p =>
       (p?.tipo === 'Profesional Independiente' || p?.rol === 1) && idsFromCentro.has(p.id)
     );
-    // Profesionales traídos explícitamente de backend (getAll), filtrados por centro
-    const fromBackend = (profesionalesCentroAll || []).filter(p =>
-      (p?.tipo === 'Profesional Independiente' || p?.rol === 1) && p?.integraCentroMedicoId === prestador.id
-    );
     // Unir sin duplicados
     const map = new Map();
-    [...byLink, ...byIds, ...fromBackend].forEach(p => { if (p && p.id != null) map.set(p.id, p); });
+    [...byLink, ...byIds].forEach(p => { if (p && p.id != null) map.set(p.id, p); });
     return Array.from(map.values());
-  }, [prestador, prestadores, profesionalesCentroAll]);
+  }, [prestador, prestadores]);
   const especialidadesPrestador = useMemo(() => {
     // Para centro, no hay "especialidades del profesional" global. Usamos las del propio prestador local si existen.
     return Array.isArray(local?.especialidades) ? local.especialidades.filter(e => e && typeof e.id === 'number') : [];
@@ -67,9 +61,8 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
   const idToNombreProfesional = useMemo(() => {
     const map = new Map();
     (profesionalesDelCentro || []).forEach(p => { if (p && typeof p.id === 'number' && p.nombreCompleto) map.set(p.id, p.nombreCompleto); });
-    (profesionalesCentroAll || []).forEach(p => { if (p && typeof p.id === 'number' && p.nombreCompleto && !map.has(p.id)) map.set(p.id, p.nombreCompleto); });
     return map;
-  }, [profesionalesDelCentro, profesionalesCentroAll]);
+  }, [profesionalesDelCentro]);
   useEffect(() => {
     if (!abierto || !prestador) return;
     setLugarIndex(Number(initialLugarIndex) || 0);
@@ -88,13 +81,6 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
       // Centro: cargar todas las agendas y unificarlas por dirección
       try {
         const profList = await agendasService.getByCentro(prestador.id);
-        // Cargar profesionales completos desde backend para opciones del selector
-        try {
-          const all = await prestadoresService.getAll();
-          setProfesionalesCentroAll(Array.isArray(all) ? all : []);
-        } catch {
-          setProfesionalesCentroAll([]);
-        }
         const lugares = [];
         const canonDir = (s) => {
           return String(s || '')
@@ -148,14 +134,30 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
             });
           });
         }
-        setLocal({ ...prestador, lugaresAtencion: lugares });
-        setLugarIndex(0);
+        // Si aún no hay lugares armados desde agendas, usar las direcciones propias del centro
+        const fallbackDirecciones = Array.isArray(prestador?.lugaresAtencion)
+          ? (prestador.lugaresAtencion || []).map((l) => ({
+              id: l?.id ?? null,
+              direccion: l?.direccion || '',
+              horarios: Array.isArray(l?.horarios) ? l.horarios : []
+            }))
+          : [];
+        const finalLugares = (Array.isArray(lugares) && lugares.length > 0) ? lugares : fallbackDirecciones;
+        setLocal({ ...prestador, lugaresAtencion: finalLugares });
+        setLugarIndex((finalLugares.length > 0) ? 0 : 0);
       } catch {
-        setLocal({ ...prestador, lugaresAtencion: [] });
+        const fallbackDirecciones = Array.isArray(prestador?.lugaresAtencion)
+          ? (prestador.lugaresAtencion || []).map((l) => ({
+              id: l?.id ?? null,
+              direccion: l?.direccion || '',
+              horarios: Array.isArray(l?.horarios) ? l.horarios : []
+            }))
+          : [];
+        setLocal({ ...prestador, lugaresAtencion: fallbackDirecciones });
       }
     }
     init();
-  }, [abierto, prestador, initialLugarIndex, initialHorarioIndex, profesionalesDelCentro]);
+  }, [abierto, prestador, initialLugarIndex, initialHorarioIndex]);
 
   // No preseleccionar especialidad; el usuario debe elegirla explícitamente
 
@@ -166,35 +168,32 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
     setLugarIndex(idx);
   };
 
-  const agregarDireccionCentro = () => {
-    if (prestador?.tipo !== 'Centro Médico') return;
-    const dir = String(nuevaDireccion || '').trim();
-    if (!dir) return;
-    const copia = JSON.parse(JSON.stringify(local || { lugaresAtencion: [] }));
-    const exists = (Array.isArray(copia.lugaresAtencion) ? copia.lugaresAtencion : []).some(
-      (l) => String(l?.direccion || '').trim().toLowerCase() === dir.toLowerCase()
-    );
-    if (exists) {
-      // Seleccionar la existente
-      const idx = copia.lugaresAtencion.findIndex((l) => String(l?.direccion || '').trim().toLowerCase() === dir.toLowerCase());
-      if (idx >= 0) setLugarIndex(idx);
-      setNuevaDireccion('');
-      return;
-    }
-    copia.lugaresAtencion = Array.isArray(copia.lugaresAtencion) ? copia.lugaresAtencion : [];
-    copia.lugaresAtencion.push({ id: null, direccion: dir, horarios: [] });
-    setLocal(copia);
-    setLugarIndex(copia.lugaresAtencion.length - 1);
-    setNuevaDireccion('');
-  };
+  // (UI para agregar direcciones del centro removida a pedido; solo se usan direcciones existentes)
 
   // Para centro: se ven todos los horarios por dirección; el profesional solo se elige al crear uno nuevo
 
   const agregarHorario = () => {
-    const copia = JSON.parse(JSON.stringify(local));
-    const l = copia.lugaresAtencion[lugarIndex];
-    l.horarios = l.horarios || [];
-    l.horarios.push({ dias: [], horaInicio: '', horaFin: '', duracionMinutos: 30, especialidadId: null, profesionalId: (prestador?.tipo === 'Centro Médico' ? null : prestador?.id || null) });
+    const copia = JSON.parse(JSON.stringify(local || {}));
+    const lugares = Array.isArray(copia.lugaresAtencion) ? copia.lugaresAtencion : [];
+    // Si no hay direcciones, no se puede agregar horario
+    if (lugares.length === 0) {
+      alert('Agregá una dirección primero para poder cargar horarios.');
+      return;
+    }
+    // Asegurar índice válido
+    const idx = Math.min(Math.max(0, Number(lugarIndex) || 0), lugares.length - 1);
+    const l = lugares[idx];
+    l.horarios = Array.isArray(l.horarios) ? l.horarios : [];
+    l.horarios.push({
+      dias: [],
+      horaInicio: '',
+      horaFin: '',
+      duracionMinutos: 30,
+      especialidadId: null,
+      profesionalId: (prestador?.tipo === 'Centro Médico' ? null : (prestador?.id || null))
+    });
+    copia.lugaresAtencion = lugares;
+    setLugarIndex(idx);
     setLocal(copia);
   };
 
@@ -234,6 +233,12 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
     const copia = JSON.parse(JSON.stringify(local));
     const lugares = Array.isArray(copia.lugaresAtencion) ? copia.lugaresAtencion : [];
     let totalValidos = 0;
+    // Reglas extra: el backend de Agenda requiere lugarId válido
+    const sinId = lugares.some((l) => (Array.isArray(l?.horarios) && l.horarios.length > 0) && !(typeof l?.id === 'number'));
+    if (sinId) {
+      alert('Esta dirección no tiene identificador. Guardá primero el centro/profesional para que la dirección obtenga un ID y luego cargá los horarios.');
+      return;
+    }
     copia.lugaresAtencion = lugares.map((l) => {
       const hs = Array.isArray(l.horarios) ? l.horarios : [];
       const validos = hs.filter((h) => {
@@ -349,22 +354,7 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
                     ))}
                   </Select>
                 </FormControl>
-                {prestador?.tipo === 'Centro Médico' && (
-                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} alignItems={{ xs: 'stretch', sm: 'center' }} sx={{ mt: 1 }}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      label="Nueva dirección del centro"
-                      placeholder="Ej: Av. Siempre Viva 742"
-                      value={nuevaDireccion}
-                      onChange={(e) => setNuevaDireccion(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); agregarDireccionCentro(); } }}
-                    />
-                    <Button variant="outlined" startIcon={<AddIcon />} onClick={agregarDireccionCentro} sx={{ textTransform: 'none', whiteSpace: 'nowrap' }}>
-                      Agregar dirección
-                    </Button>
-                  </Stack>
-                )}
+                
               </>
             )}
           </Box>
@@ -373,7 +363,15 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
             <CardContent>
               <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
                 <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Horarios</Typography>
-                <Button variant="contained" startIcon={<AddIcon />} onClick={agregarHorario} sx={{ textTransform: 'none', fontWeight: 700 }}>Agregar Horario</Button>
+                <Button
+                  variant="contained"
+                  startIcon={<AddIcon />}
+                  onClick={agregarHorario}
+                  disabled={!Array.isArray(local?.lugaresAtencion) || local.lugaresAtencion.length === 0}
+                  sx={{ textTransform: 'none', fontWeight: 700 }}
+                >
+                  Agregar Horario
+                </Button>
               </Stack>
 
               {(lugarActual.horarios || []).length === 0 && (

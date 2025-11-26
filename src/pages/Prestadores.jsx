@@ -569,7 +569,7 @@ function Prestadores() {
           prestador={prestadorSeleccionado}
           initialLugarIndex={horariosContext.lugarIndex}
           initialHorarioIndex={horariosContext.horarioIndex}
-          lockLugar={true}
+          lockLugar={!(prestadorSeleccionado?.tipo === 'Centro Médico' || prestadorSeleccionado?.rol === 0)}
           onCerrar={() => {
             setDialogoHorarios(false);
             setPrestadorSeleccionado(null);
@@ -584,11 +584,39 @@ function Prestadores() {
                 if (prestadorActualizado.actualizacionesPorProfesional) {
                   const entries = Object.entries(prestadorActualizado.actualizacionesPorProfesional);
                   if (entries.length === 0) throw new Error('Debe asignar al menos un horario a un profesional');
-                  await Promise.all(entries.map(([pid, lugares]) => {
+                  // Unificar por lugar del CENTRO y adjuntar profesionalId en cada tramo
+                  const canonDir = (s) => String(s || '')
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .replace(/\s+/g, ' ')
+                    .replace(/\b(s\/?n|s\/?d)\b/gi, '')
+                    .replace(/[,.;\\-–—]+$/g, '')
+                    .trim()
+                    .toLowerCase();
+                  const keyLugar = (l) => (l && l.id != null) ? `id:${l.id}` : `dir:${canonDir(l?.direccion)}`;
+                  const mapLugaresCentro = new Map();
+                  entries.forEach(([pid, lugares]) => {
                     const profId = Number(pid);
-                    return dispatch(actualizarHorariosPrestador({ id: profId, lugaresAtencion: Array.isArray(lugares) ? lugares : [] })).unwrap();
-                  }));
-                  // Refresco en caliente la cache local de cada profesional afectado
+                    (Array.isArray(lugares) ? lugares : []).forEach((l) => {
+                      const key = keyLugar(l);
+                      const existente = mapLugaresCentro.get(key) || { id: l?.id ?? null, direccion: l?.direccion || '', horarios: [] };
+                      const hs = Array.isArray(l?.horarios) ? l.horarios : [];
+                      hs.forEach((h) => {
+                        existente.horarios.push({
+                          id: h?.id ?? null,
+                          dias: Array.isArray(h?.dias) ? h.dias : (Array.isArray(h?.diasDeLaSemana) ? h.diasDeLaSemana : []),
+                          horaInicio: h?.horaInicio || h?.desde || '',
+                          horaFin: h?.horaFin || h?.hasta || '',
+                          duracionMinutos: (typeof h?.duracionMinutos === 'number') ? h.duracionMinutos : (typeof h?.duracionConsulta === 'number' ? h.duracionConsulta : 30),
+                          especialidadId: (Array.isArray(h?.especialidades) && h.especialidades.length > 0) ? h.especialidades[0] : (h?.especialidadId ?? null),
+                          profesionalId: profId
+                        });
+                      });
+                      mapLugaresCentro.set(key, existente);
+                    });
+                  });
+                  const lugaresCentro = Array.from(mapLugaresCentro.values());
+                  await dispatch(actualizarHorariosPrestador({ id: centroId, lugaresAtencion: lugaresCentro, isCentro: true })).unwrap();
+                  // Refresco en caliente la cache local de cada profesional afectado (opcional)
                   try {
                     const idsToRefresh = entries.map(([pid]) => Number(pid)).filter((x) => !isNaN(x));
                     const reqs = idsToRefresh.map((rid) =>
@@ -649,36 +677,6 @@ function Prestadores() {
                       if (typeof pid === 'number') usados.add(pid);
                     });
                   });
-                  // Además de actualizar la agenda del Centro, reflejar en cada profesional los horarios correspondientes
-                  const porProfesional = {};
-                  (Array.isArray(lugaresAtencion) ? lugaresAtencion : []).forEach((l) => {
-                    const hs = Array.isArray(l?.horarios) ? l.horarios : [];
-                    hs.forEach((h) => {
-                      const pid = (typeof h?.profesionalId === 'number') ? h.profesionalId : (typeof h?.prestadorId === 'number' ? h.prestadorId : null);
-                      if (typeof pid !== 'number') return;
-                      porProfesional[pid] = porProfesional[pid] || [];
-                      // agrupar por dirección
-                      let lugar = porProfesional[pid].find(x => String(x.direccion || '').trim().toLowerCase() === String(l.direccion || '').trim().toLowerCase());
-                      if (!lugar) {
-                        lugar = { id: l?.id ?? null, direccion: l?.direccion || '', horarios: [] };
-                        porProfesional[pid].push(lugar);
-                      }
-                      lugar.horarios.push({
-                        id: h?.id ?? null,
-                        dias: Array.isArray(h?.dias) ? h.dias : (Array.isArray(h?.diasDeLaSemana) ? h.diasDeLaSemana : []),
-                        horaInicio: h?.horaInicio || h?.desde || '',
-                        horaFin: h?.horaFin || h?.hasta || '',
-                        duracionMinutos: (typeof h?.duracionMinutos === 'number') ? h.duracionMinutos : (typeof h?.duracionConsulta === 'number' ? h.duracionConsulta : 30),
-                        especialidadId: (Array.isArray(h?.especialidades) && h.especialidades.length > 0) ? h.especialidades[0] : (h?.especialidadId ?? null)
-                      });
-                    });
-                  });
-                  const updates = Object.entries(porProfesional).map(([pid, lugares]) =>
-                    dispatch(actualizarHorariosPrestador({ id: Number(pid), lugaresAtencion: lugares })).unwrap()
-                  );
-                  if (updates.length > 0) {
-                    await Promise.allSettled(updates);
-                  }
                   const todos = (Array.isArray(prestadoresTodos) ? prestadoresTodos : []);
                   const actualesIds = new Set(todos.filter(p => p?.integraCentroMedicoId === centroId).map(p => p.id));
                   const toLink = [...usados].filter(id => !actualesIds.has(id));

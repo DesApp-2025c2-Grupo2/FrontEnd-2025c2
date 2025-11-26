@@ -135,8 +135,10 @@ function mapLugaresForAPI(lugaresAtencion, options = {}) {
   const { isCentro = false } = options;
   const result = [];
   (Array.isArray(lugaresAtencion) ? lugaresAtencion : []).forEach((l) => {
+    // Para el backend: siempre requiere lugarId válido
+    const lugarId = l?.id ?? l?.lugarId ?? null;
+    if (lugarId == null) return;
     const direccion = String(l?.direccion || '').trim();
-    if (!direccion) return; // no enviar lugares sin dirección
     const horariosSrc = Array.isArray(l?.horarios) ? l.horarios : [];
     const horariosAtencion = horariosSrc
       .filter((h) => {
@@ -162,24 +164,24 @@ function mapLugaresForAPI(lugaresAtencion, options = {}) {
         if (isCentro && typeof h?.profesionalId === 'number') {
           out.profesionalId = h.profesionalId;
         }
+        out.deleted = typeof h?.deleted === 'boolean' ? h.deleted : false;
         return out;
       });
-    // Derivar duración base del lugar (opcional) usando la del primer horario
-    const durLugar = horariosAtencion.length > 0 ? (horariosAtencion[0]?.duracionConsulta || 30) : undefined;
-    // Incluir también direcciones con horarios vacíos, para que el backend pueda limpiar todos los horarios de ese lugar
-    result.push({ lugarId: l?.id ?? null, direccion, ...(typeof durLugar === 'number' ? { duracionConsulta: durLugar } : {}), horariosAtencion });
+    result.push({ lugarId, horariosAtencion });
   });
   return result;
 }
 
 // Actualiza lugares y horarios (Centro o Profesional) usando /Agenda/{id}/direcciones
 export async function updateLugares(id, lugaresAtencion, options = {}) {
-  const { isCentro = false, strategy = 'merge' } = options;
+  const { isCentro = false, strategy = 'merge', removeIds = [] } = options;
   const direcciones = mapLugaresForAPI(lugaresAtencion, { isCentro });
   try {
     // 1) Contract principal: PUT /Agenda/{id}/direcciones con wrapper { direcciones: [...] }
     const url = `${ENDPOINT}/${id}/direcciones${strategy ? `?strategy=${encodeURIComponent(strategy)}` : ''}`;
-    const body = { direcciones };
+    const body = { direcciones, removeIds: Array.isArray(removeIds) ? removeIds : [] };
+    // eslint-disable-next-line no-console
+    console.debug('Agenda PUT payload', { url, isCentro, body });
     let res = await WebAPI.Instance().put(url, body);
     const raw = res?.data;
     let data = Array.isArray(raw)
