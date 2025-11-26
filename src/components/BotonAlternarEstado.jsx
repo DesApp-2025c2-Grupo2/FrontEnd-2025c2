@@ -3,7 +3,7 @@ import { Button } from '@mui/material';
 import ToggleOnIcon from '@mui/icons-material/ToggleOn';
 import ToggleOffIcon from '@mui/icons-material/ToggleOff';
 
-export default function BotonAlternarEstado({ activo = true, onClick, ancho = 160, alto = 40 }) {
+export default function BotonAlternarEstado({ activo = true, onClick, ancho = { xs: '100%', sm: 160 }, alto = 40 }) {
   const color = activo ? 'error' : 'success';
   const texto = activo ? 'Desactivar' : 'Activar';
   const Icono = activo ? ToggleOffIcon : ToggleOnIcon;
