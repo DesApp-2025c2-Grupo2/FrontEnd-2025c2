@@ -93,12 +93,12 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
         };
         const keyMap = new Map(); // key -> index
         const add = (dir, h, pid, lugarId) => {
-          const key = (typeof lugarId === 'number') ? `id:${lugarId}` : `dir:${canonDir(dir)}`;
+          const key = (typeof lugarId === 'number' && lugarId > 0) ? `id:${lugarId}` : `dir:${canonDir(dir)}`;
           let idx = keyMap.get(key);
           if (idx === undefined) {
             idx = lugares.length;
             keyMap.set(key, idx);
-            lugares.push({ id: (typeof lugarId === 'number' ? lugarId : null), direccion: dir, horarios: [] });
+            lugares.push({ id: (typeof lugarId === 'number' && lugarId > 0 ? lugarId : null), direccion: dir, horarios: [] });
           }
           const lista = lugares[idx].horarios;
           const dias = Array.isArray(h?.dias) ? h.dias : (Array.isArray(h?.diasDeLaSemana) ? h.diasDeLaSemana : []);
@@ -462,7 +462,7 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
                         </Select>
                       </FormControl>
                       {prestador?.tipo === 'Centro Médico' && (
-                        <Box sx={{ minWidth: 220 }}>
+                        <Box sx={{ minWidth: 180 }}>
                           {/* Selección de profesional SOLO cuando es nuevo (sin id) */}
                           {h.id == null ? (
                             <Autocomplete

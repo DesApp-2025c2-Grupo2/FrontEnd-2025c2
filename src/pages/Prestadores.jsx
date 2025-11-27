@@ -92,7 +92,10 @@ function Prestadores() {
         if (existente) {
           const lugares = Array.isArray(existente.lugaresAtencion) ? existente.lugaresAtencion : p.lugaresAtencion;
           actuales[p.id] = { ...p, lugaresAtencion: lugares };
-          return;
+          // Si es Centro y la cache no tiene lugares aún, continuar para cargar desde getByCentro
+          if (!(p.tipo === 'Centro Médico' && (!Array.isArray(lugares) || lugares.length === 0))) {
+            return;
+          }
         }
         // Si no hay cache, cargar agendas y mergear
         if (p.tipo === 'Centro Médico') {
@@ -112,12 +115,12 @@ function Prestadores() {
               const lugares = [];
               const keyMap = new Map(); // key -> index
               const addHorario = (lugarId, dir, horario, pid) => {
-                const key = (typeof lugarId === 'number') ? `id:${lugarId}` : `dir:${canonDir(dir)}`;
+                const key = (typeof lugarId === 'number' && lugarId > 0) ? `id:${lugarId}` : `dir:${canonDir(dir)}`;
                 let idx = keyMap.get(key);
                 if (idx === undefined) {
                   idx = lugares.length;
                   keyMap.set(key, idx);
-                  lugares.push({ id: (typeof lugarId === 'number' ? lugarId : null), direccion: dir, horarios: [] });
+                  lugares.push({ id: (typeof lugarId === 'number' && lugarId > 0 ? lugarId : null), direccion: dir, horarios: [] });
                 }
                 const lista = lugares[idx].horarios;
                 // evitar duplicados exactos
@@ -186,13 +189,11 @@ function Prestadores() {
               const lugaresMergeados = lugaresBase.map((l) => {
                 const lid = l?.id;
                 const dirNorm = canonDir(l?.direccion);
-                // Tomar todas las agendas que correspondan por id de lugar (lugarId/id) o por dirección normalizada
+                // Solo enriquecer por id exacto de lugar del PROFESIONAL (no por dirección)
                 const matches = listaAgendas.filter((a) => {
                   const aLugarId = a?.lugarId ?? a?.lugarAtencionId ?? a?.id;
-                  const aDirNorm = canonDir(a?.direccion);
                   const matchId = lid != null && (String(aLugarId) === String(lid));
-                  const matchDir = !!dirNorm && aDirNorm === dirNorm;
-                  return matchId || matchDir;
+                  return matchId;
                 });
                 if (matches.length > 0) {
                   const primera = matches[0];
@@ -208,18 +209,10 @@ function Prestadores() {
                 }
                 return l;
               });
-              // Agregar agendas que no matchearon ningún lugar base (union)
-              const extras = listaAgendas.filter((a) => {
-                const key = (a?.id != null) ? `id:${a.id}` : `dir:${canonDir(a?.direccion)}`;
-                return !matchedKeys.has(key);
-              }).map((a) => ({
-                id: a?.id ?? null,
-                direccion: a?.direccion || '',
-                horarios: a?.horarios || a?.horariosAtencion || []
-              }));
               const dedup = [];
               const seen = new Set();
-              [...lugaresMergeados, ...extras].forEach((l) => {
+              // Solo los lugares del profesional (no agregamos lugares extra provenientes del centro)
+              [...lugaresMergeados].forEach((l) => {
                 const key = (l && l.id != null) ? `id:${l.id}` : `dir:${canonDir(l?.direccion)}`;
                 if (key && !seen.has(key)) {
                   seen.add(key);
@@ -770,12 +763,11 @@ function Prestadores() {
                       .trim()
                       .toLowerCase();
                     const agendaById = new Map((Array.isArray(ags) ? ags : []).map((a) => [a.id, a]));
-                    const agendaByDir = new Map((Array.isArray(ags) ? ags : []).map((a) => [canonDir(a.direccion), a]));
                   const basePrev = prestadoresConAgenda[rid] || {};
                   const lugaresBase = JSON.parse(JSON.stringify(basePrev?.lugaresAtencion || []));
                   const matchedKeys = new Set();
                   const lugaresMergeados = lugaresBase.map((l) => {
-                    const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(canonDir(l.direccion));
+                    const a = (l.id != null ? agendaById.get(l.id) : null);
                     if (a) {
                       const key = (a?.id != null) ? `id:${a.id}` : `dir:${String(a?.direccion || '').trim().toLowerCase()}`;
                       matchedKeys.add(key);
@@ -783,17 +775,10 @@ function Prestadores() {
                     }
                     return l;
                   });
-                  const extras = (Array.isArray(ags) ? ags : []).filter((a) => {
-                    const key = (a?.id != null) ? `id:${a.id}` : `dir:${canonDir(a?.direccion)}`;
-                    return !matchedKeys.has(key);
-                  }).map((a) => ({
-                    id: a?.id ?? null,
-                    direccion: a?.direccion || '',
-                    horarios: a?.horarios || a?.horariosAtencion || []
-                  }));
                   const dedup = [];
                   const seen = new Set();
-                  [...lugaresMergeados, ...extras].forEach((l) => {
+                  // No agregamos extras: solo lugares propios del profesional
+                  [...lugaresMergeados].forEach((l) => {
                     const key = (l && l.id != null)
                       ? `id:${l.id}`
                       : `dir:${String(l?.direccion || '').trim().toLowerCase()}`;
