@@ -31,6 +31,7 @@ import {
   ContactPhone as ContactPhoneIcon
 } from '@mui/icons-material';
 import { selectPrestadores } from '../store/prestadoresSlice';
+import * as agendasService from '../services/agendasService';
 
 export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
   if (!prestador) return null;
@@ -65,6 +66,210 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
     return map;
   }, [catalogoEspecialidades, prestador.especialidades]);
 
+  // Para centros, intentamos enriquecer los lugares con horarios desde /Agenda
+  const [lugaresConHorarios, setLugaresConHorarios] = React.useState(null);
+
+  React.useEffect(() => {
+    let cancelado = false;
+    async function cargarLugares() {
+      if (!prestador || !prestador.id) {
+        setLugaresConHorarios(null);
+        return;
+      }
+
+      // PROFESIONAL INDEPENDIENTE: enriquecer con horarios desde /Agenda/getByProfesional
+      if (prestador.tipo !== 'Centro Médico') {
+        try {
+          const res = await agendasService.getByProfesional(prestador.id);
+          const listaAgendas = Array.isArray(res) ? res : [];
+          const baseDirecciones = Array.isArray(prestador.lugaresAtencion) ? prestador.lugaresAtencion : [];
+
+          let finales = baseDirecciones;
+          if (listaAgendas.length > 0 && baseDirecciones.length > 0) {
+            const canonMerge = (s) => String(s || '')
+              .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+              .replace(/\s+/g, ' ')
+              .replace(/\b(s\/?n|s\/?d)\b/gi, '')
+              .replace(/[,.;\-–—]+$/g, '')
+              .trim()
+              .toLowerCase();
+
+            const byId = new Map(
+              listaAgendas
+                .filter(l => typeof l?.id === 'number')
+                .map(l => [l.id, l])
+            );
+            const byDir = new Map(
+              listaAgendas.map(l => [canonMerge(l.direccion), l])
+            );
+
+            finales = baseDirecciones.map((l) => {
+              const lid = (typeof l?.id === 'number') ? l.id : null;
+              const match =
+                (lid != null ? byId.get(lid) : null) ||
+                byDir.get(canonMerge(l?.direccion));
+              if (match) {
+                const horarios = Array.isArray(match.horarios)
+                  ? match.horarios
+                  : (Array.isArray(match.horariosAtencion) ? match.horariosAtencion : []);
+                return { ...l, horarios };
+              }
+              return {
+                ...l,
+                horarios: Array.isArray(l?.horarios) ? l.horarios : []
+              };
+            });
+          } else if (listaAgendas.length > 0) {
+            finales = listaAgendas.map(a => ({
+              id: a?.id ?? null,
+              direccion: a?.direccion || '',
+              horarios: a?.horarios || a?.horariosAtencion || []
+            }));
+          }
+
+          if (!cancelado) {
+            setLugaresConHorarios(finales);
+          }
+          return;
+        } catch {
+          const baseDirecciones = Array.isArray(prestador.lugaresAtencion) ? prestador.lugaresAtencion : [];
+          if (!cancelado) setLugaresConHorarios(baseDirecciones);
+          return;
+        }
+      }
+
+      // CENTROS MÉDICOS: enriquecer lugares del centro con horarios de /Agenda/getByCentro
+      try {
+        let arr = await agendasService.getByCentro(prestador.id);
+        // Fallback: si el backend no devuelve agendas del centro, construirlas desde las agendas de los profesionales asociados
+        if (!Array.isArray(arr) || arr.length === 0) {
+          const ids = new Set(
+            (Array.isArray(prestador?.profesionalesIds) ? prestador.profesionalesIds : [])
+              .filter((x) => typeof x === 'number')
+          );
+          (todosPrestadores || []).forEach((p) => {
+            if ((p?.tipo === 'Profesional Independiente' || p?.rol === 1) && p?.integraCentroMedicoId === prestador.id) {
+              ids.add(p.id);
+            }
+          });
+          if (ids.size > 0) {
+            const reqs = [...ids].map((pid) =>
+              agendasService.getByProfesional(pid)
+                .then((dirs) => ({
+                  profesionalId: pid,
+                  nombreCompleto:
+                    (todosPrestadores || []).find(pp => pp.id === pid)?.nombreCompleto || `Profesional ${pid}`,
+                  direcciones: Array.isArray(dirs) ? dirs : []
+                }))
+                .catch(() => ({
+                  profesionalId: pid,
+                  nombreCompleto:
+                    (todosPrestadores || []).find(pp => pp.id === pid)?.nombreCompleto || `Profesional ${pid}`,
+                  direcciones: []
+                }))
+            );
+            arr = await Promise.all(reqs);
+          }
+        }
+
+        const canonDir = (s) => String(s || '')
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .replace(/\b(s\/?n|s\/?d)\b/gi, '')
+          .replace(/[,.;\-–—]+$/g, '')
+          .trim()
+          .toLowerCase();
+
+        const lugaresAgregados = [];
+        const keyMap = new Map();
+
+        const addHorario = (lugarId, dir, horario) => {
+          const key = (typeof lugarId === 'number' && lugarId > 0) ? `id:${lugarId}` : `dir:${canonDir(dir)}`;
+          let idx = keyMap.get(key);
+          if (idx === undefined) {
+            idx = lugaresAgregados.length;
+            keyMap.set(key, idx);
+            lugaresAgregados.push({ id: (typeof lugarId === 'number' && lugarId > 0) ? lugarId : null, direccion: dir, horarios: [] });
+          }
+          const lista = lugaresAgregados[idx].horarios;
+          lista.push(horario);
+        };
+
+        (Array.isArray(arr) ? arr : []).forEach((p) => {
+          const dirs = Array.isArray(p?.direcciones) ? p.direcciones : [];
+          dirs.forEach((l) => {
+            const dir = String(l?.direccion || '').trim();
+            const lid = (typeof l?.id === 'number') ? l.id : (typeof l?.lugarId === 'number' ? l.lugarId : null);
+            const horariosSrc = Array.isArray(l?.horarios)
+              ? l.horarios
+              : (Array.isArray(l?.horariosAtencion) ? l.horariosAtencion : []);
+            horariosSrc.forEach((h) => addHorario(lid, dir, h));
+          });
+        });
+
+        const baseDirecciones = Array.isArray(prestador.lugaresAtencion) ? prestador.lugaresAtencion : [];
+
+        let finales = baseDirecciones;
+        if (lugaresAgregados.length > 0 && baseDirecciones.length > 0) {
+          // Merge: usar direcciones definidas en el centro y enriquecerlas con horarios de Agenda
+          const canonMerge = (s) => String(s || '')
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ')
+            .replace(/\b(s\/?n|s\/?d)\b/gi, '')
+            .replace(/[,.;\-–—]+$/g, '')
+            .trim()
+            .toLowerCase();
+
+          const byId = new Map(
+            lugaresAgregados
+              .filter(l => typeof l?.id === 'number')
+              .map(l => [l.id, l])
+          );
+          const byDir = new Map(
+            lugaresAgregados.map(l => [canonMerge(l.direccion), l])
+          );
+
+          const usados = new Set();
+          finales = baseDirecciones.map((l) => {
+            const lid = (typeof l?.id === 'number') ? l.id : null;
+            const match =
+              (lid != null ? byId.get(lid) : null) ||
+              byDir.get(canonMerge(l?.direccion));
+            if (match) {
+              usados.add(match);
+              return {
+                ...l,
+                horarios: Array.isArray(match.horarios) ? match.horarios : []
+              };
+            }
+            return {
+              ...l,
+              horarios: Array.isArray(l?.horarios) ? l.horarios : []
+            };
+          });
+
+          // Agregar lugares extra que solo existen en Agenda (por si hubiera)
+          lugaresAgregados.forEach((l) => {
+            if (!usados.has(l)) {
+              finales.push(l);
+            }
+          });
+        } else if (lugaresAgregados.length > 0) {
+          finales = lugaresAgregados;
+        }
+
+        if (!cancelado) setLugaresConHorarios(finales);
+      } catch {
+        if (!cancelado) {
+          const baseDirecciones = Array.isArray(prestador.lugaresAtencion) ? prestador.lugaresAtencion : [];
+          setLugaresConHorarios(baseDirecciones);
+        }
+      }
+    }
+    cargarLugares();
+    return () => { cancelado = true; };
+  }, [prestador, todosPrestadores]);
+
   return (
     <Dialog
       open={abierto}
@@ -75,13 +280,10 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
         sx: { borderRadius: 2, height: '90vh' }
       }}
     >
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 3, py: 2 }}>
+      <DialogTitle sx={{ px: 3, py: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary' }}>
           Detalles del Prestador
         </Typography>
-        <IconButton onClick={onCerrar} aria-label="Cerrar">
-          <CloseIcon />
-        </IconButton>
       </DialogTitle>
 
       <DialogContent dividers>
@@ -239,7 +441,12 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
           ) : null}
 
           {/* Lugares de Atención */}
-          {prestador.lugaresAtencion && prestador.lugaresAtencion.length > 0 && (
+          {(() => {
+            const lugares = Array.isArray(lugaresConHorarios)
+              ? lugaresConHorarios
+              : (Array.isArray(prestador.lugaresAtencion) ? prestador.lugaresAtencion : []);
+            return Array.isArray(lugares) && lugares.length > 0;
+          })() && (
             <Box>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
                 <LocationOnIcon color="primary" />
@@ -248,7 +455,10 @@ export default function DialogVerPrestador({ abierto, prestador, onCerrar }) {
                 </Typography>
               </Stack>
 
-              {prestador.lugaresAtencion.map((lugar, index) => (
+              {(Array.isArray(lugaresConHorarios)
+                ? lugaresConHorarios
+                : (Array.isArray(prestador.lugaresAtencion) ? prestador.lugaresAtencion : [])
+              ).map((lugar, index) => (
                 <Card
                   key={index}
                   variant="outlined"

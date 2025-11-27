@@ -30,8 +30,8 @@ export default function Layout() {
         {/* Espacio para el AppBar en móviles */}
         <Toolbar sx={{ display: { xs: "block", md: "none" } }} />
 
-        <Box sx={{ flexGrow: 1, p: 3, minHeight: 0, overflowY: 'auto' }}>
-          <Box sx={{ maxWidth: 1200, mr: 'auto' }}>
+        <Box sx={{ flexGrow: 1, p: { xs: 2, sm: 3 }, minHeight: 0, overflowY: 'auto' }}>
+          <Box sx={{ maxWidth: '100%', width: '100%' }}>
             <Outlet />
           </Box>
         </Box>

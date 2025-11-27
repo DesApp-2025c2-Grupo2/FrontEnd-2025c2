@@ -61,10 +61,9 @@ export const actualizarDireccionesPrestador = createAsyncThunk(
 
 export const actualizarHorariosPrestador = createAsyncThunk(
   'prestadores/actualizarHorarios',
-  async ({ id, lugaresAtencion }, { rejectWithValue }) => {
+  async ({ id, lugaresAtencion, isCentro = false }, { rejectWithValue }) => {
     try {
-      const normalizados = await agendasService.updateLugares(id, lugaresAtencion);
-      // normalizados: [{ id, direccion, horarios: [...] }]
+      const normalizados = await agendasService.updateLugares(id, lugaresAtencion, { isCentro, strategy: 'merge' });
       return { id, lugaresAtencion: Array.isArray(normalizados) ? normalizados : lugaresAtencion };
     } catch (error) {
       return rejectWithValue(error.message || 'Error al actualizar horarios');

@@ -98,9 +98,38 @@ export default function TarjetaPrestadorSimple({
     return map;
   }, [catalogoEspecialidades, prestador.especialidades]);
 
+  const profesionalIdToNombre = React.useMemo(() => {
+    const map = new Map();
+    (todosPrestadores || []).forEach((p) => {
+      if (p && typeof p.id === 'number' && p.nombreCompleto) map.set(p.id, p.nombreCompleto);
+    });
+    return map;
+  }, [todosPrestadores]);
+
+  const lugaresUnicos = React.useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    const canonDir = (s) => String(s || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/\b(s\/?n|s\/?d)\b/gi, '')
+      .replace(/[,.;\-–—]+$/g, '')
+      .trim()
+      .toLowerCase();
+    (Array.isArray(prestador.lugaresAtencion) ? prestador.lugaresAtencion : []).forEach((l) => {
+      const key = (l && l.id != null) ? `id:${l.id}` : `dir:${canonDir(l?.direccion)}`;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        out.push(l);
+      }
+    });
+    return out;
+  }, [prestador.lugaresAtencion]);
+
   return (
     <Card
       sx={{
+        width: '100%',
         p: 2,
         mb: 2,
         border: prestador.activo ? "1px solid #e0e0e0" : "1px solid #d1d5db",
@@ -120,6 +149,7 @@ export default function TarjetaPrestadorSimple({
           "background-color 200ms ease, box-shadow 200ms ease, border-color 200ms ease",
       }}
     >
+
       <Box sx={{ 
         display: 'flex', 
         flexDirection: { xs: "column", md: "row" }, 
@@ -205,6 +235,7 @@ export default function TarjetaPrestadorSimple({
           {/* Lugares de atención movidos fuera de la fila principal para ocupar ancho completo */}
         </Box>
 
+
         <Box sx={{ 
             display: 'flex', 
             flexDirection: 'column', 
@@ -255,11 +286,11 @@ export default function TarjetaPrestadorSimple({
           </Button>
         </Box>
       </Box>
-      {prestador.lugaresAtencion && prestador.lugaresAtencion.length > 0 && (
+      {lugaresUnicos && lugaresUnicos.length > 0 && (
         <Accordion sx={{ mt: 2 }}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Typography variant="subtitle2">
-              Lugares de Atención ({prestador.lugaresAtencion.length})
+              Lugares de Atención ({lugaresUnicos.length})
             </Typography>
             {isRefreshing && (
               <Box sx={{ display: "flex", alignItems: "center", ml: 1 }}>
@@ -275,8 +306,9 @@ export default function TarjetaPrestadorSimple({
             )}
           </AccordionSummary>
           <AccordionDetails>
+
             <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {prestador.lugaresAtencion.map((lugar, idx) => (
+              {lugaresUnicos.map((lugar, idx) => (
                 <Card
                   key={idx}
                   variant="outlined"
@@ -355,38 +387,31 @@ export default function TarjetaPrestadorSimple({
                         Horarios de Atención
                       </Typography>
                     </Stack>
-                    {Array.isArray(lugar.horarios) &&
-                    lugar.horarios.length > 0 ? (
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 1,
-                        }}
-                      >
-                        {(lugar.horarios || []).map((h, i) => {
-                          const dias = Array.isArray(h.dias)
-                            ? h.dias.map(canonDia).filter(Boolean)
-                            : [];
-                          const inicio = h.horaInicio || h.desde || "";
-                          const fin = h.horaFin || h.hasta || "";
-                          const dur =
-                            typeof h.duracionMinutos === "number" &&
-                            h.duracionMinutos > 0
+                    {(() => {
+                      const horariosSrc = Array.isArray(lugar.horarios)
+                        ? lugar.horarios
+                        : (Array.isArray(lugar.horariosAtencion) ? lugar.horariosAtencion : []);
+                      return Array.isArray(horariosSrc) && horariosSrc.length > 0;
+                    })() ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {(() => {
+                          const horariosSrc = Array.isArray(lugar.horarios)
+                            ? lugar.horarios
+                            : (Array.isArray(lugar.horariosAtencion) ? lugar.horariosAtencion : []);
+                          return horariosSrc.map((h, i) => {
+                          const dias = Array.isArray(h.dias) ? h.dias.map(canonDia).filter(Boolean) : [];
+                          const inicio = h.horaInicio || h.desde || '';
+                          const fin = h.horaFin || h.hasta || '';
+                            const dur = (typeof h.duracionMinutos === 'number' && h.duracionMinutos > 0)
                               ? h.duracionMinutos
-                              : undefined;
-                          const espId =
-                            Array.isArray(h.especialidades) &&
-                            h.especialidades.length > 0
-                              ? h.especialidades[0]
-                              : typeof h.especialidadId === "number" &&
-                                h.especialidadId > 0
-                              ? h.especialidadId
-                              : null;
-                          const espNombre =
-                            espId != null
-                              ? especialidadIdToNombre.get(espId)
-                              : null;
+                              : (typeof h.duracionConsulta === 'number' && h.duracionConsulta > 0 ? h.duracionConsulta : undefined);
+                          const espId = (Array.isArray(h.especialidades) && h.especialidades.length > 0)
+                            ? h.especialidades[0]
+                            : ((typeof h.especialidadId === 'number' && h.especialidadId > 0) ? h.especialidadId : null);
+                          const espNombre = (espId != null) ? especialidadIdToNombre.get(espId) : null;
+                          const pid = (typeof h.profesionalId === 'number') ? h.profesionalId : (typeof h.prestadorId === 'number' ? h.prestadorId : null);
+                          const profNombre = (prestador.tipo === 'Centro Médico' && typeof pid === 'number')
+                            ? profesionalIdToNombre.get(pid) : null;
                           return (
                             <Box
                               key={i}
@@ -407,17 +432,18 @@ export default function TarjetaPrestadorSimple({
                               >
                                 {dias.length > 0 ? dias.join(", ") : "Horario"}
                               </Typography>
-                              <Typography
-                                variant="body2"
-                                color="text.secondary"
-                              >
-                                {espNombre ? `${espNombre} • ` : ""}
+                              <Typography variant="body2" color="text.secondary">
+                                {profNombre ? `${profNombre} • ` : ''}
+                                {espNombre ? `${espNombre} • ` : ''}
+
+
                                 {inicio} - {fin}
                                 {dur ? ` • ${dur} min` : ""}
                               </Typography>
                             </Box>
                           );
-                        })}
+                          });
+                        })()}
                       </Box>
                     ) : (
                       <Typography variant="body2" color="text.secondary">

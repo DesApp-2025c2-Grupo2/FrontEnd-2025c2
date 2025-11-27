@@ -226,37 +226,103 @@ export async function getById(id) {
 }
 
 function toBackendPayload(prestador, options = {}) {
-  const { includeLugares = true, includeDirecciones = true } = options;
+  const { includeLugares = true, includeDirecciones = true, partialUpdate = false } = options;
   const idsFromEspecialidades = Array.isArray(prestador?.especialidades)
     ? prestador.especialidades
         .map((e) => (typeof e === 'number' ? e : (e && e.id)))
         .filter((id) => typeof id === 'number')
     : [];
-  const base = {
-    nombreCompleto: prestador?.nombreCompleto || '',
-    rol: prestador?.tipo === 'Centro Médico' ? 2 : 1,
-    centroMedico: prestador?.centroMedico || '',
-    centroMedicoId: (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined,
-    integraCentroMedicoId: (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined,
-    especialidadesIds: idsFromEspecialidades,
-    documentacion: prestador?.cuilCuit || '',
-    telefonos: Array.isArray(prestador?.telefonos) ? prestador.telefonos.map(t => t?.numero).filter(Boolean) : [],
-    emails: Array.isArray(prestador?.emails) ? prestador.emails.map(e => e?.email).filter(Boolean) : [],
-  };
-  if (includeDirecciones) {
-    const dirs = Array.isArray(prestador?.lugaresAtencion)
-      ? prestador.lugaresAtencion
-          .map(l => (typeof l === 'string' ? l : (l?.direccion || '')))
-          .map(s => String(s).trim())
-          .filter(s => s !== '')
+  const base = {};
+  // Para updates parciales, solo incluir campos presentes para no sobreescribir con nulls/''
+  if (!partialUpdate || prestador?.nombreCompleto !== undefined) {
+    base.nombreCompleto = prestador?.nombreCompleto || '';
+  }
+  if (!partialUpdate || prestador?.tipo !== undefined) {
+    base.rol = prestador?.tipo === 'Centro Médico' ? 0 : 1;
+  }
+  if (!partialUpdate || prestador?.centroMedico !== undefined) {
+    base.centroMedico = prestador?.centroMedico || '';
+  }
+  const cmId =
+    (typeof prestador?.integraCentroMedicoId === 'number') ? prestador.integraCentroMedicoId : undefined;
+  if (!partialUpdate || cmId !== undefined) {
+    base.centroMedicoId = cmId;
+    base.integraCentroMedicoId = cmId;
+    base.centroId = cmId; // compat
+  }
+  if (!partialUpdate || (Array.isArray(prestador?.especialidades))) {
+    base.especialidades = idsFromEspecialidades;
+  }
+  if (!partialUpdate || (prestador?.cuilCuit !== undefined || prestador?.documentacion !== undefined)) {
+    const doc = prestador?.documentacion || {};
+    base.documentacion = {
+      id: (typeof doc?.id === 'number') ? doc.id : 0,
+      tipoDocumento: (typeof doc?.tipoDocumento === 'number') ? doc.tipoDocumento : 0,
+      numero: (doc?.numero || prestador?.cuilCuit || '').toString()
+    };
+  }
+  if (!partialUpdate || Array.isArray(prestador?.telefonos)) {
+    base.telefonos = Array.isArray(prestador?.telefonos)
+      ? prestador.telefonos
+          .map(t => (t ? { id: (typeof t.id === 'number') ? t.id : 0, numero: t?.numero || '' } : null))
+          .filter(x => x && x.numero)
       : [];
+  }
+  if (!partialUpdate || Array.isArray(prestador?.emails)) {
+    base.emails = Array.isArray(prestador?.emails)
+      ? prestador.emails
+          .map(e => (e ? { id: (typeof e.id === 'number') ? e.id : 0, correo: e?.email || e?.correo || '' } : null))
+          .filter(x => x && x.correo)
+      : [];
+  }
+  // Campo opcional: listado de profesionales asociados al centro
+  // Incluir siempre que venga, aunque no se envíe el tipo en este update parcial
+  if (Array.isArray(prestador?.profesionalesIds)) {
+    base.profesionalesIds = prestador.profesionalesIds.filter((id) => typeof id === 'number');
+  }
+  if (includeDirecciones) {
+    // Contrato: direcciones es array de objetos
+    const raw = Array.isArray(prestador?.lugaresAtencion) ? prestador.lugaresAtencion : [];
     const seen = new Set();
-    base.direcciones = dirs.filter((d) => {
-      const k = d.toLowerCase();
-      if (seen.has(k)) return false;
-      seen.add(k);
+    base.direcciones = raw.map((l) => {
+      if (!l) return null;
+      const calle = (typeof l?.calle === 'string' && l.calle) ? l.calle : (l?.direccion || '');
+      const altura = typeof l?.altura === 'string' ? l.altura : '';
+      const piso = typeof l?.piso === 'string' ? l.piso : '';
+      const departamento = typeof l?.departamento === 'string' ? l.departamento : '';
+      const provinciaCiudad = typeof l?.provinciaCiudad === 'string' ? l.provinciaCiudad : '';
+      const codigoPostalRaw = l?.codigoPostal;
+      let codigoPostal = undefined;
+      if (typeof codigoPostalRaw === 'number' && Number.isInteger(codigoPostalRaw)) {
+        codigoPostal = codigoPostalRaw;
+      } else if (typeof codigoPostalRaw === 'string') {
+        const trimmed = codigoPostalRaw.trim();
+        if (/^\d+$/.test(trimmed)) {
+          codigoPostal = parseInt(trimmed, 10);
+        }
+      }
+      return {
+        id: (typeof l?.id === 'number') ? l.id : 0,
+        calle: String(calle || '').trim(),
+        altura: String(altura || '').trim(),
+        piso: String(piso || '').trim(),
+        departamento: String(departamento || '').trim(),
+        provinciaCiudad: String(provinciaCiudad || '').trim(),
+        // Nuevo campo requerido por backend: entero codigoPostal
+        ...(codigoPostal !== undefined ? { codigoPostal } : {}),
+      };
+    }).filter(Boolean).filter((d) => {
+      const key = `${(d.calle || '').toLowerCase()}|${(d.altura || '').toLowerCase()}`;
+      if (!d.calle) return false;
+      if (seen.has(key)) return false;
+      seen.add(key);
       return true;
     });
+  }
+  if (!partialUpdate) {
+    base.activo = prestador?.activo !== false;
+    base.alta = prestador?.alta || null;
+    base.baja = prestador?.baja || null;
   }
   if (!includeLugares) return base;
   return {
@@ -265,6 +331,11 @@ function toBackendPayload(prestador, options = {}) {
     lugaresAtencion: Array.isArray(prestador?.lugaresAtencion)
       ? prestador.lugaresAtencion.map((l) => ({
           direccion: l?.direccion || '',
+          calle: l?.calle || undefined,
+          altura: l?.altura || undefined,
+          piso: l?.piso ?? undefined,
+          departamento: l?.departamento ?? undefined,
+          provinciaCiudad: l?.provinciaCiudad || undefined,
           horarios: Array.isArray(l?.horarios)
             ? l.horarios.map((h) => ({
                 dias: Array.isArray(h?.dias) ? h.dias : [],
@@ -329,9 +400,19 @@ function normalizeFromBackend(p, idToNombre) {
       const alturaRaw = typeof l?.altura === 'string' ? l.altura.trim() : '';
       const alturaEsSN = /^(s\/?n|s\/?d)$/i.test(alturaRaw);
       const direccion = l?.direccion || (calle ? (alturaRaw && !alturaEsSN ? `${calle} ${alturaRaw}` : calle) : '');
+      const cpRaw = l?.codigoPostal;
+      const codigoPostal = (typeof cpRaw === 'number' && Number.isInteger(cpRaw))
+        ? cpRaw
+        : (typeof cpRaw === 'string' && /^\d+$/.test(cpRaw.trim()) ? parseInt(cpRaw.trim(), 10) : undefined);
       return {
         id: l?.id ?? null,
         direccion,
+        calle: calle || undefined,
+        altura: alturaRaw || (alturaEsSN ? 'S/N' : undefined),
+        piso: l?.piso ?? null,
+        departamento: l?.departamento ?? null,
+        provinciaCiudad: l?.provinciaCiudad || undefined,
+        ...(codigoPostal !== undefined ? { codigoPostal } : {}),
         horarios: buildHorarios(l),
       };
     });
@@ -344,9 +425,19 @@ function normalizeFromBackend(p, idToNombre) {
       const alturaRaw = typeof d?.altura === 'string' ? d.altura.trim() : '';
       const alturaEsSN = /^(s\/?n|s\/?d)$/i.test(alturaRaw);
       const direccion = calle ? (alturaRaw && !alturaEsSN ? `${calle} ${alturaRaw}` : calle) : '';
+      const cpRaw = d?.codigoPostal;
+      const codigoPostal = (typeof cpRaw === 'number' && Number.isInteger(cpRaw))
+        ? cpRaw
+        : (typeof cpRaw === 'string' && /^\d+$/.test(cpRaw.trim()) ? parseInt(cpRaw.trim(), 10) : undefined);
       return {
         id: d?.id || null,
         direccion,
+        calle: calle || undefined,
+        altura: alturaRaw || (alturaEsSN ? 'S/N' : undefined),
+        piso: d?.piso ?? null,
+        departamento: d?.departamento ?? null,
+        provinciaCiudad: d?.provinciaCiudad || undefined,
+        ...(codigoPostal !== undefined ? { codigoPostal } : {}),
         horarios: buildHorarios(d),
       };
     });
@@ -364,16 +455,20 @@ function normalizeFromBackend(p, idToNombre) {
     id: p.id,
     cuilCuit: p?.documentacion?.numero || p?.documentacion || '',
     nombreCompleto: p?.nombreCompleto || '',
-    tipo: (p?.rol === 2 ? 'Centro Médico' : 'Profesional Independiente'),
-    rol: (typeof p?.rol === 'number') ? p.rol : (p?.tipo === 'Centro Médico' ? 2 : 1),
+    tipo: (p?.rol === 0 ? 'Centro Médico' : 'Profesional Independiente'),
+    rol: (typeof p?.rol === 'number') ? p.rol : (p?.tipo === 'Centro Médico' ? 0 : 1),
     integraCentroMedicoId: (typeof p?.integraCentroMedicoId === 'number')
       ? p.integraCentroMedicoId
-      : (typeof p?.centroMedicoId === 'number' ? p.centroMedicoId : null),
+      : (typeof p?.centroMedicoId === 'number')
+        ? p.centroMedicoId
+        : (typeof p?.centroId === 'number' ? p.centroId : null),
     centroMedicoNombre: typeof p?.centroMedico === 'string' ? p.centroMedico : undefined,
     especialidades,
     telefonos: Array.isArray(p?.telefonos) ? p.telefonos.map(t => ({ numero: t?.numero || t })) : [],
     emails: Array.isArray(p?.emails) ? p.emails.map(e => ({ email: e?.correo || e })) : [],
     lugaresAtencion,
+    // Campo opcional del backend para Centros: listado de profesionales asociados
+    profesionalesIds: Array.isArray(p?.profesionalesIds) ? p.profesionalesIds.filter((x) => typeof x === 'number') : undefined,
     activo: activoCalc,
   };
 }
@@ -417,7 +512,8 @@ export async function ensureSeed() {
 
 export async function create(prestador) {
   try {
-    const payload = toBackendPayload(prestador, { includeLugares: true });
+    // En creación, enviamos datos base + direcciones. Los horarios se actualizan luego vía endpoint de agendas.
+    const payload = toBackendPayload(prestador, { includeLugares: false, includeDirecciones: true });
     // Nuevo endpoint principal
     let res = await WebAPI.Instance().post(`${ENDPOINT}`, payload);
     if (!res || !res.data) {
@@ -429,13 +525,47 @@ export async function create(prestador) {
     const catalogo = await especialidadesService.getAll().catch(() => []);
     const idToNombre = new Map((catalogo || []).map(e => [e.id, e.nombre]));
     if (creado && typeof creado === 'object' && creado.id) {
-      return normalizeFromBackend(creado, idToNombre);
+      const normal = normalizeFromBackend(creado, idToNombre);
+      // Persistir direcciones con contrato de Afiliados si el create no las tomó
+      if (Array.isArray(prestador?.lugaresAtencion) && prestador.lugaresAtencion.length > 0) {
+        try {
+          await update({ id: normal.id, lugaresAtencion: prestador.lugaresAtencion }, { includeDirecciones: true });
+        } catch (_) {}
+      }
+      // Si se enviaron horarios inicialmente, intentar persistirlos ahora
+      if (Array.isArray(prestador?.lugaresAtencion) && prestador.lugaresAtencion.some(l => Array.isArray(l?.horarios) && l.horarios.length > 0)) {
+        try {
+          await updateHorarios(normal.id, prestador.lugaresAtencion);
+          const refreshed = await getById(normal.id);
+          return refreshed || normal;
+        } catch {
+          // si falla horario, devolvemos el creado base igualmente
+          return normal;
+        }
+      }
+      return normal;
     }
     // 2) Si devuelve solo un ID numérico
     if (typeof creado === 'number') {
       // Volver a cargar lista y devolver ese ítem
       const todos = await getAll();
       const match = todos.find(p => p.id === creado);
+      // Persistir direcciones si corresponde
+      if (match && Array.isArray(prestador?.lugaresAtencion) && prestador.lugaresAtencion.length > 0) {
+        try {
+          await update({ id: match.id, lugaresAtencion: prestador.lugaresAtencion }, { includeDirecciones: true });
+        } catch (_) {}
+      }
+      // Actualizar horarios si correspondía
+      if (match && Array.isArray(prestador?.lugaresAtencion) && prestador.lugaresAtencion.some(l => Array.isArray(l?.horarios) && l.horarios.length > 0)) {
+        try {
+          await updateHorarios(match.id, prestador.lugaresAtencion);
+          const refreshed = await getById(match.id);
+          return refreshed || match || todos;
+        } catch {
+          return match || todos;
+        }
+      }
       return match || todos;
     }
     // 3) Si devuelve true/OK o sin body pero status 2xx, recargar
@@ -444,7 +574,8 @@ export async function create(prestador) {
       // Buscar por CUIL/CUIT
       const cuilLower = String(prestador.cuilCuit || '').toLowerCase();
       const match = todos.find(p => String(p.cuilCuit || '').toLowerCase() === cuilLower);
-      return match || todos;
+      // Si el backend todavía no refleja el nuevo, devolver el objeto local (evita pisar la UI).
+      return match || { ...prestador };
     }
   } catch (_) {
     // fallback a mock local
@@ -466,7 +597,7 @@ export async function create(prestador) {
 export async function update(partial, options = {}) {
   try {
     const includeDirecciones = !!options.includeDirecciones;
-    const payload = toBackendPayload(partial, { includeLugares: false, includeDirecciones });
+    const payload = toBackendPayload(partial, { includeLugares: false, includeDirecciones, partialUpdate: true });
     // Preferir PUT /Prestador/{id}
     let res = null;
     if (partial && partial.id != null) {
@@ -566,7 +697,9 @@ function toHorariosUpdatePayload(lugaresAtencion) {
           horaInicio: h?.horaInicio || '',
           horaFin: h?.horaFin || '',
           duracionMinutos: (typeof h?.duracionMinutos === 'number') ? h.duracionMinutos : 30,
-          especialidades: (typeof h?.especialidadId === 'number') ? [h.especialidadId] : [],
+        especialidades: (typeof h?.especialidadId === 'number') ? [h.especialidadId] : [],
+        // En caso de Centros: algunos backends requieren el profesional en cada horario
+        profesionalId: (typeof h?.profesionalId === 'number') ? h.profesionalId : undefined,
         }))
       : [],
   }));

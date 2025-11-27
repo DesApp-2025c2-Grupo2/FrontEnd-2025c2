@@ -8,9 +8,6 @@ import {
   Button,
   TextField,
   FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   Box,
   Typography,
   IconButton,
@@ -24,6 +21,8 @@ import {
   Autocomplete,
   FormControlLabel,
   Switch,
+  Radio,
+  RadioGroup,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -37,6 +36,7 @@ import {
 import { selectEspecialidades } from "../store/especialidadesSlice";
 import { selectPrestadores } from "../store/prestadoresSlice";
 import ContactInfoEditor from "./ContactInfoEditor";
+import * as agendasService from "../services/agendasService";
 
 const diasSemana = [
   "Lunes",
@@ -188,7 +188,7 @@ export default function DialogPrestador({
   const todosPrestadores = useSelector(selectPrestadores);
 
   const centrosMedicos = (todosPrestadores || []).filter(
-    (p) => p?.rol === 2 || p?.tipo === "Centro Médico"
+    (p) => p?.rol === 0 || p?.tipo === "Centro Médico"
   );
 
   // Si el prestador viene con nombre de centro pero sin ID, intentar resolver solo una vez
@@ -235,6 +235,119 @@ export default function DialogPrestador({
       setNewEmail("");
     }
   }, [abierto, valorInicial]);
+
+  // Para Centros: intentar enriquecer lugares con horarios desde /Agenda/getByCentro
+  useEffect(() => {
+    let cancelado = false;
+    async function cargarHorariosCentro() {
+      if (!abierto) return;
+      if (form.tipo !== "Centro Médico") return;
+      if (!form.id) return;
+      const tieneHorarios = Array.isArray(form.lugaresAtencion)
+        ? form.lugaresAtencion.some(
+            (l) => Array.isArray(l?.horarios) && l.horarios.length > 0
+          )
+        : false;
+      if (tieneHorarios) return;
+      try {
+        let arr = await agendasService.getByCentro(form.id);
+        if (!Array.isArray(arr) || arr.length === 0) return;
+        const canonDir = (s) =>
+          String(s || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, " ")
+            .replace(/\b(s\/?n|s\/?d)\b/gi, "")
+            .replace(/[,.;\-–—]+$/g, "")
+            .trim()
+            .toLowerCase();
+        const lugaresAgregados = [];
+        const keyMap = new Map();
+        const addHorario = (lugarId, dir, horario) => {
+          const key =
+            typeof lugarId === "number" && lugarId > 0
+              ? `id:${lugarId}`
+              : `dir:${canonDir(dir)}`;
+          let idx = keyMap.get(key);
+          if (idx === undefined) {
+            idx = lugaresAgregados.length;
+            keyMap.set(key, idx);
+            lugaresAgregados.push({
+              id: typeof lugarId === "number" && lugarId > 0 ? lugarId : null,
+              direccion: dir,
+              horarios: [],
+            });
+          }
+          const lista = lugaresAgregados[idx].horarios;
+          const horariosSrc = Array.isArray(horario?.horarios)
+            ? horario.horarios
+            : Array.isArray(horario?.horariosAtencion)
+            ? horario.horariosAtencion
+            : [horario];
+          horariosSrc.forEach((h) => {
+            lista.push(h);
+          });
+        };
+        (Array.isArray(arr) ? arr : []).forEach((p) => {
+          const dirs = Array.isArray(p?.direcciones) ? p.direcciones : [];
+          dirs.forEach((l) => {
+            const dir = String(l?.direccion || "").trim();
+            const lid =
+              typeof l?.id === "number"
+                ? l.id
+                : typeof l?.lugarId === "number"
+                ? l.lugarId
+                : null;
+            const horarios = Array.isArray(l?.horarios)
+              ? l.horarios
+              : Array.isArray(l?.horariosAtencion)
+              ? l.horariosAtencion
+              : [];
+            horarios.forEach((h) => addHorario(lid, dir, h));
+          });
+        });
+        const baseDirecciones = Array.isArray(form.lugaresAtencion)
+          ? form.lugaresAtencion
+          : [];
+        if (baseDirecciones.length === 0) return;
+        const byId = new Map(
+          lugaresAgregados
+            .filter((l) => typeof l?.id === "number")
+            .map((l) => [l.id, l])
+        );
+        const byDir = new Map(
+          lugaresAgregados.map((l) => [canonDir(l.direccion), l])
+        );
+        const lugaresConHorarios = baseDirecciones.map((l) => {
+          const lid = typeof l?.id === "number" ? l.id : null;
+          const match =
+            (lid != null ? byId.get(lid) : null) ||
+            byDir.get(canonDir(l?.direccion));
+          if (match) {
+            const horarios = Array.isArray(match.horarios)
+              ? match.horarios
+              : Array.isArray(match.horariosAtencion)
+              ? match.horariosAtencion
+              : [];
+            return { ...l, horarios };
+          }
+          return l;
+        });
+        if (!cancelado) {
+          setForm((prev) => ({
+            ...prev,
+            lugaresAtencion: lugaresConHorarios,
+          }));
+        }
+      } catch {
+        // silencio: si falla, simplemente no mostramos horarios en este diálogo
+      }
+    }
+    cargarHorariosCentro();
+    return () => {
+      cancelado = true;
+    };
+  }, [abierto, form.id, form.tipo]);
 
   // Detectar conflictos de horarios dentro de cada lugar Y entre lugares diferentes
   useEffect(() => {
@@ -325,8 +438,14 @@ export default function DialogPrestador({
       lugaresAtencion: [
         ...prev.lugaresAtencion,
         {
-          id: Date.now(),
+          id: 0,
           direccion: "",
+          calle: "",
+          altura: "",
+          piso: "",
+          departamento: "",
+          provinciaCiudad: "",
+          codigoPostal: "",
           horarios: [],
         },
       ],
@@ -406,15 +525,54 @@ export default function DialogPrestador({
   const validar = () => {
     const errores = {};
 
-    if (!form.cuilCuit.trim()) {
+    const cuilTrim = form.cuilCuit.trim();
+    if (!cuilTrim) {
       errores.cuilCuit = "CUIL/CUIT requerido";
+    } else {
+      const soloDigitos = cuilTrim.replace(/\D/g, "");
+      if (soloDigitos.length !== 11) {
+        errores.cuilCuit = "CUIL/CUIT debe tener 11 dígitos (sin contar guiones)";
+      }
     }
 
     if (!form.nombreCompleto.trim()) {
       errores.nombreCompleto = "Nombre completo requerido";
     }
 
-    if (form.especialidades.length === 0) {
+    // Al menos un teléfono
+    const telefonosValidos = (form.telefonos || []).filter(
+      (t) => String(t.numero || "").trim() !== ""
+    );
+    if (telefonosValidos.length === 0) {
+      errores.telefonos = "Debe agregar al menos un teléfono";
+    } else {
+      const algunTelInvalido = telefonosValidos.some((t) => {
+        const digitos = String(t.numero || "").replace(/\D/g, "");
+        return digitos.length !== 10;
+      });
+      if (algunTelInvalido) {
+        errores.telefonos = "Cada teléfono debe tener 10 dígitos (código de área + número)";
+      }
+    }
+
+    // Al menos un email
+    const emailsValidos = (form.emails || []).filter(
+      (e) => String(e.email || "").trim() !== ""
+    );
+    if (emailsValidos.length === 0) {
+      errores.emails = "Debe agregar al menos un email";
+    } else {
+      const algunEmailInvalido = emailsValidos.some((e) => {
+        const val = String(e.email || "").trim();
+        return !val.includes("@");
+      });
+      if (algunEmailInvalido) {
+        errores.emails = 'Ingrese emails válidos (deben contener "@")';
+      }
+    }
+
+    // Especialidades obligatorias solo para Profesional Independiente
+    if (form.tipo === "Profesional Independiente" && form.especialidades.length === 0) {
       errores.especialidades = "Debe agregar al menos una especialidad";
     }
 
@@ -471,8 +629,6 @@ export default function DialogPrestador({
             mensajes.join("\n") +
             "\n\nDebe resolver estos conflictos antes de continuar."
         );
-      } else {
-        alert("Por favor complete todos los campos requeridos (revise direcciones válidas)");
       }
       return;
     }
@@ -507,13 +663,24 @@ export default function DialogPrestador({
               ? Number(h.especialidadId)
               : null,
           }));
+        const codigoPostalStr = String(l.codigoPostal ?? '').trim();
+        const codigoPostal =
+          codigoPostalStr && /^\d+$/.test(codigoPostalStr)
+            ? parseInt(codigoPostalStr, 10)
+            : undefined;
         return {
           id: l.id,
-          direccion: (l.direccion || "").trim(),
+          direccion: (l.direccion || `${String(l.calle || '').trim()} ${String(l.altura || '').trim()}`).trim(),
+          calle: (l.calle || '').trim(),
+          altura: (l.altura ?? '').trim(),
+          piso: (l.piso ?? '').trim(),
+          departamento: (l.departamento ?? '').trim(),
+          provinciaCiudad: (l.provinciaCiudad ?? '').trim(),
+          ...(codigoPostal !== undefined ? { codigoPostal } : {}),
           horarios: horariosLimpios,
         };
       })
-      .filter((l) => isValidDireccion(l.direccion));
+      .filter((l) => isValidDireccion(l.calle || l.direccion));
 
     const integraCentroMedicoNormalizado =
       form.tipo === "Profesional Independiente" && form.vinculaCentro
@@ -627,32 +794,23 @@ export default function DialogPrestador({
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <FormControl fullWidth>
-                    <InputLabel>Tipo</InputLabel>
-                    <Select
+                    <Typography variant="caption" sx={{ color: 'text.secondary', mb: 0.5, display: 'block' }}>Tipo</Typography>
+                    <RadioGroup
+                      row
                       value={form.tipo}
                       onChange={(e) => {
                         const nuevoTipo = e.target.value;
                         setForm((prev) => ({
                           ...prev,
                           tipo: nuevoTipo,
-                          // reset center link if becomes Centro Médico
-                          vinculaCentro:
-                            nuevoTipo === "Profesional Independiente"
-                              ? prev.vinculaCentro
-                              : false,
-                          integraCentroMedicoId:
-                            nuevoTipo === "Profesional Independiente"
-                              ? prev.integraCentroMedicoId
-                              : null,
+                          vinculaCentro: nuevoTipo === "Profesional Independiente" ? prev.vinculaCentro : false,
+                          integraCentroMedicoId: nuevoTipo === "Profesional Independiente" ? prev.integraCentroMedicoId : null,
                         }));
                       }}
-                      label="Tipo"
                     >
-                      <MenuItem value="Profesional Independiente">
-                        Profesional Independiente
-                      </MenuItem>
-                      <MenuItem value="Centro Médico">Centro Médico</MenuItem>
-                    </Select>
+                      <FormControlLabel value="Profesional Independiente" control={<Radio size="small" color="secondary" />} label="Profesional Independiente" />
+                      <FormControlLabel value="Centro Médico" control={<Radio size="small" color="secondary" />} label="Centro Médico" />
+                    </RadioGroup>
                   </FormControl>
                 </Grid>
 
@@ -697,6 +855,7 @@ export default function DialogPrestador({
                                   isOptionEqualToValue={(o, v) => o?.id === v?.id}
                                   value={valorCentro}
                                   disableClearable
+                                  openOnFocus
                                   onChange={(e, newValue) => {
                                     setForm((prev) => ({
                                       ...prev,
@@ -709,7 +868,7 @@ export default function DialogPrestador({
                                       {...params}
                                       label="Centro Médico"
                                       placeholder="Seleccionar centro"
-                                      inputProps={{ ...params.inputProps, readOnly: true }}
+                                      inputProps={{ ...params.inputProps }}
                                     />
                                   )}
                                   noOptionsText="No hay centros disponibles"
@@ -845,6 +1004,11 @@ export default function DialogPrestador({
                 onAdd={agregarTelefono}
                 onRemove={eliminarTelefono}
               />
+              {intentoGuardar && errores.telefonos && (
+                <FormHelperText error sx={{ mt: 1 }}>
+                  {errores.telefonos}
+                </FormHelperText>
+              )}
             </Box>
 
             <Divider />
@@ -863,6 +1027,11 @@ export default function DialogPrestador({
                 onAdd={agregarEmail}
                 onRemove={eliminarEmail}
               />
+              {intentoGuardar && errores.emails && (
+                <FormHelperText error sx={{ mt: 1 }}>
+                  {errores.emails}
+                </FormHelperText>
+              )}
             </Box>
 
             <Divider />
@@ -925,35 +1094,178 @@ export default function DialogPrestador({
                     </Box>
 
                     <Grid container spacing={2}>
-                      <Grid item xs={12} sm={8}>
+                      <Grid item xs={12} sm={6}>
                         <TextField
-                          label="Dirección"
-                          value={lugar.direccion}
-                          onChange={(e) =>
-                            actualizarLugarAtencion(
-                              lugarIndex,
-                              "direccion",
-                              e.target.value
-                            )
-                          }
+                          label="Calle"
+                          value={lugar.calle || ""}
+                          onChange={(e) => {
+                            const nuevaCalle = e.target.value;
+                            const nuevaDir = `${String(nuevaCalle || "").trim()} ${String(lugar.altura || "").trim()}`.trim();
+                            actualizarLugarAtencion(lugarIndex, "calle", nuevaCalle);
+                            actualizarLugarAtencion(lugarIndex, "direccion", nuevaDir);
+                          }}
                           fullWidth
-                          placeholder="Avenida Vergara 1908, CABA"
-                          error={intentoGuardar && !isValidDireccion(lugar.direccion)}
-                          helperText={intentoGuardar && !isValidDireccion(lugar.direccion) ? "Ingrese una dirección válida (calle y número/barrio)" : ""}
+                          placeholder="Avenida Vergara"
+                          error={intentoGuardar && !isValidDireccion(lugar.calle)}
+                          helperText={intentoGuardar && !isValidDireccion(lugar.calle) ? "Ingrese una calle válida" : ""}
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          label="Altura"
+                          value={lugar.altura || ""}
+                          onChange={(e) => {
+                            const nuevaAltura = e.target.value;
+                            const nuevaDir = `${String(lugar.calle || "").trim()} ${String(nuevaAltura || "").trim()}`.trim();
+                            actualizarLugarAtencion(lugarIndex, "altura", nuevaAltura);
+                            actualizarLugarAtencion(lugarIndex, "direccion", nuevaDir);
+                          }}
+                          fullWidth
+                          placeholder="1234 o S/N"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          label="Piso"
+                          value={lugar.piso || ""}
+                          onChange={(e) => actualizarLugarAtencion(lugarIndex, "piso", e.target.value)}
+                          fullWidth
+                          placeholder="(opcional)"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          label="Depto"
+                          value={lugar.departamento || ""}
+                          onChange={(e) => actualizarLugarAtencion(lugarIndex, "departamento", e.target.value)}
+                          fullWidth
+                          placeholder="(opcional)"
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label="Provincia/Ciudad"
+                          value={lugar.provinciaCiudad || ""}
+                          onChange={(e) => actualizarLugarAtencion(lugarIndex, "provinciaCiudad", e.target.value)}
+                          fullWidth
+                          placeholder="CABA / Buenos Aires ..."
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          label="Código Postal"
+                          value={lugar.codigoPostal || ""}
+                          onChange={(e) => actualizarLugarAtencion(lugarIndex, "codigoPostal", e.target.value)}
+                          fullWidth
+                          placeholder="Ej: 1708"
+                          inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
                         />
                       </Grid>
                     </Grid>
 
-                    {!soloDirecciones && (
-                      <>
-                        <Divider sx={{ my: 2 }} />
-                        {/* Horarios del lugar - se oculta si soloDirecciones es true */}
-                        <Typography variant="body2" color="text.secondary">
-                          Los horarios ahora se gestionan desde el modal
-                          dedicado.
-                        </Typography>
-                      </>
-                    )}
+                    {(() => {
+                      const parseDias = (d) => {
+                        if (Array.isArray(d)) return d;
+                        if (typeof d === "string") {
+                          return d
+                            .split(/[,/]/)
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                        }
+                        return [];
+                      };
+                      const canon = (d) => {
+                        const t = String(d || "").trim().toLowerCase();
+                        if (!t) return "";
+                        if (t === "miercoles") return "Miércoles";
+                        if (t === "sabado") return "Sábado";
+                        const map = {
+                          lunes: "Lunes",
+                          martes: "Martes",
+                          miércoles: "Miércoles",
+                          jueves: "Jueves",
+                          viernes: "Viernes",
+                          sábado: "Sábado",
+                          domingo: "Domingo",
+                        };
+                        return map[t] || (t.charAt(0).toUpperCase() + t.slice(1));
+                      };
+                      const horariosSrc = Array.isArray(lugar.horarios)
+                        ? lugar.horarios
+                        : Array.isArray(lugar.horariosAtencion)
+                        ? lugar.horariosAtencion
+                        : [];
+                      if (!Array.isArray(horariosSrc) || horariosSrc.length === 0)
+                        return null;
+                      return (
+                        <Box sx={{ mt: 2 }}>
+                          <Divider sx={{ mb: 1.5 }} />
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 600, mb: 1 }}
+                            color="text.secondary"
+                          >
+                            Horarios de atención (solo lectura)
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 0.75,
+                            }}
+                          >
+                            {horariosSrc.map((h, hIdx) => {
+                              const diasLinea = parseDias(
+                                h.dias || h.diasDeLaSemana
+                              )
+                                .map(canon)
+                                .filter(Boolean)
+                                .join(", ");
+                              const inicio = h.horaInicio || h.desde || "";
+                              const fin = h.horaFin || h.hasta || "";
+                              const rango = [inicio, fin]
+                                .filter(Boolean)
+                                .join(" - ");
+                              if (!diasLinea && !rango) return null;
+                              return (
+                                <Box
+                                  key={hIdx}
+                                  sx={{
+                                    p: 1,
+                                    borderRadius: 1,
+                                    backgroundColor: "#f3f4ff",
+                                    border: "1px solid #e0e7ff",
+                                  }}
+                                >
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 600,
+                                      color: "primary.main",
+                                    }}
+                                  >
+                                    {diasLinea}
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {rango}
+                                  </Typography>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                          {!soloDirecciones && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ mt: 1, display: "block" }}
+                            >
+                              Los horarios se editan desde el modal dedicado de
+                              horarios.
+                            </Typography>
+                          )}
+                        </Box>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               ))}
