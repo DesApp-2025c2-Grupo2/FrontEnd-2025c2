@@ -410,12 +410,50 @@ export default function DialogPrestador({
   const validar = () => {
     const errores = {};
 
-    if (!form.cuilCuit.trim()) {
+    const cuilTrim = form.cuilCuit.trim();
+    if (!cuilTrim) {
       errores.cuilCuit = "CUIL/CUIT requerido";
+    } else {
+      const soloDigitos = cuilTrim.replace(/\D/g, "");
+      if (soloDigitos.length !== 11) {
+        errores.cuilCuit = "CUIL/CUIT debe tener 11 dígitos (sin contar guiones)";
+      }
     }
 
     if (!form.nombreCompleto.trim()) {
       errores.nombreCompleto = "Nombre completo requerido";
+    }
+
+    // Al menos un teléfono
+    const telefonosValidos = (form.telefonos || []).filter(
+      (t) => String(t.numero || "").trim() !== ""
+    );
+    if (telefonosValidos.length === 0) {
+      errores.telefonos = "Debe agregar al menos un teléfono";
+    } else {
+      const algunTelInvalido = telefonosValidos.some((t) => {
+        const digitos = String(t.numero || "").replace(/\D/g, "");
+        return digitos.length !== 10;
+      });
+      if (algunTelInvalido) {
+        errores.telefonos = "Cada teléfono debe tener 10 dígitos (código de área + número)";
+      }
+    }
+
+    // Al menos un email
+    const emailsValidos = (form.emails || []).filter(
+      (e) => String(e.email || "").trim() !== ""
+    );
+    if (emailsValidos.length === 0) {
+      errores.emails = "Debe agregar al menos un email";
+    } else {
+      const algunEmailInvalido = emailsValidos.some((e) => {
+        const val = String(e.email || "").trim();
+        return !val.includes("@");
+      });
+      if (algunEmailInvalido) {
+        errores.emails = 'Ingrese emails válidos (deben contener "@")';
+      }
     }
 
     // Especialidades obligatorias solo para Profesional Independiente
@@ -476,8 +514,6 @@ export default function DialogPrestador({
             mensajes.join("\n") +
             "\n\nDebe resolver estos conflictos antes de continuar."
         );
-      } else {
-        alert("Por favor complete todos los campos requeridos (revise direcciones válidas)");
       }
       return;
     }
@@ -847,6 +883,11 @@ export default function DialogPrestador({
                 onAdd={agregarTelefono}
                 onRemove={eliminarTelefono}
               />
+              {intentoGuardar && errores.telefonos && (
+                <FormHelperText error sx={{ mt: 1 }}>
+                  {errores.telefonos}
+                </FormHelperText>
+              )}
             </Box>
 
             <Divider />
@@ -865,6 +906,11 @@ export default function DialogPrestador({
                 onAdd={agregarEmail}
                 onRemove={eliminarEmail}
               />
+              {intentoGuardar && errores.emails && (
+                <FormHelperText error sx={{ mt: 1 }}>
+                  {errores.emails}
+                </FormHelperText>
+              )}
             </Box>
 
             <Divider />
