@@ -20,6 +20,7 @@ import CreditCardIcon from "@mui/icons-material/CreditCard";
 import { Link, useLocation } from "react-router-dom";
 
 import CloseIcon from "@mui/icons-material/Close";
+import logo from "/assets/logos/logo.png";
 
 const drawerWidth = 220;
 
@@ -57,7 +58,6 @@ export default function NavBar({ mobileOpen, handleDrawerToggle }) {
             <Box
               sx={{
                 color: "common.white",
-                bgcolor: "text.primary",
                 p: 1,
                 borderRadius: "50%",
                 display: "flex",
@@ -65,7 +65,7 @@ export default function NavBar({ mobileOpen, handleDrawerToggle }) {
                 justifyContent: "center",
               }}
             >
-              <LocalHospitalIcon />
+              <img src={logo} alt="AesMed Logo" style={{ width: 40, height: 40 }} />
             </Box>
           </ListItemIcon>
           <ListItemText primary="AesMed" secondary="Medicina Integral" />

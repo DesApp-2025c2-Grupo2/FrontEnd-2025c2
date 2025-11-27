@@ -26,7 +26,10 @@ import SituacionesSelector from "./SituacionesSelector";
 import DireccionesEditor from "./DireccionesEditor";
 import { tiposDocumento } from "../../utilidades/tipoDocumento";
 
-const hoyISO = () => new Date().toISOString().split("T")[0];
+const hoyISO = () => {
+  const aux = new Date().getTime() - 3 * 60 * 60 * 1000;
+  return new Date(aux).toISOString();
+};
 const padNumeroAfiliado = (n) => String(Number(n) || 0).padStart(7, "0");
 const padIntegrante = (n) => String(Number(n) || 0).padStart(2, "0");
 
@@ -83,6 +86,14 @@ export default function AfiliadoFormDialog({
         departamento: "",
         provinciaCiudad: "",
       });
+      if (!isEditing && !selectedAfiliado) {
+        const primerTipo = Object.keys(tiposDocumento)[0];
+        onFormChange("tipoDocumento", primerTipo);
+      }
+
+      if (!isEditing && !selectedAfiliado && planesActivos.length > 0) {
+        onFormChange("planMedicoId", String(planesActivos[0].id));
+      }
     }
   }, [open]);
 
@@ -151,6 +162,58 @@ export default function AfiliadoFormDialog({
     nuevas[idx] = updated;
     onEditSituacionesChange(nuevas);
   };
+
+  const telefonoToString = (t) => {
+    if (!t) return "";
+    if (typeof t === "object") return t.numero || t.Numero || "";
+    return String(t);
+  };
+
+  const emailToString = (e) => {
+    if (!e) return "";
+    if (typeof e === "object") return e.correo || e.Correo || "";
+    return String(e);
+  };
+
+  const planesActivos = (planesMedicos || []).filter(
+    (plan) => plan.activo === true
+  );
+
+  const planActual =
+    selectedAfiliado &&
+    planesMedicos?.find((plan) => plan.id === selectedAfiliado.planMedicoId);
+
+  // Crear una lista de opciones que incluya planes activos + el plan actual (si está inactivo)
+  let opcionesPlanes = [...planesActivos];
+  if (isEditing && planActual && planActual.baja !== null) {
+    opcionesPlanes = [planActual, ...planesActivos];
+  }
+
+  const situacionesActivas = (situacionesCatalogo || []).filter(
+    (sit) => sit.activa === true
+  );
+
+  const situacionesActuales =
+    selectedAfiliado?.situacionesTerapeuticas ||
+    selectedAfiliado?.situacionesTerapeuticas ||
+    [];
+
+  // Filtrar situaciones activas + agregar las actuales (si están inactivas)
+  let situacionesParaMostrar = [...situacionesActivas];
+  if (isEditing && situacionesActuales.length > 0) {
+    situacionesActuales.forEach((sit) => {
+      const situacionCompleta = situacionesCatalogo.find(
+        (sc) => sc.id === (sit.id || sit)
+      );
+      if (
+        situacionCompleta &&
+        situacionCompleta.activa === true &&
+        !situacionesParaMostrar.find((spm) => spm.id === situacionCompleta.id)
+      ) {
+        situacionesParaMostrar.push(situacionCompleta);
+      }
+    });
+  }
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -337,17 +400,9 @@ export default function AfiliadoFormDialog({
                       }}
                     >
                       {(titular.situacionesTerapeuticas || []).map((s, i) => {
-                        // s puede ser string, number o objeto {id,nombre,fechaFin}
                         const nombre =
-                          typeof s === "string"
-                            ? s
-                            : s && s.nombre
-                            ? s.nombre
-                            : String(s);
-                        const fechaFin =
-                          s && (s.fechaFin || s.fechaFin === null)
-                            ? s.fechaFin
-                            : null;
+                          typeof s === "string" ? s : s?.nombre || String(s);
+                        const fechaFin = s?.fechaFin;
                         return (
                           <Typography key={i} variant="body2">
                             • {nombre}
@@ -446,25 +501,8 @@ export default function AfiliadoFormDialog({
                   required
                 />
               </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Fecha de Alta"
-                  type="date"
-                  InputLabelProps={{ shrink: true }}
-                  value={
-                    formData.alta
-                      ? new Date(formData.alta).toISOString().split("T")[0]
-                      : hoyISO()
-                  }
-                  onChange={(e) => handleFormChange("alta", e.target.value)}
-                  required
-                />
-              </Grid>
             </Grid>
-
-            <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid container spacing={2} sx={{ mb: 3 }} width="300px">
               <Grid item xs={12}>
                 <FormControl fullWidth>
                   <InputLabel>Plan Médico</InputLabel>
@@ -474,9 +512,19 @@ export default function AfiliadoFormDialog({
                     onChange={handlePlanMedicoChange}
                   >
                     <MenuItem value="">Seleccione</MenuItem>
-                    {(planesMedicos || []).map((plan) => (
-                      <MenuItem key={plan.id} value={String(plan.id)}>
-                        {plan.nombre}
+                    {opcionesPlanes.map((plan) => (
+                      <MenuItem
+                        key={plan.id}
+                        value={String(plan.id)}
+                        disabled={plan.activo === false} // Deshabilitar si el plan está dado de baja
+                        style={{
+                          fontStyle:
+                            plan.activo === false ? "italic" : "normal",
+                          color: plan.activo === false ? "#999" : "inherit",
+                        }}
+                      >
+                        {plan.nombre}{" "}
+                        {plan.activo === false ? " (Inactivo)" : ""}
                       </MenuItem>
                     ))}
                   </Select>
@@ -489,7 +537,7 @@ export default function AfiliadoFormDialog({
                 <ContactInfoEditor
                   icon={<PhoneIcon sx={{ mr: 1, color: "#1976d2" }} />}
                   title="Teléfonos"
-                  items={editTelefonos || []}
+                  items={(editTelefonos || []).map(telefonoToString)}
                   newValue={newTelefono}
                   placeholder="Agregar teléfono"
                   onNewValueChange={setNewTelefono}
@@ -504,7 +552,7 @@ export default function AfiliadoFormDialog({
                 <ContactInfoEditor
                   icon={<EmailIcon sx={{ mr: 1, color: "#1976d2" }} />}
                   title="Emails"
-                  items={editEmails || []}
+                  items={(editEmails || []).map(emailToString)}
                   newValue={newEmail}
                   placeholder="Agregar email"
                   inputType="email"
@@ -532,7 +580,7 @@ export default function AfiliadoFormDialog({
               <Grid item xs={12}>
                 <SituacionesSelector
                   items={editSituaciones || []}
-                  opciones={situacionesCatalogo}
+                  opciones={situacionesParaMostrar}
                   onAdd={handleAddSituacion}
                   onRemove={handleRemoveSituacion}
                   onUpdate={handleUpdateSituacion}
