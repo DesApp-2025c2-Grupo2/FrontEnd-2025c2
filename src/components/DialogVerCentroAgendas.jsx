@@ -22,12 +22,12 @@ import { selectPrestadores } from '../store/prestadoresSlice';
 import { selectEspecialidades } from '../store/especialidadesSlice';
 import * as agendasService from '../services/agendasService';
 
-export default function DialogVerCentroAgendas({ abierto, centro, onCerrar }) {
+export default function DialogVerCentroAgendas({ abierto, centro, onCerrar, onVerProfesional }) {
   const todosPrestadores = useSelector(selectPrestadores);
   const catalogoEspecialidades = useSelector(selectEspecialidades);
 
   const [cargando, setCargando] = useState(false);
-  const [agregado, setAgregado] = useState([]); // [{ direccion, items: [{profNombre, dias, hi, hf, dur, espNombre}] }]
+  const [agregado, setAgregado] = useState([]); // [{ direccion, items: [{profesionalId, profNombre, dias, hi, hf, dur, espNombre}] }]
 
   const profesionalIdToNombre = useMemo(() => {
     const map = new Map();
@@ -96,8 +96,8 @@ export default function DialogVerCentroAgendas({ abierto, centro, onCerrar }) {
                 : ((typeof h?.especialidadId === 'number' && h.especialidadId > 0) ? h.especialidadId : null);
               const espNombre = (espId != null) ? (especialidadIdToNombre.get(espId) || `Esp. ${espId}`) : null;
               const dupKey = JSON.stringify({ d: [...(dias || [])].sort(), hi, hf, dur, esp: espId, p: profNombre });
-              const exists = nodo.items.some(x => JSON.stringify({ d: [...(x.dias || [])].sort(), hi: x.hi, hf: x.hf, dur: x.dur, esp: (x.espNombre ? espId : null), p: x.profNombre }) === dupKey);
-              if (!exists) nodo.items.push({ profNombre, dias, hi, hf, dur, espNombre });
+              const exists = nodo.items.some(x => JSON.stringify({ d: [...(x.dias || [])].sort(), hi: x.hi, hf: x.hf, dur: x.dur, esp: (x._espId || null), p: x.profNombre }) === dupKey);
+              if (!exists) nodo.items.push({ profesionalId, profNombre, dias, hi, hf, dur, espNombre, _espId: espId });
             });
             map.set(key, nodo);
           });
@@ -147,7 +147,15 @@ export default function DialogVerCentroAgendas({ abierto, centro, onCerrar }) {
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                     {l.items.map((it, i) => (
                       <Stack key={i} direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
-                        <Chip icon={<PersonIcon />} label={it.profNombre} size="small" />
+                        <Chip
+                          icon={<PersonIcon />}
+                          label={it.profNombre}
+                          size="small"
+                          clickable={!!onVerProfesional && typeof it.profesionalId === 'number'}
+                          onClick={onVerProfesional && typeof it.profesionalId === 'number'
+                            ? () => onVerProfesional(it.profesionalId)
+                            : undefined}
+                        />
                         <Chip icon={<ScheduleIcon />} label={(it.dias || []).map(canonDia).join(', ')} size="small" variant="outlined" />
                         <Typography variant="body2">{it.hi} - {it.hf}{it.dur ? ` • ${it.dur} min` : ''}</Typography>
                         {it.espNombre && <Chip label={it.espNombre} size="small" color="primary" variant="outlined" />}

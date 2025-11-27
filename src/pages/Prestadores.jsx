@@ -92,12 +92,13 @@ function Prestadores() {
         if (existente) {
           const lugares = Array.isArray(existente.lugaresAtencion) ? existente.lugaresAtencion : p.lugaresAtencion;
           actuales[p.id] = { ...p, lugaresAtencion: lugares };
-          // Si es Centro y la cache no tiene lugares aún, continuar para cargar desde getByCentro
-          if (!(p.tipo === 'Centro Médico' && (!Array.isArray(lugares) || lugares.length === 0))) {
+          // Para profesionales independientes, si ya tenemos cache, no volvemos a pedir agendas
+          if (p.tipo !== 'Centro Médico') {
             return;
           }
+          // Para centros SIEMPRE refrescamos desde getByCentro, así reflejan los horarios más recientes del backend
         }
-        // Si no hay cache, cargar agendas y mergear
+        // Cargar agendas y mergear
         if (p.tipo === 'Centro Médico') {
           // Preferir endpoint del backend para centros; fallback a fan-out
           promises.push(
@@ -150,21 +151,7 @@ function Prestadores() {
                     horarios.forEach(h => addHorario(l?.id ?? l?.lugarId ?? null, l?.direccion || '', h, pr.profesionalId));
                   });
                 });
-                const baseDirecciones = Array.isArray(p.lugaresAtencion) ? p.lugaresAtencion : [];
-                const finalLugares = (lugares.length > 0) ? lugares : baseDirecciones;
-                actuales[p.id] = { ...p, lugaresAtencion: finalLugares };
-                return;
               }
-              // Fallback: usar profesionales asociados
-              const asociados = (prestadoresTodos || []).filter(x => (x?.tipo === 'Profesional Independiente' || x?.rol === 1) && x?.integraCentroMedicoId === p.id);
-              const reqs = asociados.map(ap => agendasService.getByProfesional(ap.id).then((ags) => ({ ap, ags })).catch(() => ({ ap, ags: [] })));
-              const arr = await Promise.all(reqs);
-              arr.forEach(({ ap, ags }) => {
-                (Array.isArray(ags) ? ags : []).forEach((l) => {
-                  const horarios = Array.isArray(l?.horarios) ? l.horarios : (Array.isArray(l?.horariosAtencion) ? l.horariosAtencion : []);
-                  horarios.forEach((h) => addHorario(l?.id ?? l?.lugarId ?? null, l?.direccion || '', h, ap.id));
-                });
-              });
               const baseDirecciones2 = Array.isArray(p.lugaresAtencion) ? p.lugaresAtencion : [];
               const finalLugares2 = (lugares.length > 0) ? lugares : baseDirecciones2;
               actuales[p.id] = { ...p, lugaresAtencion: finalLugares2 };
@@ -248,12 +235,14 @@ function Prestadores() {
 
   // Handlers para los botones
   const handleVer = (prestador) => {
-    setPrestadorSeleccionado(prestador);
-    if (prestador?.tipo === 'Centro Médico' || prestador?.rol === 0) {
-      setDialogoVerCentro(true);
-    } else {
-      setDialogoVer(true);
-    }
+    // Usar siempre la versión base desde Redux para preservar direcciones completas,
+    // y dejar que el diálogo enriquezca con horarios según sea necesario.
+    const lista = Array.isArray(prestadoresTodos) ? prestadoresTodos : [];
+    const base = lista.find(p => p.id === prestador.id) || prestador;
+    setPrestadorSeleccionado(base);
+    // Unificar comportamiento: "Ver" siempre muestra detalles del prestador,
+    // tanto para profesionales independientes como para centros médicos.
+    setDialogoVer(true);
   };
 
   const handleEditar = (prestador) => {
@@ -552,6 +541,15 @@ function Prestadores() {
             setDialogoVerCentro(false);
             setPrestadorSeleccionado(null);
           }}
+          onVerProfesional={(profId) => {
+            const lista = Array.isArray(prestadoresTodos) ? prestadoresTodos : [];
+            const prof = lista.find(p => p.id === profId);
+            if (!prof) return;
+            // Cerrar vista de centro y abrir diálogo de detalles de ese profesional
+            setDialogoVerCentro(false);
+            setPrestadorSeleccionado(prof);
+            setDialogoVer(true);
+          }}
         />
       )}
 
@@ -630,23 +628,17 @@ function Prestadores() {
                         const agendaByDir = new Map((ags || []).map((a) => [canonDir(a.direccion), a]));
                         const base = n[rid] || {};
                         const lugaresBase = JSON.parse(JSON.stringify(base?.lugaresAtencion || []));
-                        const matchedKeys = new Set();
                         const lugaresMergeados = lugaresBase.map((l) => {
                           const a = (l.id != null ? agendaById.get(l.id) : null) || agendaByDir.get(canonDir(l.direccion));
                           if (a) {
-                            const key = (a?.id != null) ? `id:${a.id}` : `dir:${String(a?.direccion || '').trim().toLowerCase()}`;
-                            matchedKeys.add(key);
                             return { ...l, horarios: a.horarios || a.horariosAtencion || [] };
                           }
                           return l;
                         });
-                        const extras = (ags || []).filter((a) => {
-                          const key = (a?.id != null) ? `id:${a.id}` : `dir:${canonDir(a?.direccion)}`;
-                          return !matchedKeys.has(key);
-                        }).map((a) => ({ id: a?.id ?? null, direccion: a?.direccion || '', horarios: a?.horarios || a?.horariosAtencion || [] }));
                         const dedup = [];
                         const seen = new Set();
-                        [...lugaresMergeados, ...extras].forEach((l) => {
+                        // Importante: solo lugares propios del profesional (no agregamos extras provenientes del centro)
+                        lugaresMergeados.forEach((l) => {
                           const key = (l && l.id != null)
                             ? `id:${l.id}`
                             : `dir:${String(l?.direccion || '').trim().toLowerCase()}`;

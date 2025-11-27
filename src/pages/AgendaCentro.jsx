@@ -20,6 +20,7 @@ import PageHeader from '../components/Ui/PageHeader.jsx';
 import * as prestadoresService from '../services/prestadoresService';
 import * as agendasService from '../services/agendasService';
 import DialogHorariosPrestador from '../components/DialogHorariosPrestador.jsx';
+import DialogVerPrestador from '../components/DialogVerPrestador.jsx';
 import { cargarPrestadores, selectPrestadores } from '../store/prestadoresSlice';
 import { cargarEspecialidades, selectEspecialidades } from '../store/especialidadesSlice';
 
@@ -33,6 +34,8 @@ function AgendaCentro() {
   const [centro, setCentro] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [agendasCentro, setAgendasCentro] = useState([]);
+  const [dialogVerProfesional, setDialogVerProfesional] = useState(false);
+  const [profesionalSeleccionado, setProfesionalSeleccionado] = useState(null);
 
   const profesionalesDelCentro = useMemo(() => {
     const cid = Number(centroId);
@@ -154,6 +157,15 @@ function AgendaCentro() {
     return map;
   }, [agendasCentro, profesionalesDelCentro]);
 
+  const handleVerProfesional = (profesionalId) => {
+    if (typeof profesionalId !== 'number') return;
+    const lista = Array.isArray(todosPrestadores) ? todosPrestadores : [];
+    const prof = lista.find(p => p.id === profesionalId);
+    if (!prof) return;
+    setProfesionalSeleccionado(prof);
+    setDialogVerProfesional(true);
+  };
+
   // Lugares del centro con horarios (agregados desde todas las agendas por profesional)
   const lugaresCentro = useMemo(() => {
     const lugares = [];
@@ -254,13 +266,22 @@ function AgendaCentro() {
                           ? h.especialidades[0]
                           : ((typeof h.especialidadId === 'number' && h.especialidadId > 0) ? h.especialidadId : null);
                         const espNom = espId != null ? especialidadIdToNombre.get(espId) : null;
-                        const profNom = (typeof h?.profesionalId === 'number') ? (nombreProfesionalPorId.get(h.profesionalId) || '') : '';
+                        const profId = (typeof h?.profesionalId === 'number') ? h.profesionalId : null;
+                        const profNom = profId != null ? (nombreProfesionalPorId.get(profId) || '') : '';
                         return (
                           <Stack key={i} direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'wrap' }}>
                             <Chip label={(dias || []).map(canonDia).join(', ')} size="small" />
                             <Typography variant="body2">{inicio} - {fin}{dur ? ` • ${dur} min` : ''}</Typography>
                             {espNom && <Chip label={espNom} size="small" color="primary" variant="outlined" />}
-                            {profNom && <Chip label={profNom} size="small" icon={<PersonIcon />} />}
+                            {profNom && (
+                              <Chip
+                                label={profNom}
+                                size="small"
+                                icon={<PersonIcon />}
+                                clickable
+                                onClick={() => handleVerProfesional(profId)}
+                              />
+                            )}
                           <IconButton color="error" onClick={() => eliminarHorarioCentro(h)} aria-label="Eliminar horario" sx={{ ml: 'auto' }}>
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -295,10 +316,28 @@ function AgendaCentro() {
               // Guardar como CENTRO: centroId en URL, profesionalId en cada horario
               const lugares = profActualizado?.lugaresAtencion || [];
               await agendasService.updateLugares(Number(centroId), lugares, { isCentro: true, strategy: 'merge' });
+              // Refrescar agendas del centro para que "Lugares de Atención del Centro" muestre lo nuevo
+              try {
+                const data = await agendasService.getByCentro(Number(centroId));
+                setAgendasCentro(Array.isArray(data) ? data : []);
+              } catch {
+                // si falla el refresh, al menos cerramos el diálogo
+              }
               setDialogOpen(false);
             } catch {
               setDialogOpen(false);
             }
+          }}
+        />
+      )}
+
+      {dialogVerProfesional && profesionalSeleccionado && (
+        <DialogVerPrestador
+          abierto={dialogVerProfesional}
+          prestador={profesionalSeleccionado}
+          onCerrar={() => {
+            setDialogVerProfesional(false);
+            setProfesionalSeleccionado(null);
           }}
         />
       )}

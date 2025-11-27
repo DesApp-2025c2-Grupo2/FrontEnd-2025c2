@@ -78,10 +78,10 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
         setLocal(JSON.parse(JSON.stringify(prestador)));
         return;
       }
-      // Centro: cargar todas las agendas y unificarlas por dirección
+      // Centro: cargar agendas del centro y mapearlas a los lugares definidos del centro
       try {
         const profList = await agendasService.getByCentro(prestador.id);
-        const lugares = [];
+        const lugaresAgendas = [];
         const canonDir = (s) => {
           return String(s || '')
             .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -91,16 +91,16 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
             .trim()
             .toLowerCase();
         };
-        const keyMap = new Map(); // key -> index
+        const keyMap = new Map(); // key -> index en lugaresAgendas
         const add = (dir, h, pid, lugarId) => {
           const key = (typeof lugarId === 'number' && lugarId > 0) ? `id:${lugarId}` : `dir:${canonDir(dir)}`;
           let idx = keyMap.get(key);
           if (idx === undefined) {
-            idx = lugares.length;
+            idx = lugaresAgendas.length;
             keyMap.set(key, idx);
-            lugares.push({ id: (typeof lugarId === 'number' && lugarId > 0 ? lugarId : null), direccion: dir, horarios: [] });
+            lugaresAgendas.push({ id: (typeof lugarId === 'number' && lugarId > 0 ? lugarId : null), direccion: dir, horarios: [] });
           }
-          const lista = lugares[idx].horarios;
+          const lista = lugaresAgendas[idx].horarios;
           const dias = Array.isArray(h?.dias) ? h.dias : (Array.isArray(h?.diasDeLaSemana) ? h.diasDeLaSemana : []);
           const espId = (Array.isArray(h?.especialidades) && h.especialidades.length > 0)
             ? h.especialidades[0]
@@ -121,39 +121,57 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
               hs.forEach(h => add(l?.direccion || '', h, pr.profesionalId, l?.id ?? l?.lugarId ?? null));
             });
           });
-        } else {
-          // Fallback fan-out
-          const reqs = (profesionalesDelCentro || []).map(p =>
-            agendasService.getByProfesional(p.id).then((dirs) => ({ p, dirs: Array.isArray(dirs) ? dirs : [] })).catch(() => ({ p, dirs: [] }))
-          );
-          const arr = await Promise.all(reqs);
-          arr.forEach(({ p, dirs }) => {
-            (dirs || []).forEach(l => {
-              const hs = Array.isArray(l?.horarios) ? l.horarios : (Array.isArray(l?.horariosAtencion) ? l.horariosAtencion : []);
-              hs.forEach(h => add(l?.direccion || '', h, p.id, l?.id ?? l?.lugarId ?? null));
-            });
-          });
         }
-        // Si aún no hay lugares armados desde agendas, usar las direcciones propias del centro
-        const fallbackDirecciones = Array.isArray(prestador?.lugaresAtencion)
-          ? (prestador.lugaresAtencion || []).map((l) => ({
-              id: l?.id ?? null,
-              direccion: l?.direccion || '',
-              horarios: Array.isArray(l?.horarios) ? l.horarios : []
-            }))
+
+        // Partimos SIEMPRE de los lugares definidos en el centro (gestión de direcciones)
+        const baseLugares = Array.isArray(prestador?.lugaresAtencion)
+          ? JSON.parse(JSON.stringify(prestador.lugaresAtencion))
           : [];
-        const finalLugares = (Array.isArray(lugares) && lugares.length > 0) ? lugares : fallbackDirecciones;
+
+        // Mergeamos horarios provenientes de Agenda por lugarId / dirección normalizada
+        const canonMerge = (s) => String(s || '')
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .replace(/\b(s\/?n|s\/?d)\b/gi, '')
+          .replace(/[,.;\-–—]+$/g, '')
+          .trim()
+          .toLowerCase();
+
+        const byId = new Map(
+          (Array.isArray(lugaresAgendas) ? lugaresAgendas : [])
+            .filter(l => typeof l?.id === 'number')
+            .map(l => [l.id, l])
+        );
+        const byDir = new Map(
+          (Array.isArray(lugaresAgendas) ? lugaresAgendas : [])
+            .map(l => [canonMerge(l.direccion), l])
+        );
+
+        const merged = baseLugares.map((l) => {
+          const lid = (typeof l?.id === 'number') ? l.id : null;
+          const match =
+            (lid != null ? byId.get(lid) : null) ||
+            byDir.get(canonMerge(l?.direccion));
+          if (match) {
+            return {
+              ...l,
+              horarios: Array.isArray(match.horarios) ? match.horarios : []
+            };
+          }
+          return {
+            ...l,
+            horarios: Array.isArray(l?.horarios) ? l.horarios : []
+          };
+        });
+
+        const finalLugares = merged.length > 0 ? merged : baseLugares;
         setLocal({ ...prestador, lugaresAtencion: finalLugares });
         setLugarIndex((finalLugares.length > 0) ? 0 : 0);
       } catch {
-        const fallbackDirecciones = Array.isArray(prestador?.lugaresAtencion)
-          ? (prestador.lugaresAtencion || []).map((l) => ({
-              id: l?.id ?? null,
-              direccion: l?.direccion || '',
-              horarios: Array.isArray(l?.horarios) ? l.horarios : []
-            }))
+        const baseLugares = Array.isArray(prestador?.lugaresAtencion)
+          ? JSON.parse(JSON.stringify(prestador.lugaresAtencion))
           : [];
-        setLocal({ ...prestador, lugaresAtencion: fallbackDirecciones });
+        setLocal({ ...prestador, lugaresAtencion: baseLugares });
       }
     }
     init();
@@ -303,7 +321,15 @@ export default function DialogHorariosPrestador({ abierto, prestador, onCerrar, 
       });
       const actualizacionesPorProfesional = {};
       porProfesional.forEach((value, key) => { actualizacionesPorProfesional[key] = value; });
-      onGuardar?.({ id: prestador.id, isCentro: true, actualizacionesPorProfesional });
+      // Enviamos ambas vistas de la data:
+      // - actualizacionesPorProfesional: para flujos que necesitan saber qué cambia por profesional
+      // - lugaresAtencion: para flujos que solo esperan los lugares del centro con horarios ya armados
+      onGuardar?.({
+        id: prestador.id,
+        isCentro: true,
+        actualizacionesPorProfesional,
+        lugaresAtencion: copia.lugaresAtencion || []
+      });
       return;
     }
 
