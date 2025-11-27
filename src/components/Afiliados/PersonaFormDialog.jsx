@@ -29,7 +29,10 @@ import { useSelector } from "react-redux";
 import { tiposDocumento } from "../../utilidades/tipoDocumento";
 import { parentescos, getParentescoNombre } from "../../utilidades/parentesco";
 
-const hoyISO = () => new Date().toISOString().split("T")[0];
+const hoyISO = () => {
+  const aux = new Date().getTime() - 3 * 60 * 60 * 1000;
+  return new Date(aux).toISOString();
+};
 const padNumeroAfiliado = (n) => String(Number(n) || 0).padStart(7, "0");
 const padIntegrante = (n) => String(Number(n) || 0).padStart(2, "0");
 
@@ -67,6 +70,7 @@ export default function PersonaFormDialog({
     piso: "",
     departamento: "",
     provinciaCiudad: "",
+    codigoPostal: "",
   });
 
   const isViewMode = !!selectedFamiliar && !isEditing;
@@ -91,10 +95,11 @@ export default function PersonaFormDialog({
       const piso = d.piso ? `, Piso ${d.piso}` : "";
       const dept = d.departamento ? `, Dept ${d.departamento}` : "";
       const provincia = d.provinciaCiudad ?? "";
+      const codigoPostal = d.codigoPostal ?? "";
       const calle = d.calle ?? "";
       return `${calle}${altura}${piso}${dept}${
         provincia ? `, ${provincia}` : ""
-      }`.trim();
+      }${codigoPostal}`.trim();
     }
     return String(d);
   };
@@ -125,7 +130,29 @@ export default function PersonaFormDialog({
     if (open) {
       setNewTelefono("");
       setNewEmail("");
-      setNewDireccion("");
+      setNewDireccion({
+        calle: "",
+        altura: "",
+        piso: "",
+        departamento: "",
+        provinciaCiudad: "",
+      });
+
+      // VALORES POR DEFECTO - NUEVO
+      if (!selectedFamiliar && !isEditing) {
+        // Tipo de documento por defecto
+        const primerTipo = Object.keys(tiposDocumento)[0];
+        onFormChange("tipoDocumento", primerTipo);
+
+        // Fecha de alta por defecto (hoy)
+        onFormChange("alta", hoyISO());
+
+        // Parentesco por defecto (primer parentesco disponible)
+        const primerParentesco = parentescos.filter((p) => p.id !== 0)[0]?.id;
+        if (primerParentesco) {
+          onFormChange("parentesco", primerParentesco);
+        }
+      }
     }
 
     // Normalizar siempre que haya selectedFamiliar
@@ -155,7 +182,6 @@ export default function PersonaFormDialog({
       return e.correo ?? e.Correo ?? e.email ?? e.Email ?? "";
     };
 
-    // Normalizar telefonos -> strings (para mostrar en el editor / vista)
     if (
       Array.isArray(selectedFamiliar.telefonos) ||
       Array.isArray(selectedFamiliar.Telefonos)
@@ -171,7 +197,6 @@ export default function PersonaFormDialog({
       onEditTelefonosChange([]);
     }
 
-    // Normalizar emails -> strings
     if (
       Array.isArray(selectedFamiliar.emails) ||
       Array.isArray(selectedFamiliar.Emails)
@@ -217,7 +242,6 @@ export default function PersonaFormDialog({
       onEditDireccionesChange([]);
     }
 
-    // Situaciones: puede venir como ids, objetos o strings
     const situacionesRaw =
       selectedFamiliar.situacionesTerapeuticas ??
       selectedFamiliar.situacionesTerapeuticasIds ??
@@ -242,19 +266,14 @@ export default function PersonaFormDialog({
   const handleRemoveTelefono = (index) =>
     onEditTelefonosChange((editTelefonos || []).filter((_, i) => i !== index));
 
-
   const handleAddEmail = () => {
     if (!newEmail.trim()) return;
-    onEditEmailsChange([
-      ...(editEmails || []),
-      { correo: newEmail.trim() },
-    ]);
+    onEditEmailsChange([...(editEmails || []), { correo: newEmail.trim() }]);
     setNewEmail("");
   };
 
   const handleRemoveEmail = (index) =>
     onEditEmailsChange((editEmails || []).filter((_, i) => i !== index));
-
 
   const handleAddDireccion = (direccion) => {
     if (!direccion || !direccion.calle?.trim()) return;
@@ -316,7 +335,6 @@ export default function PersonaFormDialog({
     );
   };
 
-  // Validación mínima local
   const validateBeforeSave = () => {
     if (!formData.nombre || !formData.apellido) {
       return { isValid: false, message: "Nombre y apellido son requeridos" };
@@ -511,7 +529,6 @@ export default function PersonaFormDialog({
                 )}
               </Box>
             </Box>
-
             {(
               selectedFamiliar.situacionesTerapeuticas ||
               selectedFamiliar.situacionesTerapeuticasIds ||
@@ -533,11 +550,29 @@ export default function PersonaFormDialog({
                     selectedFamiliar.situacionesTerapeuticas ||
                     selectedFamiliar.situacionesTerapeuticasIds ||
                     []
-                  ).map((s, i) => (
-                    <Typography key={i} variant="body2">
-                      • {typeof s === "string" ? s : s?.nombre ?? String(s)}
-                    </Typography>
-                  ))}
+                  ).map((s, i) => {
+                    // Extraer nombre y fechaFin
+                    let nombre = "";
+                    let fechaFin = null;
+
+                    if (typeof s === "object" && s !== null) {
+                      nombre = s.nombre || s.Nombre || String(s);
+                      fechaFin = s.fechaFin || s.FechaFin || null;
+                    } else {
+                      nombre = String(s);
+                    }
+
+                    return (
+                      <Typography key={i} variant="body2">
+                        • {nombre}
+                        {fechaFin
+                          ? ` — hasta: ${new Date(fechaFin).toLocaleDateString(
+                              "es-AR"
+                            )}`
+                          : ""}
+                      </Typography>
+                    );
+                  })}
                 </Box>
               </Box>
             )}
@@ -615,21 +650,6 @@ export default function PersonaFormDialog({
                     handleFormChange("fechaNacimiento", e.target.value)
                   }
                   required
-                />
-              </Grid>
-
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Fecha de Alta"
-                  type="date"
-                  InputLabelProps={{ shrink: true }}
-                  value={
-                    formData.alta
-                      ? new Date(formData.alta).toISOString().split("T")[0]
-                      : hoyISO()
-                  }
-                  onChange={(e) => handleFormChange("alta", e.target.value)}
                 />
               </Grid>
             </Grid>

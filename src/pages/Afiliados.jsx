@@ -26,9 +26,16 @@ import { cargarPlanes, selectPlanes } from "../store/planesSlice";
 import { personasService } from "../services/personasService";
 
 import { parentescos } from "../utilidades/parentesco";
-import { updatePersona, createMember } from "../store/personasSlice";
+import {
+  updatePersona,
+  createMember,
+  togglePersonaStatus,
+} from "../store/personasSlice";
 
-const hoyISO = () => new Date().toISOString().split("T")[0];
+const hoyISO = () => {
+  const aux = new Date().getTime() - 3 * 60 * 60 * 1000;
+  return new Date(aux).toISOString();
+};
 
 // Reemplazar la función actual por esta versión que compara fecha y hora completa
 const estaActivo = (alta, baja) => {
@@ -117,6 +124,12 @@ export default function Afiliados() {
   const [afiliadoParaBaja, setAfiliadoParaBaja] = useState(null);
   const [afiliadoParaAlta, setAfiliadoParaAlta] = useState(null);
 
+  // Alta / Baja — Familiares
+  const [openBajaFamiliarDialog, setOpenBajaFamiliarDialog] = useState(false);
+  const [openAltaFamiliarDialog, setOpenAltaFamiliarDialog] = useState(false);
+  const [familiarParaBaja, setFamiliarParaBaja] = useState(null);
+  const [familiarParaAlta, setFamiliarParaAlta] = useState(null);
+
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -131,7 +144,12 @@ export default function Afiliados() {
     fechaNacimiento: "",
     planMedicoId: "1",
     alta: hoyISO(),
+    telefonos: [],
+    emails: [],
+    direcciones: [],
+    situacionesTerapeuticasIds: [],
   });
+
   // fetch inicial
   useEffect(() => {
     dispatch(fetchAfiliados());
@@ -171,6 +189,10 @@ export default function Afiliados() {
       fechaNacimiento: "",
       planMedicoId: "",
       alta: hoyISO(),
+      telefonos: [],
+      emails: [],
+      direcciones: [],
+      situacionesTerapeuticasIds: [],
     });
     setIntegrantes([]);
     setOpenDialog(true);
@@ -183,6 +205,7 @@ export default function Afiliados() {
 
     const titular = getTitularDelAfiliado(afiliado) ?? null;
 
+    // Mantener objetos completos (con id) para telefonos/emails/direcciones
     setFormAfiliado({
       nombre: titular?.nombre ?? "",
       apellido: titular?.apellido ?? "",
@@ -195,17 +218,10 @@ export default function Afiliados() {
       fechaNacimiento: titular?.fechaNacimiento ?? "",
       planMedicoId: afiliado.planMedicoId ?? 1,
       alta: afiliado.alta ?? hoyISO(),
-      telefonos: titular?.telefonos?.map((t) => t.numero) ?? [],
-      emails: titular?.emails?.map((e) => e.correo) ?? [],
-      // CAMBIO: Mantener direcciones como objetos, no como strings
-      direcciones:
-        titular?.direcciones?.map((d) => ({
-          calle: d.calle ?? "",
-          altura: d.altura ?? "",
-          piso: d.piso ?? "",
-          departamento: d.departamento ?? "",
-          provinciaCiudad: d.provinciaCiudad ?? "",
-        })) ?? [],
+      telefonos: titular?.telefonos ?? [],
+      emails: titular?.emails ?? [],
+      // Mantener direcciones como objetos, no como strings
+      direcciones: titular?.direcciones ?? [],
       situacionesTerapeuticasIds: Array.isArray(
         titular?.situacionesTerapeuticas
       )
@@ -243,19 +259,14 @@ export default function Afiliados() {
       fechaNacimiento: titular?.fechaNacimiento ?? "",
       planMedicoId: afiliado.planMedicoId ?? 1,
       alta: afiliado.alta ?? hoyISO(),
-      telefonos: titular?.telefonos?.map((t) => t.numero) ?? [],
-      emails: titular?.emails?.map((e) => e.correo) ?? [],
-      // CAMBIO: Mantener direcciones como objetos, no como strings
-      direcciones:
-        titular?.direcciones?.map((d) => ({
-          calle: d.calle ?? "",
-          altura: d.altura ?? "",
-          piso: d.piso ?? "",
-          departamento: d.departamento ?? "",
-          provinciaCiudad: d.provinciaCiudad ?? "",
-        })) ?? [],
+      telefonos: titular?.telefonos ?? [],
+      emails: titular?.emails ?? [],
+      // Mantener direcciones como objetos, no como strings
+      direcciones: titular?.direcciones ?? [],
       situacionesTerapeuticasIds:
-        titular?.situacionesTerapeuticas?.map((s) => s.id ?? s) ?? [],
+        titular?.situacionesTerapeuticas?.map((s) =>
+          typeof s === "object" ? s : { id: s, nombre: "", fechaFin: null }
+        ) ?? [],
     });
 
     setIntegrantes(
@@ -268,12 +279,6 @@ export default function Afiliados() {
   const handleViewFamiliar = useCallback(async (afiliado, fam) => {
     try {
       const familiarCompleto = await personasService.getPersona(fam.id);
-      {
-        console.log("fam", fam, fam.id);
-      }
-      {
-        console.log("afiliado", afiliado, afiliado.id);
-      }
       setSelectedAfiliado(afiliado);
       setSelectedFamiliar(familiarCompleto); // solo vista
       setIsEditingFamiliar(false);
@@ -288,6 +293,7 @@ export default function Afiliados() {
     try {
       const familiarCompleto = await personasService.getPersona(fam.id);
       setSelectedAfiliado(afiliado);
+      // Aquí mantenemos la estructura completa (incluye id en telefonos/emails/direcciones)
       setFormFamiliar(familiarCompleto);
       setSelectedFamiliar(familiarCompleto);
       setIsEditingFamiliar(true);
@@ -336,7 +342,7 @@ export default function Afiliados() {
     }
 
     try {
-      // Función helper para convertir situaciones a objeto
+      // Convierte situaciones en { idSituacion : fechaFin | null }
       const convertirSituacionesAObjeto = (situacionesArray) => {
         const obj = {};
         situacionesArray.forEach((sit) => {
@@ -347,44 +353,103 @@ export default function Afiliados() {
         return obj;
       };
 
-      // Construcción segura de campos de contacto y dirección
+      // ----------------------------
+      // NORMALIZACIÓN PUNTUAL 100% COMPATIBLE CON TU BACKEND
+      // ----------------------------
+
+      // Telefónos: soporta objeto {id, numero}, string, MUI {value}
       const telefonosNormalizados = (formFamiliar.telefonos || [])
-        .filter((t) => t && (t.numero || t.trim?.()))
-        .map((t) => ({
-          id: t.id || 0,
-          numero: typeof t === "string" ? t.trim() : (t.numero || "").trim(),
-        }));
+        .map((t) => {
+          if (!t) return null;
 
+          // Si viene como string
+          if (typeof t === "string") {
+            const v = t.trim();
+            return v ? { id: 0, numero: v } : null;
+          }
+
+          // Si viene como objeto con "numero"
+          if (t.numero) {
+            return {
+              id: t.id ?? 0,
+              numero: (t.numero || "").toString().trim(),
+            };
+          }
+
+          // Si viene como objeto con "value" típico de MUI
+          if (t.value) {
+            const v = t.value.trim();
+            return v ? { id: t.id ?? 0, numero: v } : null;
+          }
+
+          return null;
+        })
+        .filter(Boolean);
+
+      // Emails: soporta {id, correo}, string, MUI {value}
       const emailsNormalizados = (formFamiliar.emails || [])
-        .filter((e) => e && (e.correo || e.trim?.()))
-        .map((e) => ({
-          id: e.id || 0,
-          correo: typeof e === "string" ? e.trim() : (e.correo || "").trim(),
-        }));
+        .map((e) => {
+          if (!e) return null;
 
+          if (typeof e === "string") {
+            const v = e.trim();
+            return v ? { id: 0, correo: v } : null;
+          }
+
+          if (e.correo) {
+            return {
+              id: e.id ?? 0,
+              correo: (e.correo || "").toString().trim(),
+            };
+          }
+
+          if (e.value) {
+            const v = e.value.trim();
+            return v ? { id: e.id ?? 0, correo: v } : null;
+          }
+
+          return null;
+        })
+        .filter(Boolean);
+
+      // Direcciones: soporta string y estructura del backend
       const direccionesNormalizadas = (formFamiliar.direcciones || [])
-        .filter((d) => d && (d.calle || typeof d === "string"))
-        .map((d) =>
-          typeof d === "string"
-            ? {
-                id: 0,
-                calle: d,
-                altura: "",
-                piso: "",
-                departamento: "",
-                provinciaCiudad: "",
-              }
-            : {
-                id: d.id || 0,
-                calle: d.calle || "",
-                altura: d.altura || "",
-                piso: d.piso || "",
-                departamento: d.departamento || "",
-                provinciaCiudad: d.provinciaCiudad || "",
-              }
-        );
+        .map((d) => {
+          if (!d) return null;
 
-      // Payload base
+          // Si viene como string
+          if (typeof d === "string") {
+            const v = d.trim();
+            if (!v) return null;
+            return {
+              id: 0,
+              calle: v,
+              altura: "",
+              piso: "",
+              departamento: "",
+              provinciaCiudad: "",
+            };
+          }
+
+          // Si viene como objeto del backend
+          if (d.calle) {
+            return {
+              id: d.id ?? 0,
+              calle: d.calle ?? "",
+              altura: d.altura ?? "",
+              piso: d.piso ?? "",
+              departamento: d.departamento ?? "",
+              provinciaCiudad: d.provinciaCiudad ?? "",
+            };
+          }
+
+          return null;
+        })
+        .filter(Boolean);
+
+      // ---------------------------------------------
+      // PAYLOAD FINAL
+      // ---------------------------------------------
       const payloadBase = {
         numeroIntegrante: formFamiliar.numeroIntegrante,
         nombre: formFamiliar.nombre.trim(),
@@ -396,17 +461,17 @@ export default function Afiliados() {
         afiliadoId: selectedAfiliado.id,
         alta: formFamiliar.alta
           ? new Date(formFamiliar.alta).toISOString()
-          : new Date().toISOString(),
+          : hoyISO(),
         baja: formFamiliar.baja
           ? new Date(formFamiliar.baja).toISOString()
           : null,
+
         documentacion: {
           id: formFamiliar.documentacion?.id || 0,
           tipoDocumento: parseInt(formFamiliar.tipoDocumento) || 1,
           numero: (formFamiliar.numeroDocumento || "").toString(),
         },
 
-        // 🔧 Normalizados y filtrados
         telefonos: telefonosNormalizados,
         emails: emailsNormalizados,
         direcciones: direccionesNormalizadas,
@@ -418,10 +483,13 @@ export default function Afiliados() {
 
       let result;
 
+      // ---------------------------------------------
+      // UPDATE EXISTENTE
+      // ---------------------------------------------
       if (isEditingFamiliar && formFamiliar.id) {
         const updatePayload = {
           ...payloadBase,
-          id: formFamiliar.id, // ID existente del familiar
+          id: formFamiliar.id,
         };
 
         console.log(
@@ -431,10 +499,15 @@ export default function Afiliados() {
 
         result = await dispatch(updatePersona(updatePayload)).unwrap();
         showSnackbar("Familiar actualizado correctamente");
-      } else {
+      }
+
+      // ---------------------------------------------
+      // CREATE NUEVO
+      // ---------------------------------------------
+      else {
         const createPayload = {
           ...payloadBase,
-          id: 0, // Nuevo registro
+          id: 0,
         };
 
         console.log(
@@ -448,12 +521,11 @@ export default function Afiliados() {
             memberData: createPayload,
           })
         ).unwrap();
+
         showSnackbar("Familiar agregado correctamente");
       }
 
-      // Recargar los afiliados para reflejar los cambios
       await dispatch(fetchAfiliados()).unwrap();
-
       setOpenFamiliarDialog(false);
       setSelectedFamiliar(null);
       setIsEditingFamiliar(false);
@@ -468,6 +540,114 @@ export default function Afiliados() {
     }
   }, [formFamiliar, selectedAfiliado, isEditingFamiliar, dispatch]);
 
+  // ---------- Alta / Baja de Familiares ----------
+
+  const handleSetBajaFamiliar = useCallback((familiar) => {
+    setFamiliarParaBaja(familiar);
+    setOpenBajaFamiliarDialog(true);
+  }, []);
+
+  const handleSetAltaFamiliar = useCallback((familiar) => {
+    setFamiliarParaAlta(familiar);
+    setOpenAltaFamiliarDialog(true);
+  }, []);
+
+  const handleProgramarAltaFamiliar = useCallback(
+    async (persona, fecha) => {
+      try {
+        await dispatch(
+          togglePersonaStatus({
+            id: persona.id,
+            activo: true,
+            fecha: fecha,
+          })
+        ).unwrap();
+        showSnackbar("Alta programada para el familiar");
+        await dispatch(fetchAfiliados()).unwrap();
+      } catch (err) {
+        showSnackbar("Error al programar alta del familiar", "error");
+      }
+    },
+    [dispatch]
+  );
+
+  const handleSetBajaFamiliarFinal = useCallback(
+    async (persona, fecha) => {
+      try {
+        await dispatch(
+          togglePersonaStatus({
+            id: persona.id,
+            activo: false,
+            fecha: fecha,
+          })
+        ).unwrap();
+        showSnackbar("Baja registrada para el familiar");
+        await dispatch(fetchAfiliados()).unwrap();
+      } catch (err) {
+        showSnackbar("Error al dar de baja al familiar", "error");
+      }
+    },
+    [dispatch]
+  );
+
+  const handleCancelarAltaProgramadaFamiliar = useCallback(
+    async (persona) => {
+      try {
+        const hoy = new Date().getTime() - 3 * 60 * 60 * 1000;
+        await dispatch(
+          togglePersonaStatus({
+            id: persona.id,
+            activo: true,
+            fecha: new Date(hoy).toISOString(),
+          })
+        ).unwrap();
+        showSnackbar("Alta programada cancelada para el familiar");
+        await dispatch(fetchAfiliados()).unwrap();
+      } catch (err) {
+        showSnackbar("Error al cancelar alta programada del familiar", "error");
+      }
+    },
+    [dispatch]
+  );
+
+  const handleCancelBajaFamiliar = useCallback(
+    async (persona) => {
+      try {
+        await dispatch(
+          togglePersonaStatus({
+            id: persona.id,
+            activo: false,
+            fecha: null,
+          })
+        ).unwrap();
+        showSnackbar("Baja cancelada para el familiar");
+        await dispatch(fetchAfiliados()).unwrap();
+      } catch (err) {
+        showSnackbar("Error al cancelar baja del familiar", "error");
+      }
+    },
+    [dispatch]
+  );
+
+  const handleReactivarInmediatamenteFamiliar = useCallback(
+    async (persona, fechaAlta) => {
+      try {
+        await dispatch(
+          togglePersonaStatus({
+            id: persona.id,
+            activo: true,
+            fecha: fechaAlta || new Date().toISOString(),
+          })
+        ).unwrap();
+        showSnackbar("Familiar reactivado inmediatamente");
+        await dispatch(fetchAfiliados()).unwrap();
+      } catch (err) {
+        showSnackbar("Error al reactivar familiar", "error");
+      }
+    },
+    [dispatch]
+  );
+
   // ---------- Construcción payload afiliado ----------
   const buildAfiliadoPayload = useCallback(
     (afiliadoToEdit = null) => {
@@ -475,7 +655,7 @@ export default function Afiliados() {
       console.log("🔧 [DEBUG] formAfiliado:", formAfiliado);
 
       // Función helper para convertir situaciones a objeto
-      const convertirSituacionesAObjeto = (situacionesArray) => {
+      const convertirSituacionesAObjetoLocal = (situacionesArray) => {
         const obj = {};
         situacionesArray.forEach((sit) => {
           obj[sit.id] = sit.fechaFin
@@ -485,14 +665,9 @@ export default function Afiliados() {
         return obj;
       };
 
-      // Asegurar que el tipo de documento sea numérico
-      const tipoDocumentoNumerico =
-        formAfiliado.tipoDocumento && !isNaN(formAfiliado.tipoDocumento)
-          ? formAfiliado.tipoDocumento
-          : 1; // Default a DNI si no es numérico
-
       // 1. Construir el TITULAR desde formAfiliado
       const titularPayload = {
+        id: formAfiliado.id ?? 0,
         numeroIntegrante: 1,
         nombre: formAfiliado.nombre?.trim() || "",
         apellido: formAfiliado.apellido?.trim() || "",
@@ -500,10 +675,9 @@ export default function Afiliados() {
           ? new Date(formAfiliado.fechaNacimiento).toISOString().split("T")[0]
           : new Date().toISOString().split("T")[0],
         parentesco: 0, // Titular
-        afiliadoId: selectedAfiliado.id, // ID del afiliado
         alta: formAfiliado.alta
           ? new Date(formAfiliado.alta).toISOString().split("T")[0]
-          : new Date().toISOString().split("T")[0],
+          : hoyISO(),
         baja: null,
         documentacion: {
           tipoDocumento: parseInt(formAfiliado.tipoDocumento) || 1,
@@ -518,6 +692,7 @@ export default function Afiliados() {
                 (t.numero && String(t.numero).trim()))
           )
           .map((t) => ({
+            id: typeof t === "object" ? t.id ?? 0 : 0,
             numero:
               typeof t === "string"
                 ? t.trim()
@@ -532,6 +707,7 @@ export default function Afiliados() {
                 (e.correo && String(e.correo).trim()))
           )
           .map((e) => ({
+            id: typeof e === "object" ? e.id ?? 0 : 0,
             correo:
               typeof e === "string"
                 ? e.trim()
@@ -548,22 +724,26 @@ export default function Afiliados() {
           .map((d) =>
             typeof d === "string"
               ? {
+                  id: 0,
                   calle: d,
                   altura: "",
                   piso: "",
                   departamento: "",
-                  provinciaCiudad: "Bs As",
+                  provinciaCiudad: "",
+                  codigoPostal: "",
                 }
               : {
-                  calle: d.calle || "",
+                  id: d.id ?? 0,
+                  calle: (d.calle || "").substring(0, 100),
                   altura: d.altura || "",
                   piso: d.piso || "",
                   departamento: d.departamento || "",
-                  provinciaCiudad: d.provinciaCiudad || "Bs As",
+                  provinciaCiudad: d.provinciaCiudad || "",
+                  codigoPostal: d.codigoPostal || "",
                 }
           ),
 
-        situacionesTerapeuticas: convertirSituacionesAObjeto(
+        situacionesTerapeuticas: convertirSituacionesAObjetoLocal(
           formAfiliado.situacionesTerapeuticasIds || []
         ),
       };
@@ -574,6 +754,7 @@ export default function Afiliados() {
       const otrosIntegrantesPayload = (integrantes || [])
         .filter((i) => i && i.numeroIntegrante !== 1)
         .map((i, index) => ({
+          id: i.id ?? 0,
           numeroIntegrante: i.numeroIntegrante || index + 2,
           nombre: i.nombre?.trim() || "",
           apellido: i.apellido?.trim() || "",
@@ -581,9 +762,7 @@ export default function Afiliados() {
             ? new Date(i.fechaNacimiento).toISOString()
             : new Date().toISOString(),
           parentesco: parseInt(i.parentesco) || 2,
-          alta: i.alta
-            ? new Date(i.alta).toISOString()
-            : new Date().toISOString(),
+          alta: i.alta ? new Date(i.alta).toISOString() : hoyISO(),
           baja: i.baja ? new Date(i.baja).toISOString() : null,
           documentacion:
             i.tipoDocumento || i.numeroDocumento
@@ -596,17 +775,22 @@ export default function Afiliados() {
                 }
               : null,
 
-          // 🔧 Igual corrección que en titular
           telefonos: (i.telefonos || [])
-            .filter((t) => t && (t.numero || t.trim?.()))
+            .filter(
+              (t) => t && (t.numero || (typeof t === "string" && t.trim?.()))
+            )
             .map((t) => ({
+              id: typeof t === "object" ? t.id ?? 0 : 0,
               numero:
                 typeof t === "string" ? t.trim() : (t.numero || "").trim(),
             })),
 
           emails: (i.emails || [])
-            .filter((e) => e && (e.correo || e.trim?.()))
+            .filter(
+              (e) => e && (e.correo || (typeof e === "string" && e.trim?.()))
+            )
             .map((e) => ({
+              id: typeof e === "object" ? e.id ?? 0 : 0,
               correo:
                 typeof e === "string" ? e.trim() : (e.correo || "").trim(),
             })),
@@ -616,22 +800,26 @@ export default function Afiliados() {
             .map((d) =>
               typeof d === "string"
                 ? {
+                    id: 0,
                     calle: d,
                     altura: "",
                     piso: "",
                     departamento: "",
                     provinciaCiudad: "",
+                    codigoPostal: "",
                   }
                 : {
+                    id: d.id ?? 0,
                     calle: d.calle || "",
                     altura: d.altura || "",
                     piso: d.piso || "",
                     departamento: d.departamento || "",
                     provinciaCiudad: d.provinciaCiudad || "",
+                    codigoPostal: d.codigoPostal || "",
                   }
             ),
 
-          situacionesTerapeuticas: convertirSituacionesAObjeto(
+          situacionesTerapeuticas: convertirSituacionesAObjetoLocal(
             i.situacionesTerapeuticasIds || []
           ),
         }));
@@ -680,7 +868,6 @@ export default function Afiliados() {
   );
 
   // ---------- Guardar afiliado ----------
-  // En Afiliados.jsx - handleSaveAfiliado
   const handleSaveAfiliado = useCallback(async () => {
     if (
       !formAfiliado.nombre ||
@@ -710,7 +897,6 @@ export default function Afiliados() {
           alta: formAfiliado.alta
             ? new Date(formAfiliado.alta).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
-
           baja: null,
           // Mantener el TitularID original
           titularID: selectedAfiliado.titularID || selectedAfiliado.titularId,
@@ -724,14 +910,14 @@ export default function Afiliados() {
           numeroIntegrante: 1,
           nombre: formAfiliado.nombre?.trim() || "",
           apellido: formAfiliado.apellido?.trim() || "",
+          afiliadoId: selectedAfiliado.id,
           fechaNacimiento: formAfiliado.fechaNacimiento
             ? new Date(formAfiliado.fechaNacimiento).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
           parentesco: 0, // Titular
-          afiliadoId: selectedAfiliado.id, // ID del afiliado
           alta: formAfiliado.alta
             ? new Date(formAfiliado.alta).toISOString().split("T")[0]
-            : new Date().toISOString().split("T")[0],
+            : hoyISO(),
           baja: null,
           documentacion: {
             tipoDocumento: parseInt(formAfiliado.tipoDocumento) || 1,
@@ -745,6 +931,7 @@ export default function Afiliados() {
                   (t.numero && String(t.numero).trim()))
             )
             .map((t) => ({
+              id: typeof t === "object" ? t.id ?? 0 : 0,
               numero:
                 typeof t === "string"
                   ? t.trim()
@@ -759,6 +946,7 @@ export default function Afiliados() {
                   (e.correo && String(e.correo).trim()))
             )
             .map((e) => ({
+              id: typeof e === "object" ? e.id ?? 0 : 0,
               correo:
                 typeof e === "string"
                   ? e.trim()
@@ -766,14 +954,28 @@ export default function Afiliados() {
             })),
 
           direcciones: (formAfiliado.direcciones || [])
-            .filter((d) => d && d.calle) // Solo direcciones con calle
-            .map((d) => ({
-              calle: (d.calle || "").substring(0, 100),
-              altura: d.altura || "",
-              piso: d.piso || "",
-              departamento: d.departamento || "",
-              provinciaCiudad: d.provinciaCiudad || "Bs As",
-            })),
+            .filter((d) => d && (d.calle || typeof d === "string"))
+            .map((d) =>
+              typeof d === "string"
+                ? {
+                    id: 0,
+                    calle: d,
+                    altura: "",
+                    piso: "",
+                    departamento: "",
+                    provinciaCiudad: "",
+                    codigoPostal: "",
+                  }
+                : {
+                    id: d.id ?? 0,
+                    calle: (d.calle || "").substring(0, 100),
+                    altura: d.altura || "",
+                    piso: d.piso || "",
+                    departamento: d.departamento || "",
+                    provinciaCiudad: d.provinciaCiudad || "",
+                    codigoPostal: d.codigoPostal || "",
+                  }
+            ),
           situacionesTerapeuticas: convertirSituacionesAObjeto(
             formAfiliado.situacionesTerapeuticasIds || []
           ),
@@ -781,7 +983,7 @@ export default function Afiliados() {
 
         console.log("🎯 [TITULAR] Payload a enviar:", titularPayload);
 
-        // 4. Ejecutar ambas actualizaciones en paralelo
+        // 4. Ejecutar ambas actualizaciones en paralelo (afiliado + titular)
         await Promise.all([
           dispatch(
             updateAfiliado({
@@ -794,21 +996,20 @@ export default function Afiliados() {
 
         showSnackbar("Afiliado actualizado correctamente");
 
-        // 5. ACTUALIZACIÓN CRÍTICA: Refrescar los datos del afiliado
-        await dispatch(fetchAfiliados()).unwrap();
-
-        // Obtener el afiliado actualizado de la lista
+        // 5. REFRESCAR los datos del afiliado una sola vez
         const afiliadosActualizados = await dispatch(fetchAfiliados()).unwrap();
         const afiliadoActualizado =
-          afiliadosActualizados.payload?.find(
-            (a) => a.id === selectedAfiliado.id
-          ) || afiliadosActualizados.find((a) => a.id === selectedAfiliado.id);
+          (afiliadosActualizados.payload &&
+            afiliadosActualizados.payload.find(
+              (a) => a.id === selectedAfiliado.id
+            )) ||
+          afiliadosActualizados.find((a) => a.id === selectedAfiliado.id);
 
         if (afiliadoActualizado) {
           setSelectedAfiliado(afiliadoActualizado);
         }
       } else {
-        // ===== CREACIÓN NUEVA (se mantiene igual) =====
+        // ===== CREACIÓN NUEVA =====
         const payload = buildAfiliadoPayload(selectedAfiliado);
         console.log(
           "🎯 [CREACIÓN] Payload a enviar:",
@@ -939,7 +1140,7 @@ export default function Afiliados() {
   // colores memoizados
   const getParentescoColor = useCallback(
     (parentescoId) =>
-      ({ 1: "#1976d2", 2: "#2e7d32", 3: "#f57c00", 4: "#757575" }[
+      ({ 0: "#1976d2", 1: "#2e7d32", 2: "#f57c00", 3: "#757575" }[
         parentescoId
       ] || "#757575"),
     []
@@ -947,7 +1148,7 @@ export default function Afiliados() {
 
   const getPlanColor = useCallback(
     (planMedicoId) =>
-      ({ 1: "#cd7f32", 2: "#c0c0c0", 3: "#ffd700", 4: "#e5e4e2" }[
+      ({ 0: "#cd7f32", 1: "#c0c0c0", 2: "#ffd700", 3: "#e5e4e2" }[
         planMedicoId
       ] || "#757575"),
     []
@@ -956,7 +1157,6 @@ export default function Afiliados() {
   return (
     <>
       <PageHeader title="Afiliados" subtitle="Gestión de afiliados" />
-
       <AdvancedSearchBar
         afiliados={afiliados}
         personas={[]}
@@ -966,7 +1166,6 @@ export default function Afiliados() {
         tieneBajaProgramada={tieneBajaProgramada}
         tieneAltaProgramada={tieneAltaProgramada}
       />
-
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {filteredAfiliados.map((afiliado) => {
           const titular = getTitularDelAfiliado(afiliado);
@@ -998,6 +1197,8 @@ export default function Afiliados() {
               onAddFamiliar={() => handleAddFamiliar(afiliado)}
               onViewFamiliar={(fam) => handleViewFamiliar(afiliado, fam)}
               onEditFamiliar={(fam) => handleEditFamiliar(afiliado, fam)}
+              onSetBajaFamiliar={(fam) => handleSetBajaFamiliar(fam)}
+              onSetAltaFamiliar={(fam) => handleSetAltaFamiliar(fam)}
               //onDeleteFamiliar={(fam) => handleDeleteFamiliar(afiliado, fam)}
               getParentescoColor={getParentescoColor}
               getPlanColor={getPlanColor}
@@ -1006,7 +1207,6 @@ export default function Afiliados() {
           );
         })}
       </Box>
-
       {filteredAfiliados.length === 0 && (
         <Box sx={{ textAlign: "center", py: 8 }}>
           <PersonIcon sx={{ fontSize: 64, color: "#ccc", mb: 2 }} />
@@ -1015,7 +1215,6 @@ export default function Afiliados() {
           </Typography>
         </Box>
       )}
-
       <Fab
         color="primary"
         sx={{ position: "fixed", bottom: 16, right: 16 }}
@@ -1023,7 +1222,6 @@ export default function Afiliados() {
       >
         <AddIcon />
       </Fab>
-
       <AfiliadoFormDialog
         open={openDialog}
         selectedAfiliado={selectedAfiliado}
@@ -1058,7 +1256,6 @@ export default function Afiliados() {
           setFormAfiliado((prev) => ({ ...prev, [field]: value }))
         }
       />
-
       <PersonaFormDialog
         open={openFamiliarDialog}
         selectedAfiliado={selectedAfiliado}
@@ -1096,7 +1293,6 @@ export default function Afiliados() {
           setFormFamiliar((prev) => ({ ...prev, [field]: value }))
         }
       />
-
       <BajaDialog
         open={openBajaDialog}
         afiliado={afiliadoParaBaja}
@@ -1110,7 +1306,6 @@ export default function Afiliados() {
           setOpenBajaDialog(false);
         }}
       />
-
       <AltaDialog
         open={openAltaDialog}
         afiliado={afiliadoParaAlta}
@@ -1128,7 +1323,38 @@ export default function Afiliados() {
           setOpenAltaDialog(false);
         }}
       />
-
+      // Reemplaza los diálogos existentes de familiares con esta versión
+      actualizada:
+      <BajaDialog
+        open={openBajaFamiliarDialog}
+        afiliado={familiarParaBaja}
+        onClose={() => setOpenBajaFamiliarDialog(false)}
+        onConfirm={(p, fecha) => {
+          handleSetBajaFamiliarFinal(p, fecha);
+          setOpenBajaFamiliarDialog(false);
+        }}
+        onCancelBaja={(p) => {
+          handleCancelBajaFamiliar(p);
+          setOpenBajaFamiliarDialog(false);
+        }}
+      />
+      <AltaDialog
+        open={openAltaFamiliarDialog}
+        afiliado={familiarParaAlta}
+        onClose={() => setOpenAltaFamiliarDialog(false)}
+        onConfirm={(p, fecha) => {
+          handleProgramarAltaFamiliar(p, fecha);
+          setOpenAltaFamiliarDialog(false);
+        }}
+        onCancelAlta={(p) => {
+          handleCancelarAltaProgramadaFamiliar(p);
+          setOpenAltaFamiliarDialog(false);
+        }}
+        onReactivar={(p, fecha) => {
+          handleReactivarInmediatamenteFamiliar(p, fecha);
+          setOpenAltaFamiliarDialog(false);
+        }}
+      />
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}

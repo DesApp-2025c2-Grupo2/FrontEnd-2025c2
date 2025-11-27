@@ -1,55 +1,99 @@
-import React from 'react';
-import { Button, Chip, Card, Typography, Box, Accordion, AccordionSummary, AccordionDetails, IconButton, Tooltip, CircularProgress, Stack } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import ScheduleIcon from '@mui/icons-material/Schedule';
-import PersonIcon from '@mui/icons-material/Person';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useSelector } from 'react-redux';
-import { selectPrestadores } from '../store/prestadoresSlice';
-import { selectEspecialidades } from '../store/especialidadesSlice';
+import React from "react";
+import {
+  Button,
+  Chip,
+  Card,
+  Typography,
+  Box,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  IconButton,
+  Tooltip,
+  CircularProgress,
+  Stack,
+} from "@mui/material";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import EditIcon from "@mui/icons-material/Edit";
+import ScheduleIcon from "@mui/icons-material/Schedule";
+import PersonIcon from "@mui/icons-material/Person";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { useSelector } from "react-redux";
+import { selectPrestadores } from "../store/prestadoresSlice";
+import { selectEspecialidades } from "../store/especialidadesSlice";
 
-export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onToggleActivo, onGestionarHorarios, emphasis = false, isRefreshing = false }) {
+export default function TarjetaPrestadorSimple({
+  prestador,
+  onVer,
+  onEditar,
+  onToggleActivo,
+  onGestionarHorarios,
+  emphasis = false,
+  isRefreshing = false,
+}) {
   const todosPrestadores = useSelector(selectPrestadores);
   const centroNombre = (() => {
     if (prestador.integraCentroMedicoId) {
-      const c = (todosPrestadores || []).find(p => p.id === prestador.integraCentroMedicoId);
+      const c = (todosPrestadores || []).find(
+        (p) => p.id === prestador.integraCentroMedicoId
+      );
       if (c && c.nombreCompleto) return c.nombreCompleto;
     }
     return prestador.centroMedicoNombre || prestador.centroMedico || null;
   })();
 
-  const getTipoColor = (tipo) => ({
-    'Centro Médico': '#546e7a',
-    'Profesional Independiente': '#1976d2'
-  }[tipo] || '#757575');
+  const getTipoColor = (tipo) =>
+    ({
+      "Centro Médico": "#546e7a",
+      "Profesional Independiente": "#1976d2",
+    }[tipo] || "#757575");
 
   const formatHorario = (h) => {
-    const desde = h.desde || h.horaInicio || '';
-    const hasta = h.hasta || h.horaFin || '';
-    const dias = Array.isArray(h.dias) ? h.dias.join('/') : '';
-    if (!dias && !desde && !hasta) return '';
+    const desde = h.desde || h.horaInicio || "";
+    const hasta = h.hasta || h.horaFin || "";
+    const dias = Array.isArray(h.dias) ? h.dias.join("/") : "";
+    if (!dias && !desde && !hasta) return "";
     return dias ? `${dias}: ${desde} - ${hasta}` : `${desde} - ${hasta}`;
   };
 
-  const diasSemanaOrden = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+  const diasSemanaOrden = [
+    "Lunes",
+    "Martes",
+    "Miércoles",
+    "Jueves",
+    "Viernes",
+    "Sábado",
+    "Domingo",
+  ];
   const canonDia = (d) => {
-    const t = String(d || '').trim().toLowerCase();
-    if (!t) return '';
-    if (t === 'miercoles') return 'Miércoles';
-    if (t === 'sabado') return 'Sábado';
-    const map = { lunes: 'Lunes', martes: 'Martes', miércoles: 'Miércoles', jueves: 'Jueves', viernes: 'Viernes', sábado: 'Sábado', domingo: 'Domingo' };
-    return map[t] || (t.charAt(0).toUpperCase() + t.slice(1));
+    const t = String(d || "")
+      .trim()
+      .toLowerCase();
+    if (!t) return "";
+    if (t === "miercoles") return "Miércoles";
+    if (t === "sabado") return "Sábado";
+    const map = {
+      lunes: "Lunes",
+      martes: "Martes",
+      miércoles: "Miércoles",
+      jueves: "Jueves",
+      viernes: "Viernes",
+      sábado: "Sábado",
+      domingo: "Domingo",
+    };
+    return map[t] || t.charAt(0).toUpperCase() + t.slice(1);
   };
   const catalogoEspecialidades = useSelector(selectEspecialidades);
   const especialidadIdToNombre = React.useMemo(() => {
     const map = new Map();
     // Preferir catálogo global si existe
     (catalogoEspecialidades || []).forEach((e) => {
-      if (e && typeof e.id === 'number') map.set(e.id, e.nombre);
+      if (e && typeof e.id === "number") map.set(e.id, e.nombre);
     });
     // Completar con las del prestador por si hay extras
     (prestador.especialidades || []).forEach((e) => {
-      if (e && typeof e.id === 'number' && !map.has(e.id)) map.set(e.id, e.nombre);
+      if (e && typeof e.id === "number" && !map.has(e.id))
+        map.set(e.id, e.nombre);
     });
     return map;
   }, [catalogoEspecialidades, prestador.especialidades]);
@@ -87,38 +131,75 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
       sx={{
         width: '100%',
         p: 2,
-        mb: 2, 
-        border: prestador.activo ? '1px solid #e0e0e0' : '1px solid #d1d5db',
-        backgroundColor: prestador.activo ? (emphasis ? '#fffef7' : 'white') : '#f3f4f6',
+        mb: 2,
+        border: prestador.activo ? "1px solid #e0e0e0" : "1px solid #d1d5db",
+        backgroundColor: prestador.activo
+          ? emphasis
+            ? "#fffef7"
+            : "white"
+          : "#f3f4f6",
         opacity: prestador.activo ? 1 : 0.7,
-        boxShadow: emphasis ? 6 : 'none',
-        borderColor: emphasis ? '#ffb300' : (prestador.activo ? '#e0e0e0' : '#d1d5db'),
-        transition: 'background-color 200ms ease, box-shadow 200ms ease, border-color 200ms ease',
+        boxShadow: emphasis ? 6 : "none",
+        borderColor: emphasis
+          ? "#ffb300"
+          : prestador.activo
+          ? "#e0e0e0"
+          : "#d1d5db",
+        transition:
+          "background-color 200ms ease, box-shadow 200ms ease, border-color 200ms ease",
       }}
     >
-      <Box sx={{
-        display: 'flex',
-        alignItems: { xs: 'stretch', md: 'flex-start' },
-        flexDirection: { xs: 'column', md: 'row' },
-        gap: { xs: 1.5, md: 0 }
-      }}>
+
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: "column", md: "row" }, 
+        alignItems: { xs: "stretch", md: "flex-start" },
+        gap: { xs: 2, md: 0 } 
+        }}>
         <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
           <PersonIcon sx={{ fontSize: 40, color: '#1976d2' }} />
         </Box>
 
-        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1, flexWrap: 'wrap' }}>
-            <Typography variant="h6" sx={{ fontWeight: 'bold', color: prestador.activo ? 'inherit' : '#6b7280' }}>
-                {prestador.nombreCompleto}
-              </Typography>
-              <Chip 
+        <Box
+          sx={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: 1 }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 2,
+              mb: 1,
+              flexWrap: "wrap",
+            }}
+          >
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: "bold",
+                color: prestador.activo ? "inherit" : "#6b7280",
+              }}
+            >
+              {prestador.nombreCompleto}
+            </Typography>
+            <Chip
               label={prestador.tipo}
-                size="small" 
-              sx={{ backgroundColor: getTipoColor(prestador.tipo), color: 'white', fontWeight: 'bold' }}
+              size="small"
+              sx={{
+                backgroundColor: getTipoColor(prestador.tipo),
+                color: "white",
+                fontWeight: "bold",
+              }}
             />
           </Box>
 
-          <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+          <Box
+            sx={{
+              display: "flex",
+              gap: 3,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
             <Typography variant="body2" color="textSecondary">
               <strong>CUIL/CUIT:</strong> {prestador.cuilCuit}
             </Typography>
@@ -127,7 +208,7 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                 <strong>Matrícula:</strong> {prestador.matricula}
               </Typography>
             )}
-            {prestador.tipo === 'Profesional Independiente' && centroNombre && (
+            {prestador.tipo === "Profesional Independiente" && centroNombre && (
               <Typography variant="body2" color="textSecondary">
                 <strong>Integra centro:</strong> {centroNombre}
               </Typography>
@@ -135,13 +216,17 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
           </Box>
 
           {prestador.especialidades && prestador.especialidades.length > 0 && (
-            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mt: 1 }}>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
               {prestador.especialidades.map((esp, idx) => (
                 <Chip
                   key={idx}
                   label={esp.nombre}
                   size="small"
-                  sx={{ backgroundColor: '#e3f2fd', color: '#1976d2', fontWeight: 600 }}
+                  sx={{
+                    backgroundColor: "#e3f2fd",
+                    color: "#1976d2",
+                    fontWeight: 600,
+                  }}
                 />
               ))}
             </Box>
@@ -150,48 +235,45 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
           {/* Lugares de atención movidos fuera de la fila principal para ocupar ancho completo */}
         </Box>
 
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: { xs: 'row', md: 'column' },
-            gap: 1.5,
-            ml: { xs: 0, md: 3 },
-            minWidth: { md: 140 },
-            width: { xs: '100%', md: 'auto' },
-            '& > .MuiButton-root': {
-              flexGrow: { xs: 1, md: 0 }
-            }
-          }}
-        >
+
+        <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 1.5,ml: { xs: 0, md: 3 },
+            mt: { xs: 2, md: 0 },
+            minWidth: { xs: "100%", md: 140 },
+            width: { xs: "100%", md: "auto" }
+            }}>
             <Button
             size="small"
-              onClick={(e) => { 
-                e.preventDefault(); 
-                e.stopPropagation(); 
-                onVer?.(prestador); 
-              }}
+            startIcon={<VisibilityIcon />}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onVer?.(prestador);
+            }}
             variant="outlined"
             fullWidth
           >
             Ver
-            </Button>
-            <Button
+          </Button>
+          <Button
             size="small"
-              startIcon={<EditIcon />}
-              onClick={(e) => { 
-                e.preventDefault(); 
-                e.stopPropagation(); 
-                onEditar?.(prestador); 
-              }}
+            startIcon={<EditIcon />}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onEditar?.(prestador);
+            }}
             variant="outlined"
             fullWidth
-            >
-              Editar
-            </Button>
+          >
+            Editar
+          </Button>
           <Button
             size="small"
             startIcon={<ScheduleIcon />}
-            color={prestador.activo ? 'error' : 'success'}
+            color={prestador.activo ? "error" : "success"}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -200,7 +282,7 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
             variant="outlined"
             fullWidth
           >
-            {prestador.activo ? 'Dar de baja' : 'Rehabilitar'}
+            {prestador.activo ? "Dar de baja" : "Rehabilitar"}
           </Button>
         </Box>
       </Box>
@@ -211,18 +293,38 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
               Lugares de Atención ({lugaresUnicos.length})
             </Typography>
             {isRefreshing && (
-              <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
+              <Box sx={{ display: "flex", alignItems: "center", ml: 1 }}>
                 <CircularProgress size={14} sx={{ ml: 1 }} />
-                <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>actualizando…</Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ ml: 0.5 }}
+                >
+                  actualizando…
+                </Typography>
               </Box>
             )}
           </AccordionSummary>
           <AccordionDetails>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {lugaresUnicos.map((lugar, idx) => (
-                <Card key={idx} variant="outlined" sx={{ p: 1.5, borderColor: '#e0e0e0' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5, gap: 1, flexWrap: 'wrap' }}>
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Card
+                  key={idx}
+                  variant="outlined"
+                  sx={{ p: 1.5, borderColor: "#e0e0e0" }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 0.5,
+                      gap: 1,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                         {lugar.direccion}
                       </Typography>
@@ -237,14 +339,26 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                         </Typography>
                       )}
                     </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                      {typeof lugar.especialidadSeleccionada === 'string' && lugar.especialidadSeleccionada.trim() !== '' && (
-                        <Chip
-                          label={lugar.especialidadSeleccionada}
-                          size="small"
-                          sx={{ backgroundColor: '#e3f2fd', color: '#1976d2', fontWeight: 600 }}
-                        />
-                      )}
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      {typeof lugar.especialidadSeleccionada === "string" &&
+                        lugar.especialidadSeleccionada.trim() !== "" && (
+                          <Chip
+                            label={lugar.especialidadSeleccionada}
+                            size="small"
+                            sx={{
+                              backgroundColor: "#e3f2fd",
+                              color: "#1976d2",
+                              fontWeight: 600,
+                            }}
+                          />
+                        )}
                       <Tooltip title="Editar horarios">
                         <IconButton
                           size="small"
@@ -262,7 +376,12 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                     </Box>
                   </Box>
                   <Box sx={{ mt: 1 }}>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ mb: 1 }}
+                    >
                       <ScheduleIcon color="action" />
                       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                         Horarios de Atención
@@ -297,20 +416,29 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                             <Box
                               key={i}
                               sx={{
-                                backgroundColor: '#eaf2ff',
-                                border: '1px solid #c7d7fe',
+                                backgroundColor: "#eaf2ff",
+                                border: "1px solid #c7d7fe",
                                 borderRadius: 1.5,
-                                p: 1.25
+                                p: 1.25,
                               }}
                             >
-                              <Typography variant="subtitle2" sx={{ color: '#1e40af', fontWeight: 700, mb: 0.25 }}>
-                                {dias.length > 0 ? dias.join(', ') : 'Horario'}
+                              <Typography
+                                variant="subtitle2"
+                                sx={{
+                                  color: "#1e40af",
+                                  fontWeight: 700,
+                                  mb: 0.25,
+                                }}
+                              >
+                                {dias.length > 0 ? dias.join(", ") : "Horario"}
                               </Typography>
                               <Typography variant="body2" color="text.secondary">
                                 {profNombre ? `${profNombre} • ` : ''}
                                 {espNombre ? `${espNombre} • ` : ''}
+
+
                                 {inicio} - {fin}
-                                {dur ? ` • ${dur} min` : ''}
+                                {dur ? ` • ${dur} min` : ""}
                               </Typography>
                             </Box>
                           );
@@ -318,7 +446,9 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
                         })()}
                       </Box>
                     ) : (
-                      <Typography variant="body2" color="text.secondary">No hay horarios cargados.</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        No hay horarios cargados.
+                      </Typography>
                     )}
                   </Box>
                 </Card>
@@ -330,4 +460,3 @@ export default function TarjetaPrestadorSimple({ prestador, onVer, onEditar, onT
     </Card>
   );
 }
-

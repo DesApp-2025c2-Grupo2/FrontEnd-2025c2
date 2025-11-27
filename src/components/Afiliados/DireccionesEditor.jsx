@@ -5,12 +5,14 @@ import {
   TextField,
   IconButton,
   Grid,
+  Button,
 } from "@mui/material";
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
   Home as HomeIcon,
 } from "@mui/icons-material";
+import { useState } from "react";
 
 export default function DireccionesEditor({
   items = [],
@@ -20,6 +22,7 @@ export default function DireccionesEditor({
     piso: "",
     departamento: "",
     provinciaCiudad: "",
+    codigoPostal: "",
   },
   onNewValueChange = () => {},
   onAdd = () => {},
@@ -27,26 +30,100 @@ export default function DireccionesEditor({
   disabled = false,
 }) {
   const list = Array.isArray(items) ? items : [];
+  const [errors, setErrors] = useState({});
+  const [touched, setTouched] = useState({});
+
+  // Validar campos
+  const validateField = (name, value) => {
+    switch (name) {
+      case "calle":
+        return !value?.trim() ? "La calle es obligatoria" : "";
+      case "altura":
+        return !value?.trim() ? "La altura es obligatoria" : "";
+      case "provinciaCiudad":
+        return !value?.trim() ? "La provincia/ciudad es obligatoria" : "";
+      default:
+        return "";
+    }
+  };
+
+  // Validar todo el formulario
+  const validateForm = (direccion) => {
+    const newErrors = {};
+    newErrors.calle = validateField("calle", direccion.calle);
+    newErrors.altura = validateField("altura", direccion.altura);
+    newErrors.provinciaCiudad = validateField(
+      "provinciaCiudad",
+      direccion.provinciaCiudad
+    );
+    return newErrors;
+  };
+
+  // Verificar si el formulario es válido
+  const isFormValid = () => {
+    const errors = validateForm(newValue);
+    return !errors.calle && !errors.altura && !errors.provinciaCiudad;
+  };
+
+  // Manejar cambios en los campos
+  const handleFieldChange = (field, value) => {
+    onNewValueChange({ ...newValue, [field]: value });
+
+    // Si el campo ya fue tocado, validar inmediatamente
+    if (touched[field]) {
+      const error = validateField(field, value);
+      setErrors((prev) => ({ ...prev, [field]: error }));
+    }
+  };
+
+  // Manejar blur de los campos (cuando pierden el foco)
+  const handleFieldBlur = (field) => {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    const error = validateField(field, newValue[field]);
+    setErrors((prev) => ({ ...prev, [field]: error }));
+  };
 
   const handleAdd = () => {
-    const calle = newValue?.calle?.trim?.();
-    if (calle && calle.length > 0) {
+    // Marcar todos los campos como tocados para mostrar todos los errores
+    const allTouched = {
+      calle: true,
+      altura: true,
+      piso: true,
+      departamento: true,
+      provinciaCiudad: true,
+      codigoPostal: true,
+    };
+    setTouched(allTouched);
+
+    // Validar todos los campos
+    const newErrors = validateForm(newValue);
+    setErrors(newErrors);
+
+    // Si no hay errores, agregar la dirección
+    if (isFormValid()) {
       onAdd({
         ...newValue,
-        calle,
-        altura: newValue?.altura?.trim?.() || "",
-        piso: newValue?.piso?.trim?.() || "",
-        departamento: newValue?.departamento?.trim?.() || "",
-        provinciaCiudad: newValue?.provinciaCiudad?.trim?.() || "",
+        calle: newValue.calle.trim(),
+        altura: newValue.altura.trim(),
+        piso: newValue.piso?.trim() || "",
+        departamento: newValue.departamento?.trim() || "",
+        provinciaCiudad: newValue.provinciaCiudad.trim(),
+        codigoPostal: newValue.codigoPostal?.trim() || "",
       });
 
+      // Limpiar el formulario
       onNewValueChange({
         calle: "",
         altura: "",
         piso: "",
         departamento: "",
         provinciaCiudad: "",
+        codigoPostal: "",
       });
+
+      // Limpiar errores y touched
+      setErrors({});
+      setTouched({});
     }
   };
 
@@ -74,26 +151,28 @@ export default function DireccionesEditor({
             <TextField
               fullWidth
               size="small"
-              label="Calle"
+              label="Calle *"
               value={newValue.calle || ""}
-              onChange={(e) =>
-                onNewValueChange({ ...newValue, calle: e.target.value })
-              }
+              onChange={(e) => handleFieldChange("calle", e.target.value)}
+              onBlur={() => handleFieldBlur("calle")}
               onKeyDown={handleKeyDown}
               disabled={disabled}
+              error={!!errors.calle}
+              helperText={errors.calle}
             />
           </Grid>
           <Grid item xs={12} sm={2}>
             <TextField
               fullWidth
               size="small"
-              label="Altura"
+              label="Altura *"
               value={newValue.altura || ""}
-              onChange={(e) =>
-                onNewValueChange({ ...newValue, altura: e.target.value })
-              }
+              onChange={(e) => handleFieldChange("altura", e.target.value)}
+              onBlur={() => handleFieldBlur("altura")}
               onKeyDown={handleKeyDown}
               disabled={disabled}
+              error={!!errors.altura}
+              helperText={errors.altura}
             />
           </Grid>
           <Grid item xs={12} sm={2}>
@@ -102,9 +181,7 @@ export default function DireccionesEditor({
               size="small"
               label="Piso"
               value={newValue.piso || ""}
-              onChange={(e) =>
-                onNewValueChange({ ...newValue, piso: e.target.value })
-              }
+              onChange={(e) => handleFieldChange("piso", e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={disabled}
             />
@@ -116,7 +193,7 @@ export default function DireccionesEditor({
               label="Dpto"
               value={newValue.departamento || ""}
               onChange={(e) =>
-                onNewValueChange({ ...newValue, departamento: e.target.value })
+                handleFieldChange("departamento", e.target.value)
               }
               onKeyDown={handleKeyDown}
               disabled={disabled}
@@ -126,27 +203,43 @@ export default function DireccionesEditor({
             <TextField
               fullWidth
               size="small"
-              label="Provincia/Ciudad"
+              label="Provincia/Ciudad *"
               value={newValue.provinciaCiudad || ""}
               onChange={(e) =>
-                onNewValueChange({
-                  ...newValue,
-                  provinciaCiudad: e.target.value,
-                })
+                handleFieldChange("provinciaCiudad", e.target.value)
+              }
+              onBlur={() => handleFieldBlur("provinciaCiudad")}
+              onKeyDown={handleKeyDown}
+              disabled={disabled}
+              error={!!errors.provinciaCiudad}
+              helperText={errors.provinciaCiudad}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Código Postal"
+              value={newValue.codigoPostal || ""}
+              onChange={(e) =>
+                onNewValueChange({ ...newValue, codigoPostal: e.target.value })
               }
               onKeyDown={handleKeyDown}
               disabled={disabled}
+              required
+              inputProps={{ maxLength: 10 }} // Limitar longitud máxima
             />
           </Grid>
           <Grid item xs={12}>
-            <IconButton
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
               onClick={handleAdd}
-              color="secondary"
-              aria-label="Agregar dirección"
-              disabled={disabled || !newValue?.calle?.trim?.()}
+              disabled={disabled || !isFormValid()}
+              sx={{ mt: 1 }}
             >
-              <AddIcon />
-            </IconButton>
+              Agregar Dirección
+            </Button>
           </Grid>
         </Grid>
       </Box>
@@ -185,6 +278,7 @@ export default function DireccionesEditor({
                     direccion.piso && `Piso ${direccion.piso}`,
                     direccion.departamento && `Dpto ${direccion.departamento}`,
                     direccion.provinciaCiudad,
+                    direccion.codigoPostal && `CP ${direccion.codigoPostal}`,
                   ]
                     .filter(Boolean)
                     .join(" - ")}
@@ -195,6 +289,7 @@ export default function DireccionesEditor({
                 onClick={() => onRemove(index)}
                 color="error"
                 aria-label={`Eliminar dirección ${index + 1}`}
+                disabled={disabled}
               >
                 <DeleteIcon />
               </IconButton>
