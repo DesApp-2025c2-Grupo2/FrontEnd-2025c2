@@ -114,17 +114,85 @@ export async function getByCentro(centroId) {
   try {
     const res = await WebAPI.Instance().get(`${ENDPOINT}/getByCentro/${centroId}`);
     const raw = res?.data;
-    // Esperado: { centroId, profesionales: [{ profesionalId, nombreCompleto, direcciones: [...] }] }
-    const profesionales = Array.isArray(raw?.profesionales) ? raw.profesionales : [];
-    return profesionales.map((p) => {
-      const dirsRaw = Array.isArray(p?.direcciones) ? p.direcciones : [];
-      const dirsNorm = dirsRaw.map(normalizeAgendaLugar);
-      return {
-        profesionalId: p?.profesionalId ?? p?.id,
-        nombreCompleto: p?.nombreCompleto || '',
-        direcciones: dirsNorm
-      };
-    });
+    // Formato 1 (original): { centroId, profesionales: [{ profesionalId, nombreCompleto, direcciones: [...] }] }
+    const profesionales = Array.isArray(raw?.profesionales) ? raw.profesionales : null;
+    if (profesionales && profesionales.length > 0) {
+      return profesionales.map((p) => {
+        const dirsRaw = Array.isArray(p?.direcciones) ? p.direcciones : [];
+        const dirsNorm = dirsRaw.map(normalizeAgendaLugar);
+        return {
+          profesionalId: p?.profesionalId ?? p?.id,
+          nombreCompleto: p?.nombreCompleto || '',
+          direcciones: dirsNorm
+        };
+      });
+    }
+
+    // Formato 2 (nuevo): { centroId, direcciones: [{ lugarId, detalleDireccion, horariosAtencion: [...] }] }
+    const dirsCentro = Array.isArray(raw?.direcciones) ? raw.direcciones : null;
+    if (dirsCentro && dirsCentro.length > 0) {
+      // Agrupar por profesional (prestadorId en cada horarioAtencion)
+      const byProf = new Map(); // profId|null -> { profesionalId, direcciones: [ rawDir ] }
+      dirsCentro.forEach((d) => {
+        const det = d?.detalleDireccion || {};
+        const mainId = (typeof (d?.lugarId ?? det?.id ?? d?.id) === 'number')
+          ? (d?.lugarId ?? det?.id ?? d?.id)
+          : null;
+        // Ignorar lugares inconsistentes con id 0 o sin identificador real
+        if (!(typeof mainId === 'number' && mainId > 0)) {
+          return;
+        }
+        const composed = [det.calle, det.altura].filter(Boolean).join(' ').trim();
+        const direccion = composed || det.direccion || '';
+        const baseDir = {
+          id: mainId,
+          lugarId: mainId,
+          direccion,
+        };
+        const horarios = Array.isArray(d?.horariosAtencion) ? d.horariosAtencion : [];
+        horarios.forEach((h) => {
+          const pidRaw = (typeof h?.profesionalId === 'number')
+            ? h.profesionalId
+            : (typeof h?.prestadorId === 'number' ? h.prestadorId : null);
+          const profId = (typeof pidRaw === 'number' && pidRaw > 0) ? pidRaw : null;
+          const key = profId == null ? 'null' : String(profId);
+          let entry = byProf.get(key);
+          if (!entry) {
+            entry = { profesionalId: profId, direcciones: [] };
+            byProf.set(key, entry);
+          }
+          // Buscar si ya tenemos esta dirección en este profesional
+          let dirNode = entry.direcciones.find((x) =>
+            (x.id != null && baseDir.id != null && String(x.id) === String(baseDir.id)) ||
+            (x.lugarId != null && baseDir.lugarId != null && String(x.lugarId) === String(baseDir.lugarId)) ||
+            (x.direccion && baseDir.direccion && String(x.direccion).trim().toLowerCase() === String(baseDir.direccion).trim().toLowerCase())
+          );
+          if (!dirNode) {
+            dirNode = { ...baseDir, horariosAtencion: [] };
+            entry.direcciones.push(dirNode);
+          }
+          dirNode.horariosAtencion.push(h);
+        });
+      });
+
+      const result = Array.from(byProf.values()).map((p) => {
+        const dirsNorm = p.direcciones.map((rawDir) =>
+          normalizeAgendaLugar({
+            id: rawDir.id,
+            lugarId: rawDir.lugarId,
+            direccion: rawDir.direccion,
+            horariosAtencion: rawDir.horariosAtencion,
+          })
+        );
+        return {
+          profesionalId: p.profesionalId,
+          nombreCompleto: '',
+          direcciones: dirsNorm,
+        };
+      });
+      return result;
+    }
+    return [];
   } catch (_) {
     return [];
   }

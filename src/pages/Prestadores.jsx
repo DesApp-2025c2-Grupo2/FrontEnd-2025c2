@@ -383,9 +383,53 @@ function Prestadores() {
       // Refrescar cache local inmediatamente
       setPrestadoresConAgenda((prev) => {
         if (!actualizado || !actualizado.id) return prev;
-        // Usar las direcciones actualizadas; si querés, luego se completarán horarios vía efecto de agendas
+        // Usar las direcciones actualizadas; los horarios se completan abajo con un refresh puntual
         return { ...prev, [actualizado.id]: { ...actualizado, lugaresAtencion: actualizado.lugaresAtencion || [] } };
       });
+      // Refrescar agendas del profesional editado para no depender de un F5
+      if (actualizado && actualizado.id && actualizado.tipo !== 'Centro Médico') {
+        try {
+          const ags = await agendasService.getByProfesional(actualizado.id);
+          const listaAgendas = Array.isArray(ags) ? ags : [];
+          const canonDir = (s) => {
+            return String(s || '')
+              .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+              .replace(/\s+/g, ' ')
+              .replace(/\b(s\/?n|s\/?d)\b/gi, '')
+              .replace(/[,.;\-–—]+$/g, '')
+              .trim()
+              .toLowerCase();
+          };
+          const byId = new Map(
+            listaAgendas
+              .filter(l => typeof l?.id === 'number')
+              .map(l => [l.id, l])
+          );
+          const byDir = new Map(
+            listaAgendas.map(l => [canonDir(l.direccion), l])
+          );
+          const baseDirecciones = Array.isArray(actualizado.lugaresAtencion) ? actualizado.lugaresAtencion : [];
+          const lugaresConHorarios = baseDirecciones.map((l) => {
+            const lid = (typeof l?.id === 'number') ? l.id : null;
+            const match =
+              (lid != null ? byId.get(lid) : null) ||
+              byDir.get(canonDir(l?.direccion));
+            if (match) {
+              const horarios = Array.isArray(match.horarios)
+                ? match.horarios
+                : (Array.isArray(match.horariosAtencion) ? match.horariosAtencion : []);
+              return { ...l, horarios };
+            }
+            return l;
+          });
+          setPrestadoresConAgenda((prev) => ({
+            ...prev,
+            [actualizado.id]: { ...actualizado, lugaresAtencion: lugaresConHorarios }
+          }));
+        } catch (_) {
+          // si falla el refresh puntual, el efecto general de agendas se encargará luego
+        }
+      }
       // Resaltar y hacer scroll al editado
       if (actualizado && actualizado.id) {
         setHighlightId(actualizado.id);

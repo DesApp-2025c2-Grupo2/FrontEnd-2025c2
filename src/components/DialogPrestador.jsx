@@ -36,6 +36,7 @@ import {
 import { selectEspecialidades } from "../store/especialidadesSlice";
 import { selectPrestadores } from "../store/prestadoresSlice";
 import ContactInfoEditor from "./ContactInfoEditor";
+import * as agendasService from "../services/agendasService";
 
 const diasSemana = [
   "Lunes",
@@ -234,6 +235,119 @@ export default function DialogPrestador({
       setNewEmail("");
     }
   }, [abierto, valorInicial]);
+
+  // Para Centros: intentar enriquecer lugares con horarios desde /Agenda/getByCentro
+  useEffect(() => {
+    let cancelado = false;
+    async function cargarHorariosCentro() {
+      if (!abierto) return;
+      if (form.tipo !== "Centro Médico") return;
+      if (!form.id) return;
+      const tieneHorarios = Array.isArray(form.lugaresAtencion)
+        ? form.lugaresAtencion.some(
+            (l) => Array.isArray(l?.horarios) && l.horarios.length > 0
+          )
+        : false;
+      if (tieneHorarios) return;
+      try {
+        let arr = await agendasService.getByCentro(form.id);
+        if (!Array.isArray(arr) || arr.length === 0) return;
+        const canonDir = (s) =>
+          String(s || "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/\s+/g, " ")
+            .replace(/\b(s\/?n|s\/?d)\b/gi, "")
+            .replace(/[,.;\-–—]+$/g, "")
+            .trim()
+            .toLowerCase();
+        const lugaresAgregados = [];
+        const keyMap = new Map();
+        const addHorario = (lugarId, dir, horario) => {
+          const key =
+            typeof lugarId === "number" && lugarId > 0
+              ? `id:${lugarId}`
+              : `dir:${canonDir(dir)}`;
+          let idx = keyMap.get(key);
+          if (idx === undefined) {
+            idx = lugaresAgregados.length;
+            keyMap.set(key, idx);
+            lugaresAgregados.push({
+              id: typeof lugarId === "number" && lugarId > 0 ? lugarId : null,
+              direccion: dir,
+              horarios: [],
+            });
+          }
+          const lista = lugaresAgregados[idx].horarios;
+          const horariosSrc = Array.isArray(horario?.horarios)
+            ? horario.horarios
+            : Array.isArray(horario?.horariosAtencion)
+            ? horario.horariosAtencion
+            : [horario];
+          horariosSrc.forEach((h) => {
+            lista.push(h);
+          });
+        };
+        (Array.isArray(arr) ? arr : []).forEach((p) => {
+          const dirs = Array.isArray(p?.direcciones) ? p.direcciones : [];
+          dirs.forEach((l) => {
+            const dir = String(l?.direccion || "").trim();
+            const lid =
+              typeof l?.id === "number"
+                ? l.id
+                : typeof l?.lugarId === "number"
+                ? l.lugarId
+                : null;
+            const horarios = Array.isArray(l?.horarios)
+              ? l.horarios
+              : Array.isArray(l?.horariosAtencion)
+              ? l.horariosAtencion
+              : [];
+            horarios.forEach((h) => addHorario(lid, dir, h));
+          });
+        });
+        const baseDirecciones = Array.isArray(form.lugaresAtencion)
+          ? form.lugaresAtencion
+          : [];
+        if (baseDirecciones.length === 0) return;
+        const byId = new Map(
+          lugaresAgregados
+            .filter((l) => typeof l?.id === "number")
+            .map((l) => [l.id, l])
+        );
+        const byDir = new Map(
+          lugaresAgregados.map((l) => [canonDir(l.direccion), l])
+        );
+        const lugaresConHorarios = baseDirecciones.map((l) => {
+          const lid = typeof l?.id === "number" ? l.id : null;
+          const match =
+            (lid != null ? byId.get(lid) : null) ||
+            byDir.get(canonDir(l?.direccion));
+          if (match) {
+            const horarios = Array.isArray(match.horarios)
+              ? match.horarios
+              : Array.isArray(match.horariosAtencion)
+              ? match.horariosAtencion
+              : [];
+            return { ...l, horarios };
+          }
+          return l;
+        });
+        if (!cancelado) {
+          setForm((prev) => ({
+            ...prev,
+            lugaresAtencion: lugaresConHorarios,
+          }));
+        }
+      } catch {
+        // silencio: si falla, simplemente no mostramos horarios en este diálogo
+      }
+    }
+    cargarHorariosCentro();
+    return () => {
+      cancelado = true;
+    };
+  }, [abierto, form.id, form.tipo]);
 
   // Detectar conflictos de horarios dentro de cada lugar Y entre lugares diferentes
   useEffect(() => {
@@ -1049,16 +1163,109 @@ export default function DialogPrestador({
                       </Grid>
                     </Grid>
 
-                    {!soloDirecciones && (
-                      <>
-                        <Divider sx={{ my: 2 }} />
-                        {/* Horarios del lugar - se oculta si soloDirecciones es true */}
-                        <Typography variant="body2" color="text.secondary">
-                          Los horarios ahora se gestionan desde el modal
-                          dedicado.
-                        </Typography>
-                      </>
-                    )}
+                    {(() => {
+                      const parseDias = (d) => {
+                        if (Array.isArray(d)) return d;
+                        if (typeof d === "string") {
+                          return d
+                            .split(/[,/]/)
+                            .map((s) => s.trim())
+                            .filter(Boolean);
+                        }
+                        return [];
+                      };
+                      const canon = (d) => {
+                        const t = String(d || "").trim().toLowerCase();
+                        if (!t) return "";
+                        if (t === "miercoles") return "Miércoles";
+                        if (t === "sabado") return "Sábado";
+                        const map = {
+                          lunes: "Lunes",
+                          martes: "Martes",
+                          miércoles: "Miércoles",
+                          jueves: "Jueves",
+                          viernes: "Viernes",
+                          sábado: "Sábado",
+                          domingo: "Domingo",
+                        };
+                        return map[t] || (t.charAt(0).toUpperCase() + t.slice(1));
+                      };
+                      const horariosSrc = Array.isArray(lugar.horarios)
+                        ? lugar.horarios
+                        : Array.isArray(lugar.horariosAtencion)
+                        ? lugar.horariosAtencion
+                        : [];
+                      if (!Array.isArray(horariosSrc) || horariosSrc.length === 0)
+                        return null;
+                      return (
+                        <Box sx={{ mt: 2 }}>
+                          <Divider sx={{ mb: 1.5 }} />
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 600, mb: 1 }}
+                            color="text.secondary"
+                          >
+                            Horarios de atención (solo lectura)
+                          </Typography>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 0.75,
+                            }}
+                          >
+                            {horariosSrc.map((h, hIdx) => {
+                              const diasLinea = parseDias(
+                                h.dias || h.diasDeLaSemana
+                              )
+                                .map(canon)
+                                .filter(Boolean)
+                                .join(", ");
+                              const inicio = h.horaInicio || h.desde || "";
+                              const fin = h.horaFin || h.hasta || "";
+                              const rango = [inicio, fin]
+                                .filter(Boolean)
+                                .join(" - ");
+                              if (!diasLinea && !rango) return null;
+                              return (
+                                <Box
+                                  key={hIdx}
+                                  sx={{
+                                    p: 1,
+                                    borderRadius: 1,
+                                    backgroundColor: "#f3f4ff",
+                                    border: "1px solid #e0e7ff",
+                                  }}
+                                >
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 600,
+                                      color: "primary.main",
+                                    }}
+                                  >
+                                    {diasLinea}
+                                  </Typography>
+                                  <Typography variant="body2">
+                                    {rango}
+                                  </Typography>
+                                </Box>
+                              );
+                            })}
+                          </Box>
+                          {!soloDirecciones && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ mt: 1, display: "block" }}
+                            >
+                              Los horarios se editan desde el modal dedicado de
+                              horarios.
+                            </Typography>
+                          )}
+                        </Box>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               ))}
