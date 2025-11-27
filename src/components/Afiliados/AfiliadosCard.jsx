@@ -37,7 +37,8 @@ export default function AfiliadosCard({
   onAddFamiliar = () => {},
   onEditFamiliar = () => {},
   onViewFamiliar = () => {},
-  onDeleteFamiliar = () => {},
+  onSetBajaFamiliar = () => {},
+  onSetAltaFamiliar = () => {},
   getParentescoColor = () => "#757575",
   getPlanColor = () => "#757575",
   parentescos = [],
@@ -73,7 +74,13 @@ export default function AfiliadosCard({
           : "white",
       }}
     >
-      <Box sx={{ display: "flex",  flexDirection: { xs: "column", md: "row" }, alignItems: { xs: "stretch", md: "center" }}}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          alignItems: { xs: "stretch", md: "center" },
+        }}
+      >
         <Box sx={{ display: "flex", alignItems: "center", mr: 2 }}>
           <PersonIcon sx={{ fontSize: 40, color: "#1976d2" }} />
         </Box>
@@ -214,7 +221,7 @@ export default function AfiliadosCard({
             ml: { xs: 0, md: 3 },
             mt: { xs: 2, md: 0 },
             minWidth: { xs: "100%", md: 140 },
-            width: { xs: "100%", md: "auto" }
+            width: { xs: "100%", md: "auto" },
           }}
         >
           <Button
@@ -301,7 +308,8 @@ export default function AfiliadosCard({
                   afiliado={afiliado}
                   onEdit={() => onEditFamiliar(familiar)}
                   onView={() => onViewFamiliar(familiar)}
-                  onDelete={() => onDeleteFamiliar(familiar)}
+                  onSetBaja={() => onSetBajaFamiliar(familiar)}
+                  onSetAlta={() => onSetAltaFamiliar(familiar)}
                   getParentescoColor={getParentescoColor}
                   getParentescoNombre={getParentescoNombre}
                 />
