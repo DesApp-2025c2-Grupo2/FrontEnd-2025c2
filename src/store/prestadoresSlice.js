@@ -281,9 +281,15 @@ export const selectPrestadoresFiltrados = (searchTerm) => (state) => {
         const centro = selectPrestadores(state).find(p => p.id === prestador.integraCentroMedicoId);
         return centro ? centro.nombreCompleto.toLowerCase().includes(searchLower) : false;
       })() ||
+      // Especialidades del prestador
       prestador.especialidades.some(esp => esp.nombre.toLowerCase().includes(searchLower)) ||
+      // Dirección del lugar
       prestador.lugaresAtencion.some(lugar => 
         lugar.direccion.toLowerCase().includes(searchLower)
+      ) ||
+      // Código postal del lugar (como texto)
+      prestador.lugaresAtencion.some(lugar => 
+        String(lugar.codigoPostal ?? '').toLowerCase().includes(searchLower)
       );
     
     // Si se detectó un día, también filtrar por día de atención
