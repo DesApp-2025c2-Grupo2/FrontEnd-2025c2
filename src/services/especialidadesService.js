@@ -1,7 +1,6 @@
-// Servicio para Especialidades consumiendo backend
-import WebAPI from './config/WebAPI';
+import WebAPI from "./config/WebAPI";
 
-const ENDPOINT = '/Especialidad';
+const ENDPOINT = "/Especialidad";
 
 export async function getAll() {
   const res = await WebAPI.Instance().get(`${ENDPOINT}/all`);
@@ -9,13 +8,16 @@ export async function getAll() {
 }
 
 export async function create(especialidad) {
-  const res = await WebAPI.Instance().post(`${ENDPOINT}/save`, especialidad);
+  const { id: _, ...body } = especialidad;
+  const res = await WebAPI.Instance().post(`${ENDPOINT}/save?id=0`, body);
   return res.data;
 }
 
-export async function update(partial) {
-  // El backend expone POST /Especialidad/save para crear/actualizar
-  const res = await WebAPI.Instance().post(`${ENDPOINT}/save`, partial);
+export async function update(especialidad) {
+  const id = especialidad.id ?? 0;
+  const { id: _, ...body } = especialidad;
+
+  const res = await WebAPI.Instance().post(`${ENDPOINT}/save?id=${id}`, body);
   return res.data;
 }
 

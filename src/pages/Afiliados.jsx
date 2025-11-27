@@ -1323,8 +1323,8 @@ export default function Afiliados() {
           setOpenAltaDialog(false);
         }}
       />
-      // Reemplaza los diálogos existentes de familiares con esta versión
-      actualizada:
+      {/*Reemplaza los diálogos existentes de familiares con esta versión
+      actualizada:*/}
       <BajaDialog
         open={openBajaFamiliarDialog}
         afiliado={familiarParaBaja}
