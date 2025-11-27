@@ -331,6 +331,7 @@ export default function DialogPrestador({
           piso: "",
           departamento: "",
           provinciaCiudad: "",
+          codigoPostal: "",
           horarios: [],
         },
       ],
@@ -548,6 +549,11 @@ export default function DialogPrestador({
               ? Number(h.especialidadId)
               : null,
           }));
+        const codigoPostalStr = String(l.codigoPostal ?? '').trim();
+        const codigoPostal =
+          codigoPostalStr && /^\d+$/.test(codigoPostalStr)
+            ? parseInt(codigoPostalStr, 10)
+            : undefined;
         return {
           id: l.id,
           direccion: (l.direccion || `${String(l.calle || '').trim()} ${String(l.altura || '').trim()}`).trim(),
@@ -556,6 +562,7 @@ export default function DialogPrestador({
           piso: (l.piso ?? '').trim(),
           departamento: (l.departamento ?? '').trim(),
           provinciaCiudad: (l.provinciaCiudad ?? '').trim(),
+          ...(codigoPostal !== undefined ? { codigoPostal } : {}),
           horarios: horariosLimpios,
         };
       })
@@ -1028,6 +1035,16 @@ export default function DialogPrestador({
                           onChange={(e) => actualizarLugarAtencion(lugarIndex, "provinciaCiudad", e.target.value)}
                           fullWidth
                           placeholder="CABA / Buenos Aires ..."
+                        />
+                      </Grid>
+                      <Grid item xs={12} sm={3}>
+                        <TextField
+                          label="Código Postal"
+                          value={lugar.codigoPostal || ""}
+                          onChange={(e) => actualizarLugarAtencion(lugarIndex, "codigoPostal", e.target.value)}
+                          fullWidth
+                          placeholder="Ej: 1708"
+                          inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
                         />
                       </Grid>
                     </Grid>

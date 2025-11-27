@@ -291,13 +291,25 @@ function toBackendPayload(prestador, options = {}) {
       const piso = typeof l?.piso === 'string' ? l.piso : '';
       const departamento = typeof l?.departamento === 'string' ? l.departamento : '';
       const provinciaCiudad = typeof l?.provinciaCiudad === 'string' ? l.provinciaCiudad : '';
+      const codigoPostalRaw = l?.codigoPostal;
+      let codigoPostal = undefined;
+      if (typeof codigoPostalRaw === 'number' && Number.isInteger(codigoPostalRaw)) {
+        codigoPostal = codigoPostalRaw;
+      } else if (typeof codigoPostalRaw === 'string') {
+        const trimmed = codigoPostalRaw.trim();
+        if (/^\d+$/.test(trimmed)) {
+          codigoPostal = parseInt(trimmed, 10);
+        }
+      }
       return {
         id: (typeof l?.id === 'number') ? l.id : 0,
         calle: String(calle || '').trim(),
         altura: String(altura || '').trim(),
         piso: String(piso || '').trim(),
         departamento: String(departamento || '').trim(),
-        provinciaCiudad: String(provinciaCiudad || '').trim()
+        provinciaCiudad: String(provinciaCiudad || '').trim(),
+        // Nuevo campo requerido por backend: entero codigoPostal
+        ...(codigoPostal !== undefined ? { codigoPostal } : {}),
       };
     }).filter(Boolean).filter((d) => {
       const key = `${(d.calle || '').toLowerCase()}|${(d.altura || '').toLowerCase()}`;
@@ -388,6 +400,10 @@ function normalizeFromBackend(p, idToNombre) {
       const alturaRaw = typeof l?.altura === 'string' ? l.altura.trim() : '';
       const alturaEsSN = /^(s\/?n|s\/?d)$/i.test(alturaRaw);
       const direccion = l?.direccion || (calle ? (alturaRaw && !alturaEsSN ? `${calle} ${alturaRaw}` : calle) : '');
+      const cpRaw = l?.codigoPostal;
+      const codigoPostal = (typeof cpRaw === 'number' && Number.isInteger(cpRaw))
+        ? cpRaw
+        : (typeof cpRaw === 'string' && /^\d+$/.test(cpRaw.trim()) ? parseInt(cpRaw.trim(), 10) : undefined);
       return {
         id: l?.id ?? null,
         direccion,
@@ -396,6 +412,7 @@ function normalizeFromBackend(p, idToNombre) {
         piso: l?.piso ?? null,
         departamento: l?.departamento ?? null,
         provinciaCiudad: l?.provinciaCiudad || undefined,
+        ...(codigoPostal !== undefined ? { codigoPostal } : {}),
         horarios: buildHorarios(l),
       };
     });
@@ -408,6 +425,10 @@ function normalizeFromBackend(p, idToNombre) {
       const alturaRaw = typeof d?.altura === 'string' ? d.altura.trim() : '';
       const alturaEsSN = /^(s\/?n|s\/?d)$/i.test(alturaRaw);
       const direccion = calle ? (alturaRaw && !alturaEsSN ? `${calle} ${alturaRaw}` : calle) : '';
+      const cpRaw = d?.codigoPostal;
+      const codigoPostal = (typeof cpRaw === 'number' && Number.isInteger(cpRaw))
+        ? cpRaw
+        : (typeof cpRaw === 'string' && /^\d+$/.test(cpRaw.trim()) ? parseInt(cpRaw.trim(), 10) : undefined);
       return {
         id: d?.id || null,
         direccion,
@@ -416,6 +437,7 @@ function normalizeFromBackend(p, idToNombre) {
         piso: d?.piso ?? null,
         departamento: d?.departamento ?? null,
         provinciaCiudad: d?.provinciaCiudad || undefined,
+        ...(codigoPostal !== undefined ? { codigoPostal } : {}),
         horarios: buildHorarios(d),
       };
     });
