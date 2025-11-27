@@ -1,11 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import {
-  Box,
-  Typography,
-  Alert,
-  Snackbar
-} from '@mui/material';
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Box, Typography, Alert, Snackbar } from "@mui/material";
 import {
   generarReporte,
   exportarReporte,
@@ -18,19 +13,18 @@ import {
   selectLoading,
   selectError,
   selectGenerandoReporte,
-  selectExportandoReporte
-} from '../store/reportesSlice';
-import { selectEspecialidades } from '../store/especialidadesSlice';
-import { cargarEspecialidades } from '../store/especialidadesSlice';
-import { fetchAfiliados } from '../store/afiliadosSlice';
-import SelectorReporte from '../components/Reportes/SelectorReporte';
-import HistorialReportes from '../components/Reportes/HistorialReportes';
-import PageHeader from '../components/Ui/PageHeader.jsx';
-
+  selectExportandoReporte,
+} from "../store/reportesSlice";
+import { selectEspecialidades } from "../store/especialidadesSlice";
+import { cargarEspecialidades } from "../store/especialidadesSlice";
+import { fetchAfiliados } from "../store/afiliadosSlice";
+import SelectorReporte from "../components/Reportes/SelectorReporte";
+import HistorialReportes from "../components/Reportes/HistorialReportes";
+import PageHeader from "../components/Ui/PageHeader.jsx";
 
 function ConsultasReportes() {
   const dispatch = useDispatch();
-  
+
   // Selectores de Redux
   const tiposReportes = useSelector(selectTiposReportes);
   const reporteSeleccionado = useSelector(selectReporteSeleccionado);
@@ -41,24 +35,24 @@ function ConsultasReportes() {
   const exportandoReporte = useSelector(selectExportandoReporte);
   const especialidades = useSelector(selectEspecialidades);
   const afiliados = useSelector((state) => state.afiliados.lista) || [];
-  
+
   // Estado local
   const [reporteExportando, setReporteExportando] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarMessage, setSnackbarMessage] = useState("");
 
   // Cargar datos iniciales
   useEffect(() => {
     // Limpiar sessionStorage antiguo si existe
     try {
-      const oldStorage = sessionStorage.getItem('mock_reportes_v1');
+      const oldStorage = sessionStorage.getItem("mock_reportes_v1");
       if (oldStorage) {
-        sessionStorage.removeItem('mock_reportes_v1');
+        sessionStorage.removeItem("mock_reportes_v1");
       }
     } catch (e) {
       // Ignorar errores de sessionStorage
     }
-    
+
     dispatch(cargarHistorialReportes());
     dispatch(cargarEspecialidades());
     dispatch(fetchAfiliados());
@@ -81,7 +75,11 @@ function ConsultasReportes() {
   const handleGenerarReporte = async (datos) => {
     try {
       await dispatch(generarReporte(datos)).unwrap();
-      setSnackbarMessage('Reporte generado exitosamente');
+
+      // actualizar historial real desde el backend
+      dispatch(cargarHistorialReportes());
+
+      setSnackbarMessage("Reporte generado exitosamente");
       setSnackbarOpen(true);
     } catch (error) {
       // El error se maneja en el useEffect anterior
@@ -92,7 +90,7 @@ function ConsultasReportes() {
     try {
       setReporteExportando(datos.reporteId);
       await dispatch(exportarReporte(datos)).unwrap();
-      setSnackbarMessage('Reporte exportado exitosamente');
+      setSnackbarMessage("Reporte exportado exitosamente");
       setSnackbarOpen(true);
     } catch (error) {
       // El error se maneja en el useEffect anterior
@@ -108,7 +106,10 @@ function ConsultasReportes() {
   return (
     <>
       {/* Header */}
-      <PageHeader title="Consultas y Reportes" subtitle="Análisis y estadísticas del sistema" />
+      <PageHeader
+        title="Consultas y Reportes"
+        subtitle="Análisis y estadísticas del sistema"
+      />
 
       {/* Selector de Reportes */}
       <SelectorReporte
@@ -137,12 +138,12 @@ function ConsultasReportes() {
         open={snackbarOpen}
         autoHideDuration={4000}
         onClose={handleCloseSnackbar}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
+        <Alert
+          onClose={handleCloseSnackbar}
           severity={error ? "error" : "success"}
-          sx={{ width: '100%' }}
+          sx={{ width: "100%" }}
         >
           {snackbarMessage}
         </Alert>
