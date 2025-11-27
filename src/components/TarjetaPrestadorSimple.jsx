@@ -120,9 +120,14 @@ export default function TarjetaPrestadorSimple({
           "background-color 200ms ease, box-shadow 200ms ease, border-color 200ms ease",
       }}
     >
-      <Box sx={{ display: "flex", alignItems: "flex-start" }}>
-        <Box sx={{ display: "flex", alignItems: "center", mr: 2 }}>
-          <PersonIcon sx={{ fontSize: 40, color: "#1976d2" }} />
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: "column", md: "row" }, 
+        alignItems: { xs: "stretch", md: "flex-start" },
+        gap: { xs: 2, md: 0 } 
+        }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+          <PersonIcon sx={{ fontSize: 40, color: '#1976d2' }} />
         </Box>
 
         <Box
@@ -200,16 +205,15 @@ export default function TarjetaPrestadorSimple({
           {/* Lugares de atención movidos fuera de la fila principal para ocupar ancho completo */}
         </Box>
 
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 1.5,
-            ml: 3,
-            minWidth: 140,
-          }}
-        >
-          <Button
+        <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 1.5,ml: { xs: 0, md: 3 },
+            mt: { xs: 2, md: 0 },
+            minWidth: { xs: "100%", md: 140 },
+            width: { xs: "100%", md: "auto" }
+            }}>
+            <Button
             size="small"
             startIcon={<VisibilityIcon />}
             onClick={(e) => {
