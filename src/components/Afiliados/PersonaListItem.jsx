@@ -37,8 +37,10 @@ export default function PersonaListItem({
       <Box
         sx={{
           display: "flex",
-          alignItems: "center",
+          flexDirection: { xs: "column", sm: "row" },
+          alignItems: { xs: "flex-start", sm: "center" },
           justifyContent: "space-between",
+          gap: { xs: 2, sm: 0 }
         }}
       >
         <Box sx={{ flexGrow: 1 }}>
@@ -91,7 +93,7 @@ export default function PersonaListItem({
             })}
           </Box>
         </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
+        <Box sx={{ display: "flex", gap: 1, flexDirection:  "row", justifyContent: { xs: "center", sm: "flex-end" }, mt: { xs: 2, sm: 0 },  width: { xs: "100%", sm: "auto" } }}>
           <IconButton
             size="small"
             onClick={() => onView()}
@@ -99,7 +101,7 @@ export default function PersonaListItem({
           >
             <VisibilityIcon />
           </IconButton>
-          <IconButton size="small" onClick={() => onEdit()}>
+          <IconButton size="small" onClick={() => onEdit() }>
             <EditIcon />
           </IconButton>
           <IconButton

@@ -101,7 +101,11 @@ export default function SelectorReporte({
         </Alert>
       )}
 
-      <Stack direction="row" spacing={2} alignItems="flex-end">
+      <Stack 
+        direction={{ xs: "column", sm: "row" }} 
+        spacing={2} 
+        alignItems={{ xs: "stretch", sm: "flex-end" }}
+        >
         <FormControl sx={{ minWidth: 300, flexGrow: 1 }}>
           <InputLabel sx={{ fontWeight: 600, color: "#374151" }}>
             Tipo de Reporte
@@ -136,6 +140,7 @@ export default function SelectorReporte({
 
         <Button
           variant="contained"
+          fullWidth
           startIcon={
             generandoReporte ? (
               <CircularProgress size={16} color="inherit" />
@@ -155,13 +160,14 @@ export default function SelectorReporte({
             "&:hover": {
               backgroundColor: "#4b5563",
             },
-            "&:disabled": {
-              backgroundColor: "#d1d5db",
-              color: "#9ca3af",
+            '&:disabled': {
+              backgroundColor: '#d1d5db',
+              color: '#9ca3af'
             },
+            width: { xs: "100%", sm: "auto" }
           }}
         >
-          {generandoReporte ? "GENERANDO..." : "GENERAR"}
+          {generandoReporte ? 'GENERANDO...' : 'GENERAR'}
         </Button>
       </Stack>
 
