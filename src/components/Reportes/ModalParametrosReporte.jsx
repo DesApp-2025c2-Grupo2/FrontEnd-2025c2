@@ -33,7 +33,6 @@ export default function ModalParametrosReporte({
   const [parametros, setParametros] = useState({});
   const [errors, setErrors] = useState({});
 
-  // Resetear parámetros cuando cambia el tipo de reporte o se abre/cierra
   useEffect(() => {
     if (open) {
       switch (tipoReporte) {
@@ -115,7 +114,6 @@ export default function ModalParametrosReporte({
     return titulos[tipoReporte] || "Parámetros del Reporte";
   };
 
-  // SOLO estos 2 reportes deben pedir parámetros
   const tieneParametros = () => {
     return (
       tipoReporte === "alta-afiliados-periodo" ||
@@ -141,7 +139,12 @@ export default function ModalParametrosReporte({
           </Typography>
         </DialogTitle>
 
-        <DialogContent dividers>
+        <DialogContent
+          dividers
+          sx={{
+            px: { xs: 1.5, sm: 3 },
+          }}
+        >
           {!tieneParametros() ? (
             <Alert severity="info" sx={{ mt: 1 }}>
               Este reporte no requiere parámetros. Se generará con toda la

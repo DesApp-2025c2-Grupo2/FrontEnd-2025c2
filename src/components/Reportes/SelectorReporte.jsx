@@ -24,9 +24,7 @@ export default function SelectorReporte({
   afiliados = [],
   onSeleccionarReporte,
   onGenerarReporte,
-  onExportarReporte,
   generandoReporte = false,
-  exportandoReporte = false,
   error = null,
 }) {
   const [modalAbierto, setModalAbierto] = useState(false);
@@ -44,7 +42,6 @@ export default function SelectorReporte({
   const handleGenerar = () => {
     if (!reporteSeleccionado) return;
 
-    // Solo estos 2 reportes requieren parámetros
     const necesitaParametros =
       reporteSeleccionado === "alta-afiliados-periodo" ||
       reporteSeleccionado === "alta-prestadores-periodo";
@@ -65,16 +62,6 @@ export default function SelectorReporte({
       tipoReporte: reporteSeleccionado,
       parametros: parametros || {},
     });
-  };
-
-  const handleExportar = () => {
-    if (reporteSeleccionado) {
-      onExportarReporte({
-        reporteId: reporteSeleccionado,
-        formato: "PDF",
-        tipoReporte: reporteSeleccionado,
-      });
-    }
   };
 
   const tipoSeleccionado = tiposReportesFiltrados.find(
@@ -101,12 +88,12 @@ export default function SelectorReporte({
         </Alert>
       )}
 
-      <Stack 
-        direction={{ xs: "column", sm: "row" }} 
-        spacing={2} 
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
         alignItems={{ xs: "stretch", sm: "flex-end" }}
-        >
-        <FormControl sx={{ minWidth: 300, flexGrow: 1 }}>
+      >
+        <FormControl sx={{ minWidth: { xs: "100%", sm: 300 }, flexGrow: 1 }}>
           <InputLabel sx={{ fontWeight: 600, color: "#374151" }}>
             Tipo de Reporte
           </InputLabel>
@@ -122,14 +109,35 @@ export default function SelectorReporte({
                 },
               },
             }}
+            MenuProps={{
+              PaperProps: {
+                sx: { maxHeight: 320 },
+              },
+            }}
           >
             {tiposReportesFiltrados.map((tipo) => (
-              <MenuItem key={tipo.id} value={tipo.id}>
+              <MenuItem
+                key={tipo.id}
+                value={tipo.id}
+                sx={{
+                  whiteSpace: "normal",
+                  py: 1.2,
+                  alignItems: "flex-start",
+                }}
+              >
                 <Box>
                   <Typography variant="body1" sx={{ fontWeight: 600 }}>
                     {tipo.nombre}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{
+                      whiteSpace: "normal",
+                      display: "block",
+                      lineHeight: 1.2,
+                    }}
+                  >
                     {tipo.descripcion}
                   </Typography>
                 </Box>
@@ -160,14 +168,14 @@ export default function SelectorReporte({
             "&:hover": {
               backgroundColor: "#4b5563",
             },
-            '&:disabled': {
-              backgroundColor: '#d1d5db',
-              color: '#9ca3af'
+            "&:disabled": {
+              backgroundColor: "#d1d5db",
+              color: "#9ca3af",
             },
-            width: { xs: "100%", sm: "auto" }
+            width: { xs: "100%", sm: "auto" },
           }}
         >
-          {generandoReporte ? 'GENERANDO...' : 'GENERAR'}
+          {generandoReporte ? "GENERANDO..." : "GENERAR"}
         </Button>
       </Stack>
 

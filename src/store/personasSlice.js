@@ -59,6 +59,17 @@ export const createMember = createAsyncThunk(
   }
 );
 
+export const togglePersonaStatus = createAsyncThunk(
+  "personas/toggleStatus",
+  async ({ id, activo, fecha }, { rejectWithValue }) => {
+    try {
+      return await personasService.toggleStatus(id, activo, fecha);
+    } catch (err) {
+      return rejectWithValue(err.response?.data || err.message);
+    }
+  }
+);
+
 const personasSlice = createSlice({
   name: "personas",
   initialState: {
@@ -162,6 +173,17 @@ const personasSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
         state.operationSuccess = false;
+      })
+      .addCase(togglePersonaStatus.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(togglePersonaStatus.fulfilled, (state, action) => {
+        state.loading = false;
+        state.currentPersona = action.payload;
+      })
+      .addCase(togglePersonaStatus.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
       });
   },
 });

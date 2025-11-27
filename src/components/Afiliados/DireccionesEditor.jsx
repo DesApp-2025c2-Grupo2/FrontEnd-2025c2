@@ -22,6 +22,7 @@ export default function DireccionesEditor({
     piso: "",
     departamento: "",
     provinciaCiudad: "",
+    codigoPostal: "",
   },
   onNewValueChange = () => {},
   onAdd = () => {},
@@ -90,6 +91,7 @@ export default function DireccionesEditor({
       piso: true,
       departamento: true,
       provinciaCiudad: true,
+      codigoPostal: true,
     };
     setTouched(allTouched);
 
@@ -106,6 +108,7 @@ export default function DireccionesEditor({
         piso: newValue.piso?.trim() || "",
         departamento: newValue.departamento?.trim() || "",
         provinciaCiudad: newValue.provinciaCiudad.trim(),
+        codigoPostal: newValue.codigoPostal?.trim() || "",
       });
 
       // Limpiar el formulario
@@ -115,6 +118,7 @@ export default function DireccionesEditor({
         piso: "",
         departamento: "",
         provinciaCiudad: "",
+        codigoPostal: "",
       });
 
       // Limpiar errores y touched
@@ -211,6 +215,21 @@ export default function DireccionesEditor({
               helperText={errors.provinciaCiudad}
             />
           </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Código Postal"
+              value={newValue.codigoPostal || ""}
+              onChange={(e) =>
+                onNewValueChange({ ...newValue, codigoPostal: e.target.value })
+              }
+              onKeyDown={handleKeyDown}
+              disabled={disabled}
+              required
+              inputProps={{ maxLength: 10 }} // Limitar longitud máxima
+            />
+          </Grid>
           <Grid item xs={12}>
             <Button
               variant="outlined"
@@ -259,6 +278,7 @@ export default function DireccionesEditor({
                     direccion.piso && `Piso ${direccion.piso}`,
                     direccion.departamento && `Dpto ${direccion.departamento}`,
                     direccion.provinciaCiudad,
+                    direccion.codigoPostal && `CP ${direccion.codigoPostal}`,
                   ]
                     .filter(Boolean)
                     .join(" - ")}

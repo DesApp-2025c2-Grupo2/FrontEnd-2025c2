@@ -64,4 +64,11 @@ export const personasService = {
     );
     return response.data;
   },
+
+  toggleStatus: async (personaId, activo, fecha) => {
+    let query = `/Personas/toggleStatus/${personaId}?activo=${activo}`;
+    if (fecha) query += `&fecha=${fecha}`;
+    const res = await WebAPI.Instance().patch(query);
+    return res.data;
+  },
 };

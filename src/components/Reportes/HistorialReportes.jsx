@@ -132,20 +132,36 @@ export default function HistorialReportes({
                       direction="row"
                       spacing={2}
                       alignItems="center"
-                      sx={{ mb: 1 }}
+                      sx={{
+                        mb: 1,
+                        flexWrap: "wrap",
+                        columnGap: 1,
+                        rowGap: 0.5,
+                      }}
                     >
                       <Typography
                         variant="body1"
-                        sx={{ fontWeight: 600, color: "#1f2937" }}
+                        sx={{
+                          fontWeight: 600,
+                          color: "#1f2937",
+                          maxWidth: "100%",
+                          wordBreak: "break-word",
+                          flex: "1 1 auto",
+                          minWidth: 0,
+                        }}
                       >
                         {reporte.nombre}
                       </Typography>
+
                       <Chip
                         icon={getEstadoIcon(reporte.estado)}
                         label={getEstadoTexto(reporte.estado)}
                         size="small"
                         color={getEstadoColor(reporte.estado)}
                         variant="outlined"
+                        sx={{
+                          flexShrink: 0,
+                        }}
                       />
                     </Stack>
                   }

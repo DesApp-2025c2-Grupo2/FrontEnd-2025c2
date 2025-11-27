@@ -26,9 +26,16 @@ import { cargarPlanes, selectPlanes } from "../store/planesSlice";
 import { personasService } from "../services/personasService";
 
 import { parentescos } from "../utilidades/parentesco";
-import { updatePersona, createMember } from "../store/personasSlice";
+import {
+  updatePersona,
+  createMember,
+  togglePersonaStatus,
+} from "../store/personasSlice";
 
-const hoyISO = () => new Date().toISOString().split("T")[0];
+const hoyISO = () => {
+  const aux = new Date().getTime() - 3 * 60 * 60 * 1000;
+  return new Date(aux).toISOString();
+};
 
 // Reemplazar la función actual por esta versión que compara fecha y hora completa
 const estaActivo = (alta, baja) => {
@@ -116,6 +123,12 @@ export default function Afiliados() {
   const [openAltaDialog, setOpenAltaDialog] = useState(false);
   const [afiliadoParaBaja, setAfiliadoParaBaja] = useState(null);
   const [afiliadoParaAlta, setAfiliadoParaAlta] = useState(null);
+
+  // Alta / Baja — Familiares
+  const [openBajaFamiliarDialog, setOpenBajaFamiliarDialog] = useState(false);
+  const [openAltaFamiliarDialog, setOpenAltaFamiliarDialog] = useState(false);
+  const [familiarParaBaja, setFamiliarParaBaja] = useState(null);
+  const [familiarParaAlta, setFamiliarParaAlta] = useState(null);
 
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -448,7 +461,7 @@ export default function Afiliados() {
         afiliadoId: selectedAfiliado.id,
         alta: formFamiliar.alta
           ? new Date(formFamiliar.alta).toISOString()
-          : new Date().toISOString(),
+          : hoyISO(),
         baja: formFamiliar.baja
           ? new Date(formFamiliar.baja).toISOString()
           : null,
@@ -527,6 +540,114 @@ export default function Afiliados() {
     }
   }, [formFamiliar, selectedAfiliado, isEditingFamiliar, dispatch]);
 
+  // ---------- Alta / Baja de Familiares ----------
+
+  const handleSetBajaFamiliar = useCallback((familiar) => {
+    setFamiliarParaBaja(familiar);
+    setOpenBajaFamiliarDialog(true);
+  }, []);
+
+  const handleSetAltaFamiliar = useCallback((familiar) => {
+    setFamiliarParaAlta(familiar);
+    setOpenAltaFamiliarDialog(true);
+  }, []);
+
+  const handleProgramarAltaFamiliar = useCallback(
+    async (persona, fecha) => {
+      try {
+        await dispatch(
+          togglePersonaStatus({
+            id: persona.id,
+            activo: true,
+            fecha: fecha,
+          })
+        ).unwrap();
+        showSnackbar("Alta programada para el familiar");
+        await dispatch(fetchAfiliados()).unwrap();
+      } catch (err) {
+        showSnackbar("Error al programar alta del familiar", "error");
+      }
+    },
+    [dispatch]
+  );
+
+  const handleSetBajaFamiliarFinal = useCallback(
+    async (persona, fecha) => {
+      try {
+        await dispatch(
+          togglePersonaStatus({
+            id: persona.id,
+            activo: false,
+            fecha: fecha,
+          })
+        ).unwrap();
+        showSnackbar("Baja registrada para el familiar");
+        await dispatch(fetchAfiliados()).unwrap();
+      } catch (err) {
+        showSnackbar("Error al dar de baja al familiar", "error");
+      }
+    },
+    [dispatch]
+  );
+
+  const handleCancelarAltaProgramadaFamiliar = useCallback(
+    async (persona) => {
+      try {
+        const hoy = new Date().getTime() - 3 * 60 * 60 * 1000;
+        await dispatch(
+          togglePersonaStatus({
+            id: persona.id,
+            activo: true,
+            fecha: new Date(hoy).toISOString(),
+          })
+        ).unwrap();
+        showSnackbar("Alta programada cancelada para el familiar");
+        await dispatch(fetchAfiliados()).unwrap();
+      } catch (err) {
+        showSnackbar("Error al cancelar alta programada del familiar", "error");
+      }
+    },
+    [dispatch]
+  );
+
+  const handleCancelBajaFamiliar = useCallback(
+    async (persona) => {
+      try {
+        await dispatch(
+          togglePersonaStatus({
+            id: persona.id,
+            activo: false,
+            fecha: null,
+          })
+        ).unwrap();
+        showSnackbar("Baja cancelada para el familiar");
+        await dispatch(fetchAfiliados()).unwrap();
+      } catch (err) {
+        showSnackbar("Error al cancelar baja del familiar", "error");
+      }
+    },
+    [dispatch]
+  );
+
+  const handleReactivarInmediatamenteFamiliar = useCallback(
+    async (persona, fechaAlta) => {
+      try {
+        await dispatch(
+          togglePersonaStatus({
+            id: persona.id,
+            activo: true,
+            fecha: fechaAlta || new Date().toISOString(),
+          })
+        ).unwrap();
+        showSnackbar("Familiar reactivado inmediatamente");
+        await dispatch(fetchAfiliados()).unwrap();
+      } catch (err) {
+        showSnackbar("Error al reactivar familiar", "error");
+      }
+    },
+    [dispatch]
+  );
+
   // ---------- Construcción payload afiliado ----------
   const buildAfiliadoPayload = useCallback(
     (afiliadoToEdit = null) => {
@@ -544,12 +665,6 @@ export default function Afiliados() {
         return obj;
       };
 
-      // Asegurar que el tipo de documento sea numérico
-      const tipoDocumentoNumerico =
-        formAfiliado.tipoDocumento && !isNaN(formAfiliado.tipoDocumento)
-          ? formAfiliado.tipoDocumento
-          : 1; // Default a DNI si no es numérico
-
       // 1. Construir el TITULAR desde formAfiliado
       const titularPayload = {
         id: formAfiliado.id ?? 0,
@@ -562,7 +677,7 @@ export default function Afiliados() {
         parentesco: 0, // Titular
         alta: formAfiliado.alta
           ? new Date(formAfiliado.alta).toISOString().split("T")[0]
-          : new Date().toISOString().split("T")[0],
+          : hoyISO(),
         baja: null,
         documentacion: {
           tipoDocumento: parseInt(formAfiliado.tipoDocumento) || 1,
@@ -614,7 +729,8 @@ export default function Afiliados() {
                   altura: "",
                   piso: "",
                   departamento: "",
-                  provinciaCiudad: "Bs As",
+                  provinciaCiudad: "",
+                  codigoPostal: "",
                 }
               : {
                   id: d.id ?? 0,
@@ -622,7 +738,8 @@ export default function Afiliados() {
                   altura: d.altura || "",
                   piso: d.piso || "",
                   departamento: d.departamento || "",
-                  provinciaCiudad: d.provinciaCiudad || "Bs As",
+                  provinciaCiudad: d.provinciaCiudad || "",
+                  codigoPostal: d.codigoPostal || "",
                 }
           ),
 
@@ -645,9 +762,7 @@ export default function Afiliados() {
             ? new Date(i.fechaNacimiento).toISOString()
             : new Date().toISOString(),
           parentesco: parseInt(i.parentesco) || 2,
-          alta: i.alta
-            ? new Date(i.alta).toISOString()
-            : new Date().toISOString(),
+          alta: i.alta ? new Date(i.alta).toISOString() : hoyISO(),
           baja: i.baja ? new Date(i.baja).toISOString() : null,
           documentacion:
             i.tipoDocumento || i.numeroDocumento
@@ -691,6 +806,7 @@ export default function Afiliados() {
                     piso: "",
                     departamento: "",
                     provinciaCiudad: "",
+                    codigoPostal: "",
                   }
                 : {
                     id: d.id ?? 0,
@@ -699,6 +815,7 @@ export default function Afiliados() {
                     piso: d.piso || "",
                     departamento: d.departamento || "",
                     provinciaCiudad: d.provinciaCiudad || "",
+                    codigoPostal: d.codigoPostal || "",
                   }
             ),
 
@@ -800,7 +917,7 @@ export default function Afiliados() {
           parentesco: 0, // Titular
           alta: formAfiliado.alta
             ? new Date(formAfiliado.alta).toISOString().split("T")[0]
-            : new Date().toISOString().split("T")[0],
+            : hoyISO(),
           baja: null,
           documentacion: {
             tipoDocumento: parseInt(formAfiliado.tipoDocumento) || 1,
@@ -846,7 +963,8 @@ export default function Afiliados() {
                     altura: "",
                     piso: "",
                     departamento: "",
-                    provinciaCiudad: "Bs As",
+                    provinciaCiudad: "",
+                    codigoPostal: "",
                   }
                 : {
                     id: d.id ?? 0,
@@ -854,7 +972,8 @@ export default function Afiliados() {
                     altura: d.altura || "",
                     piso: d.piso || "",
                     departamento: d.departamento || "",
-                    provinciaCiudad: d.provinciaCiudad || "Bs As",
+                    provinciaCiudad: d.provinciaCiudad || "",
+                    codigoPostal: d.codigoPostal || "",
                   }
             ),
           situacionesTerapeuticas: convertirSituacionesAObjeto(
@@ -1021,7 +1140,7 @@ export default function Afiliados() {
   // colores memoizados
   const getParentescoColor = useCallback(
     (parentescoId) =>
-      ({ 1: "#1976d2", 2: "#2e7d32", 3: "#f57c00", 4: "#757575" }[
+      ({ 0: "#1976d2", 1: "#2e7d32", 2: "#f57c00", 3: "#757575" }[
         parentescoId
       ] || "#757575"),
     []
@@ -1029,7 +1148,7 @@ export default function Afiliados() {
 
   const getPlanColor = useCallback(
     (planMedicoId) =>
-      ({ 1: "#cd7f32", 2: "#c0c0c0", 3: "#ffd700", 4: "#e5e4e2" }[
+      ({ 0: "#cd7f32", 1: "#c0c0c0", 2: "#ffd700", 3: "#e5e4e2" }[
         planMedicoId
       ] || "#757575"),
     []
@@ -1038,7 +1157,6 @@ export default function Afiliados() {
   return (
     <>
       <PageHeader title="Afiliados" subtitle="Gestión de afiliados" />
-
       <AdvancedSearchBar
         afiliados={afiliados}
         personas={[]}
@@ -1048,7 +1166,6 @@ export default function Afiliados() {
         tieneBajaProgramada={tieneBajaProgramada}
         tieneAltaProgramada={tieneAltaProgramada}
       />
-
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         {filteredAfiliados.map((afiliado) => {
           const titular = getTitularDelAfiliado(afiliado);
@@ -1080,6 +1197,8 @@ export default function Afiliados() {
               onAddFamiliar={() => handleAddFamiliar(afiliado)}
               onViewFamiliar={(fam) => handleViewFamiliar(afiliado, fam)}
               onEditFamiliar={(fam) => handleEditFamiliar(afiliado, fam)}
+              onSetBajaFamiliar={(fam) => handleSetBajaFamiliar(fam)}
+              onSetAltaFamiliar={(fam) => handleSetAltaFamiliar(fam)}
               //onDeleteFamiliar={(fam) => handleDeleteFamiliar(afiliado, fam)}
               getParentescoColor={getParentescoColor}
               getPlanColor={getPlanColor}
@@ -1088,7 +1207,6 @@ export default function Afiliados() {
           );
         })}
       </Box>
-
       {filteredAfiliados.length === 0 && (
         <Box sx={{ textAlign: "center", py: 8 }}>
           <PersonIcon sx={{ fontSize: 64, color: "#ccc", mb: 2 }} />
@@ -1097,7 +1215,6 @@ export default function Afiliados() {
           </Typography>
         </Box>
       )}
-
       <Fab
         color="primary"
         sx={{ position: "fixed", bottom: 16, right: 16 }}
@@ -1105,7 +1222,6 @@ export default function Afiliados() {
       >
         <AddIcon />
       </Fab>
-
       <AfiliadoFormDialog
         open={openDialog}
         selectedAfiliado={selectedAfiliado}
@@ -1140,7 +1256,6 @@ export default function Afiliados() {
           setFormAfiliado((prev) => ({ ...prev, [field]: value }))
         }
       />
-
       <PersonaFormDialog
         open={openFamiliarDialog}
         selectedAfiliado={selectedAfiliado}
@@ -1178,7 +1293,6 @@ export default function Afiliados() {
           setFormFamiliar((prev) => ({ ...prev, [field]: value }))
         }
       />
-
       <BajaDialog
         open={openBajaDialog}
         afiliado={afiliadoParaBaja}
@@ -1192,7 +1306,6 @@ export default function Afiliados() {
           setOpenBajaDialog(false);
         }}
       />
-
       <AltaDialog
         open={openAltaDialog}
         afiliado={afiliadoParaAlta}
@@ -1210,7 +1323,38 @@ export default function Afiliados() {
           setOpenAltaDialog(false);
         }}
       />
-
+      // Reemplaza los diálogos existentes de familiares con esta versión
+      actualizada:
+      <BajaDialog
+        open={openBajaFamiliarDialog}
+        afiliado={familiarParaBaja}
+        onClose={() => setOpenBajaFamiliarDialog(false)}
+        onConfirm={(p, fecha) => {
+          handleSetBajaFamiliarFinal(p, fecha);
+          setOpenBajaFamiliarDialog(false);
+        }}
+        onCancelBaja={(p) => {
+          handleCancelBajaFamiliar(p);
+          setOpenBajaFamiliarDialog(false);
+        }}
+      />
+      <AltaDialog
+        open={openAltaFamiliarDialog}
+        afiliado={familiarParaAlta}
+        onClose={() => setOpenAltaFamiliarDialog(false)}
+        onConfirm={(p, fecha) => {
+          handleProgramarAltaFamiliar(p, fecha);
+          setOpenAltaFamiliarDialog(false);
+        }}
+        onCancelAlta={(p) => {
+          handleCancelarAltaProgramadaFamiliar(p);
+          setOpenAltaFamiliarDialog(false);
+        }}
+        onReactivar={(p, fecha) => {
+          handleReactivarInmediatamenteFamiliar(p, fecha);
+          setOpenAltaFamiliarDialog(false);
+        }}
+      />
       <Snackbar
         open={snackbar.open}
         autoHideDuration={4000}
