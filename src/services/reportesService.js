@@ -2,9 +2,7 @@ import WebAPI from './config/WebAPI';
 
 const ENDPOINT = '/Reportes';
 
-// ============================================================================
-// MAPEO DE TIPOS DE REPORTE (Frontend string -> Backend int)
-// ============================================================================
+
 
 const TIPO_REPORTE_MAP = {
   'alta-afiliados-periodo': 1,
@@ -22,13 +20,9 @@ const TIPO_REPORTE_REVERSE_MAP = {
   5: 'prestadores-sin-agendas'
 };
 
-// ============================================================================
-// FUNCIONES DE NORMALIZACIÓN (Backend -> Frontend)
-// ============================================================================
+
 
 /**
- * Normaliza un reporte desde el formato del backend al formato del frontend
- * Backend devuelve: { HexaID, TipoReporte (string), Parametros (string JSON), FechaGeneracion }
  * @param {Object} reporteBackend - Reporte en formato del backend
  * @returns {Object} Reporte normalizado para el frontend
  */
@@ -73,9 +67,6 @@ function normalizeReporte(reporteBackend) {
 }
 
 /**
- * Normaliza el payload para enviar al backend según ReporteRequest
- * Backend espera: { TipoReporte (int), FechaDesde (DateTime?), FechaHasta (DateTime?), AfiliadoId (int?) }
- * Solo se envían los campos que corresponden según el tipo de reporte
  * 
  * @param {Object} datosFrontend - Datos en formato del frontend
  * @param {string} datosFrontend.tipoReporte - ID del tipo de reporte (string)
@@ -110,9 +101,7 @@ function toBackendPayload(datosFrontend) {
   return payload;
 }
 
-// ============================================================================
-// FUNCIONES MOCK (Fallback)
-// ============================================================================
+
 
 const STORAGE_KEY = 'mock_reportes_v2';
 const USE_MOCK = true;
@@ -137,19 +126,8 @@ function delay(ms = 1000) {
   return new Promise((res) => setTimeout(res, ms));
 }
 
-// ============================================================================
-// SERVICIOS PRINCIPALES
-// ============================================================================
 
 /**
- * Obtener todos los reportes generados alguna vez
- * Endpoint: GET /Reportes/all
- * 
- * FLUJO:
- * - El backend consulta la BD y devuelve todos los reportes guardados
- * - Cada reporte incluye: HexaID, TipoReporte (string), Parametros (string JSON), FechaGeneracion
- * - Los reportes deben estar ordenados por fechaGeneracion DESC (más reciente primero)
- * 
  * @returns {Promise<Array>} Array de reportes normalizados ordenados por fecha (más reciente primero)
  */
 export async function getHistorialReportes() {
@@ -169,19 +147,7 @@ export async function getHistorialReportes() {
   }
 }
 
-/**
- * Generar un nuevo reporte
- * Endpoint: POST /Reportes/generate
- * 
- * FLUJO:
- * 1. Frontend envía ReporteRequest al backend: { TipoReporte (int), FechaDesde?, FechaHasta?, AfiliadoId? }
- * 2. Backend recibe los parámetros y ejecuta la consulta SQL con esos filtros
- * 3. Backend genera los datos del reporte según los parámetros recibidos
- * 4. Backend GUARDA en BD: TipoReporte, Parametros (JSON string), FechaGeneracion
- * 5. Backend devuelve el reporte guardado con su HexaID generado
- * 
- * Body: ReporteRequest { TipoReporte: int, FechaDesde?: DateTime, FechaHasta?: DateTime, AfiliadoId?: int }
- * 
+/** 
  * @param {Object} datos - Datos del reporte a generar
  * @param {string} datos.tipoReporte - ID del tipo de reporte (string del frontend)
  * @param {Object} datos.parametros - Parámetros para filtrar la consulta SQL en el backend
@@ -231,8 +197,6 @@ export async function generarReporte(datos) {
 }
 
 /**
- * Obtener un reporte específico del historial
- * Endpoint: GET /Reportes/retrieve/{id}
  * 
  * @param {number} id - HexaID del reporte a obtener
  * @returns {Promise<Object>} Reporte normalizado
@@ -255,11 +219,6 @@ export async function obtenerReporte(id) {
 }
 
 /**
- * Exportar un reporte (PDF, Excel, etc.)
- * Nota: Esta función puede no estar disponible en el backend actual
- * Endpoint esperado: POST /Reportes/exportar
- * Body esperado: { reporteId: number, formato: string }
- * 
  * @param {Object} datos - Datos de exportación
  * @param {number} datos.reporteId - ID del reporte a exportar
  * @param {string} datos.formato - Formato de exportación ('PDF', 'Excel', etc.)
@@ -305,8 +264,6 @@ export async function exportarReporte(datos) {
 }
 
 /**
- * Eliminar un reporte
- * Endpoint esperado: DELETE /Reportes/{id}
  * 
  * @param {number} id - ID del reporte a eliminar
  * @returns {Promise<Object>} { id: number }
@@ -326,8 +283,6 @@ export async function eliminarReporte(id) {
 }
 
 /**
- * Obtener tipos de reportes disponibles
- * Endpoint esperado: GET /Reportes/tipos
  * 
  * @returns {Promise<Array>} Array de tipos de reportes disponibles
  */
@@ -366,6 +321,35 @@ export async function obtenerTiposReportes() {
         descripcion: 'Listado de prestadores que no tienen agendas configuradas'
       }
     ];
+  }
+}
+
+/**
+ * @param {string|number} id - HexaID del reporte a descargar
+ * @param {string} nombreArchivo - Nombre sugerido para el archivo (opcional)
+ * @returns {Promise<void>}
+ */
+export async function descargarReportePDF(id, nombreArchivo = 'reporte.pdf') {
+  try {
+    const response = await WebAPI.Instance().get(`${ENDPOINT}/download/${id}`, {
+      responseType: 'blob'
+    });
+
+    // Crear URL del blob y disparar descarga
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = nombreArchivo;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error al descargar reporte PDF:', error);
+    throw new Error(error.response?.data?.message || 'No se pudo descargar el reporte');
   }
 }
 
