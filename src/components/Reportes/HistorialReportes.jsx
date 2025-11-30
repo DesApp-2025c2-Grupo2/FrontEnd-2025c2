@@ -14,10 +14,11 @@ import {
 } from "@mui/material";
 import {
   BarChart as BarChartIcon,
-  Download as DownloadIcon,
+  Visibility as VisibilityIcon,
   AccessTime as AccessTimeIcon,
   CheckCircle as CheckCircleIcon,
   Schedule as ScheduleIcon,
+  FileOpen as FileOpenIcon,
 } from "@mui/icons-material";
 
 export default function HistorialReportes({
@@ -210,11 +211,11 @@ export default function HistorialReportes({
                 />
 
                 <Box sx={{ ml: 2 }}>
-                  <Tooltip title="Exportar reporte">
+                  <Tooltip title="Regenerar reporte">
                     <Button
                       variant="contained"
                       size="small"
-                      startIcon={<DownloadIcon />}
+                      startIcon={<FileOpenIcon />}
                       onClick={() =>
                         onExportarReporte({
                           reporteId: reporte.id,
@@ -241,7 +242,43 @@ export default function HistorialReportes({
                         },
                       }}
                     >
-                      EXPORTAR
+                      REGENERAR
+                    </Button>
+                  </Tooltip>
+                </Box>
+                <Box sx={{ ml: 2 }}>
+                  <Tooltip title="Regenerar reporte">
+                    <Button
+                      variant="contained"
+                      size="small"
+                      startIcon={<VisibilityIcon />}
+                      onClick={() =>
+                        onExportarReporte({
+                          reporteId: reporte.id,
+                          formato: "PDF",
+                          tipoReporte: reporte.tipoReporte,
+                        })
+                      }
+                      disabled={
+                        exportandoReporte && reporteExportando === reporte.id
+                      }
+                      sx={{
+                        backgroundColor: "#2563eb",
+                        color: "white",
+                        fontWeight: 700,
+                        textTransform: "none",
+                        px: 2,
+                        py: 1,
+                        "&:hover": {
+                          backgroundColor: "#1d4ed8",
+                        },
+                        "&:disabled": {
+                          backgroundColor: "#d1d5db",
+                          color: "#9ca3af",
+                        },
+                      }}
+                    >
+                      VISUALIZAR
                     </Button>
                   </Tooltip>
                 </Box>
