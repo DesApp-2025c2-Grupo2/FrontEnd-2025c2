@@ -88,22 +88,6 @@ export default function PersonaFormDialog({
     return String(e);
   };
 
-  const direccionToString = (d) => {
-    if (!d) return "";
-    if (typeof d === "object") {
-      const altura = d.altura ? ` ${d.altura}` : "";
-      const piso = d.piso ? `, Piso ${d.piso}` : "";
-      const dept = d.departamento ? `, Dept ${d.departamento}` : "";
-      const provincia = d.provinciaCiudad ?? "";
-      const codigoPostal = d.codigoPostal ?? "";
-      const calle = d.calle ?? "";
-      return `${calle}${altura}${piso}${dept}${
-        provincia ? `, ${provincia}` : ""
-      }${codigoPostal}`.trim();
-    }
-    return String(d);
-  };
-
   // Función para obtener el valor inicial del formulario
   const getInitialFormData = () => {
     if (selectedFamiliar && isEditing) {
@@ -136,6 +120,7 @@ export default function PersonaFormDialog({
         piso: "",
         departamento: "",
         provinciaCiudad: "",
+        codigoPostal: "",
       });
 
       // VALORES POR DEFECTO - NUEVO
@@ -210,7 +195,6 @@ export default function PersonaFormDialog({
       onEditEmailsChange([]);
     }
 
-    // Direcciones: normalizar objetos con keys comunes o aceptar strings
     const rawDirecciones =
       selectedFamiliar.direcciones ?? selectedFamiliar.Direcciones ?? [];
     if (Array.isArray(rawDirecciones)) {
@@ -224,6 +208,7 @@ export default function PersonaFormDialog({
               piso: "",
               departamento: "",
               provinciaCiudad: "",
+              codigoPostal: "",
             };
           }
           return {
@@ -234,6 +219,8 @@ export default function PersonaFormDialog({
               d.departamento ?? d.Departamento ?? d.depto ?? d.apartment ?? "",
             provinciaCiudad:
               d.provinciaCiudad ?? d.ProvinciaCiudad ?? d.city ?? "",
+            codigoPostal:
+              d.codigoPostal ?? d.CodigoPostal ?? d.postalCode ?? "",
           };
         })
         .filter(Boolean);
@@ -284,6 +271,7 @@ export default function PersonaFormDialog({
       piso: "",
       departamento: "",
       provinciaCiudad: "",
+      codigoPostal: "",
     });
   };
 
@@ -508,20 +496,20 @@ export default function PersonaFormDialog({
                   ml: 2,
                 }}
               >
-                {(selectedFamiliar.direcciones || []).length > 0 ? (
-                  (selectedFamiliar.direcciones || []).map(
-                    (direccion, index) => (
-                      <Box
-                        key={index}
-                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                      >
-                        <HomeIcon sx={{ fontSize: 16, color: "#1976d2" }} />
-                        <Typography variant="body2">
-                          {direccionToString(direccion)}
-                        </Typography>
-                      </Box>
-                    )
-                  )
+                {(selectedFamiliar.direcciones || []).length ? (
+                  (selectedFamiliar.direcciones || []).map((d, i) => (
+                    <Box
+                      key={i}
+                      sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                    >
+                      <HomeIcon sx={{ fontSize: 16, color: "#1976d2" }} />
+                      <Typography variant="body2">
+                        {d.calle} {d.altura}, Piso {d.piso}, Departamento{" "}
+                        {d.departamento}, {d.provinciaCiudad}, CP:
+                        {d.codigoPostal}
+                      </Typography>
+                    </Box>
+                  ))
                 ) : (
                   <Typography variant="body2" color="textSecondary">
                     No hay direcciones registradas

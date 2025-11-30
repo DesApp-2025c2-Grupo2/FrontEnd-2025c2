@@ -372,7 +372,7 @@ export default function AfiliadoFormDialog({
                         >
                           <HomeIcon sx={{ fontSize: 16, color: "#1976d2" }} />
                           <Typography variant="body2">
-                            {d.calle}, {d.altura}, Piso {d.piso}, Departamento{" "}
+                            {d.calle} {d.altura}, Piso {d.piso}, Departamento{" "}
                             {d.departamento}, {d.provinciaCiudad}, CP:{d.codigoPostal}
                           </Typography>
                         </Box>

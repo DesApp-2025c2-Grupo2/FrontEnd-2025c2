@@ -218,6 +218,7 @@ export default function Afiliados() {
       fechaNacimiento: titular?.fechaNacimiento ?? "",
       planMedicoId: afiliado.planMedicoId ?? 1,
       alta: afiliado.alta ?? hoyISO(),
+      baja: afiliado.baja ?? null,
       telefonos: titular?.telefonos ?? [],
       emails: titular?.emails ?? [],
       // Mantener direcciones como objetos, no como strings
@@ -259,6 +260,7 @@ export default function Afiliados() {
       fechaNacimiento: titular?.fechaNacimiento ?? "",
       planMedicoId: afiliado.planMedicoId ?? 1,
       alta: afiliado.alta ?? hoyISO(),
+      baja: afiliado.baja ?? null,
       telefonos: titular?.telefonos ?? [],
       emails: titular?.emails ?? [],
       // Mantener direcciones como objetos, no como strings
@@ -353,10 +355,6 @@ export default function Afiliados() {
         return obj;
       };
 
-      // ----------------------------
-      // NORMALIZACIÓN PUNTUAL 100% COMPATIBLE CON TU BACKEND
-      // ----------------------------
-
       // Telefónos: soporta objeto {id, numero}, string, MUI {value}
       const telefonosNormalizados = (formFamiliar.telefonos || [])
         .map((t) => {
@@ -428,6 +426,7 @@ export default function Afiliados() {
               piso: "",
               departamento: "",
               provinciaCiudad: "",
+              codigoPostal: "",
             };
           }
 
@@ -440,6 +439,7 @@ export default function Afiliados() {
               piso: d.piso ?? "",
               departamento: d.departamento ?? "",
               provinciaCiudad: d.provinciaCiudad ?? "",
+              codigoPostal: d.codigoPostal ?? "",
             };
           }
 
@@ -459,12 +459,8 @@ export default function Afiliados() {
           : new Date().toISOString(),
         parentesco: parseInt(formFamiliar.parentesco) || 2,
         afiliadoId: selectedAfiliado.id,
-        alta: formFamiliar.alta
-          ? new Date(formFamiliar.alta).toISOString()
-          : hoyISO(),
-        baja: formFamiliar.baja
-          ? new Date(formFamiliar.baja).toISOString()
-          : null,
+        alta: formFamiliar.alta ? formFamiliar.alta : hoyISO(),
+        baja: formFamiliar.baja ? formFamiliar.baja : null,
 
         documentacion: {
           id: formFamiliar.documentacion?.id || 0,
@@ -676,9 +672,11 @@ export default function Afiliados() {
           : new Date().toISOString().split("T")[0],
         parentesco: 0, // Titular
         alta: formAfiliado.alta
-          ? new Date(formAfiliado.alta).toISOString().split("T")[0]
+          ? formAfiliado.alta
           : hoyISO(),
-        baja: null,
+        baja: formAfiliado.baja
+          ? formAfiliado.baja
+          : null,
         documentacion: {
           tipoDocumento: parseInt(formAfiliado.tipoDocumento) || 1,
           numero: formAfiliado.numeroDocumento?.toString() || "",
@@ -836,9 +834,11 @@ export default function Afiliados() {
           : undefined,
         planMedicoId: parseInt(formAfiliado.planMedicoId) || 1,
         alta: formAfiliado.alta
-          ? new Date(formAfiliado.alta).toISOString()
+          ? formAfiliado.alta
           : new Date().toISOString(),
-        baja: null,
+        baja: formAfiliado.baja
+          ? formAfiliado.baja
+          : null,
         titularID: 0,
         integrantes: [titularPayload, ...otrosIntegrantesPayload],
       };
@@ -895,9 +895,11 @@ export default function Afiliados() {
           numeroAfiliado: selectedAfiliado.numeroAfiliado,
           planMedicoId: parseInt(formAfiliado.planMedicoId) || 1,
           alta: formAfiliado.alta
-            ? new Date(formAfiliado.alta).toISOString().split("T")[0]
+            ? formAfiliado.alta
             : new Date().toISOString().split("T")[0],
-          baja: null,
+          baja: formAfiliado.baja
+            ? formAfiliado.baja
+            : null,
           // Mantener el TitularID original
           titularID: selectedAfiliado.titularID || selectedAfiliado.titularId,
         };
@@ -915,10 +917,8 @@ export default function Afiliados() {
             ? new Date(formAfiliado.fechaNacimiento).toISOString().split("T")[0]
             : new Date().toISOString().split("T")[0],
           parentesco: 0, // Titular
-          alta: formAfiliado.alta
-            ? new Date(formAfiliado.alta).toISOString().split("T")[0]
-            : hoyISO(),
-          baja: null,
+          alta: formAfiliado.alta ? formAfiliado.alta : hoyISO(),
+          baja: formAfiliado.baja ? formAfiliado.baja : null,
           documentacion: {
             tipoDocumento: parseInt(formAfiliado.tipoDocumento) || 1,
             numero: formAfiliado.numeroDocumento?.toString() || "",
@@ -988,10 +988,9 @@ export default function Afiliados() {
           dispatch(
             updateAfiliado({
               id: selectedAfiliado.id,
-              payload: afiliadoPayload,
+              payload: { ...afiliadoPayload, integrantes: [titularPayload] },
             })
           ).unwrap(),
-          dispatch(updatePersona(titularPayload)).unwrap(),
         ]);
 
         showSnackbar("Afiliado actualizado correctamente");

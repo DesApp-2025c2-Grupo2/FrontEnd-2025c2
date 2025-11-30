@@ -42,6 +42,8 @@ export default function DireccionesEditor({
         return !value?.trim() ? "La altura es obligatoria" : "";
       case "provinciaCiudad":
         return !value?.trim() ? "La provincia/ciudad es obligatoria" : "";
+      case "codigoPostal":
+        return !value?.trim() ? "El codigo postal es obligatorio" : "";
       default:
         return "";
     }
@@ -56,13 +58,14 @@ export default function DireccionesEditor({
       "provinciaCiudad",
       direccion.provinciaCiudad
     );
+    newErrors.codigoPostal = validateField("codigoPostal", direccion.codigoPostal);
     return newErrors;
   };
 
   // Verificar si el formulario es válido
   const isFormValid = () => {
     const errors = validateForm(newValue);
-    return !errors.calle && !errors.altura && !errors.provinciaCiudad;
+    return !errors.calle && !errors.altura && !errors.provinciaCiudad && !errors.codigoPostal;
   };
 
   // Manejar cambios en los campos
