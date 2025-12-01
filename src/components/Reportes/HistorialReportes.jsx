@@ -216,12 +216,15 @@ export default function HistorialReportes({
                       variant="contained"
                       size="small"
                       startIcon={<FileOpenIcon />}
-                      onClick={() =>
-                        onExportarReporte({
-                          reporteId: reporte.id,
-                          formato: "PDF",
-                          tipoReporte: reporte.tipoReporte,
-                        })
+                      onClick={() => 
+                          window.open(
+                              `${onExportarReporte({
+                                  reporteId: reporte.id,
+                                  formato: "pdf",
+                                  tipoReporte: reporte.tipoReporte
+                              })}`,
+                              "_blank"
+                          )
                       }
                       disabled={
                         exportandoReporte && reporteExportando === reporte.id
@@ -247,17 +250,17 @@ export default function HistorialReportes({
                   </Tooltip>
                 </Box>
                 <Box sx={{ ml: 2 }}>
-                  <Tooltip title="Regenerar reporte">
+                  <Tooltip title="Visualizar reporte">
                     <Button
                       variant="contained"
                       size="small"
                       startIcon={<VisibilityIcon />}
                       onClick={() =>
-                        onExportarReporte({
-                          reporteId: reporte.id,
-                          formato: "PDF",
-                          tipoReporte: reporte.tipoReporte,
-                        })
+                          // Visualizar el mismo reporte generado usando la url del reporte para abrir el pdf en una ventana aparte
+                        window.open(
+                          `${reporte.fileURL}`,
+                          "_blank"
+                        )
                       }
                       disabled={
                         exportandoReporte && reporteExportando === reporte.id

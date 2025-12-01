@@ -52,6 +52,7 @@ function normalizeReporte(reporteBackend) {
     fechaGeneracion: reporteBackend.fechaGeneracion ?? null,
     parametros,
     estado: "generado",
+    fileURL: reporteBackend.fileURL || null,
   };
 }
 
@@ -126,28 +127,6 @@ export async function generarReporte(datos) {
 export async function exportarReporte(datos) {
   const hexaId = datos.reporteId;
   const tipoReporteInt = TIPO_REPORTE_MAP[datos.tipoReporte] || 0;
-
-  const response = await WebAPI.Instance().get(
-    `${ENDPOINT}/retrieve?hexaId=${hexaId}&tipo=${tipoReporteInt}`,
-    { responseType: "blob" }
-  );
-
-  const filename = `reporte_${hexaId}.pdf`;
-
-  const blob = new Blob([response.data], { type: "application/pdf" });
-  const url = window.URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  link.remove();
-
-  window.URL.revokeObjectURL(url);
-
-  return {
-    id: hexaId,
-    fechaExportacion: new Date().toISOString(),
-    formatoExportacion: "PDF",
-  };
+  const response = await WebAPI.Instance().get(`${ENDPOINT}/regenerate?hexaId=${hexaId}&tipo=${tipoReporteInt}`);
+  return response.data.fileURL || "";
 }
