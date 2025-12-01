@@ -12,6 +12,8 @@ export function mapPrestadorFromBackend(p) {
   return {
     id: p.id,
     nombreCompleto: p.nombreCompleto,
+    // ROL (0 = Centro Médico, 1 = Profesional)
+    rol: p.rol,
 
     // DOCUMENTACIÓN
     documentacion: p.documentacion || null,

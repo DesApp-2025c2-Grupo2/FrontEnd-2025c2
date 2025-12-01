@@ -20,6 +20,16 @@ import {
   ExpandMore as ExpandMoreIcon,
 } from "@mui/icons-material";
 
+const DIAS_SEMANA = [
+  { value: "1", label: "Lunes" },
+  { value: "2", label: "Martes" },
+  { value: "3", label: "Miércoles" },
+  { value: "4", label: "Jueves" },
+  { value: "5", label: "Viernes" },
+  { value: "6", label: "Sábado" },
+  { value: "7", label: "Domingo" },
+];
+
 export default function AdvancedSearchBarPrestadores({
   prestadores = [],
   especialidades = [],
@@ -33,6 +43,7 @@ export default function AdvancedSearchBarPrestadores({
     estado: "todos",
     rol: "todos",
     especialidadId: "todos",
+    dias: [], // array de strings con los días seleccionados ("1".."7")
     orden: "",
   });
 
@@ -44,9 +55,26 @@ export default function AdvancedSearchBarPrestadores({
     let filtered = prestadores.filter((p) => {
       const search = searchTerm.trim().toLowerCase();
 
+      // CP y otras partes de dirección
+      const direccionesText = Array.isArray(p.direcciones)
+        ? p.direcciones
+            .map((d) =>
+              [
+                d.calle,
+                d.altura,
+                d.provinciaCiudad,
+                d.codigoPostal,
+              ]
+                .filter(Boolean)
+                .join(" ")
+            )
+            .join(" ")
+        : "";
+
       const searchFields = [
         p.nombreCompleto?.toLowerCase() || "",
         p.documentacion?.numero?.toLowerCase() || "",
+        String(direccionesText).toLowerCase(),
       ].join(" ");
 
       const matchesSearch = !search || searchFields.includes(search);
@@ -79,16 +107,73 @@ export default function AdvancedSearchBarPrestadores({
           (id) => String(id) === String(filterState.especialidadId)
         );
 
+      // Filtro por día de atención (usa agendas / horarios) - permite varios días
+      let matchesDia = true;
+      if (Array.isArray(filterState.dias) && filterState.dias.length > 0) {
+        const diasSeleccionados = filterState.dias
+          .map((d) => Number(d))
+          .filter((n) => !Number.isNaN(n));
+
+        const agendas = Array.isArray(p.agendas) ? p.agendas : [];
+
+        const tieneDia = agendas.some((ag) => {
+          const horarios = Array.isArray(ag.horarios)
+            ? ag.horarios
+            : Array.isArray(ag.horariosAtencion)
+            ? ag.horariosAtencion
+            : [];
+
+          return horarios.some((h) => {
+            const dias =
+              Array.isArray(h.diasAtencion) && h.diasAtencion.length > 0
+                ? h.diasAtencion
+                : Array.isArray(h.diasDeLaSemana)
+                ? h.diasDeLaSemana
+                : Array.isArray(h.dias)
+                ? h.dias
+                : [];
+
+            return dias.some((d) => {
+              if (d == null) return false;
+              const valor =
+                typeof d === "number"
+                  ? d
+                  : typeof d === "string"
+                  ? Number(d)
+                  : Number(d.dia);
+              if (Number.isNaN(valor)) return false;
+              // alcanza con que coincida al menos un día seleccionado
+              return diasSeleccionados.includes(valor);
+            });
+          });
+        });
+
+        matchesDia = tieneDia;
+      }
+
       return (
         matchesSearch &&
         matchesActiveFilters &&
         matchesEstado &&
         matchesRol &&
-        matchesEspecialidad
+        matchesEspecialidad &&
+        matchesDia
       );
     });
 
-    return filtered; // ✅ FALTABA ESTO
+    // ORDENAMIENTO
+    if (filterState.orden === "nombre-asc" || filterState.orden === "nombre-desc") {
+      const asc = filterState.orden === "nombre-asc";
+      filtered = [...filtered].sort((a, b) => {
+        const na = (a?.nombreCompleto || "").toString().toLowerCase();
+        const nb = (b?.nombreCompleto || "").toString().toLowerCase();
+        if (na < nb) return asc ? -1 : 1;
+        if (na > nb) return asc ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return filtered;
   }, [prestadores, searchTerm, activeFilters, filterState]);
 
   // Notificar cambios
@@ -125,6 +210,7 @@ export default function AdvancedSearchBarPrestadores({
       estado: "todos",
       rol: "todos",
       especialidadId: "todos",
+      dias: [],
       orden: "",
     });
   };
@@ -134,6 +220,7 @@ export default function AdvancedSearchBarPrestadores({
     filterState.estado !== "todos" ||
     filterState.rol !== "todos" ||
     filterState.especialidadId !== "todos" ||
+    (Array.isArray(filterState.dias) && filterState.dias.length > 0) ||
     filterState.orden !== "";
 
   return (
@@ -214,6 +301,37 @@ export default function AdvancedSearchBarPrestadores({
                 {especialidades.map((e) => (
                   <MenuItem key={e.id} value={e.id}>
                     {e.nombre}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            {/* DÍAS DE ATENCIÓN (MÚLTIPLE) */}
+            <FormControl sx={{ minWidth: 220 }}>
+              <InputLabel>Días de atención</InputLabel>
+              <Select
+                multiple
+                value={filterState.dias}
+                label="Días de atención"
+                onChange={(e) =>
+                  setFilterState((s) => ({
+                    ...s,
+                    dias: e.target.value,
+                  }))
+                }
+                renderValue={(selected) => {
+                  if (!Array.isArray(selected) || selected.length === 0)
+                    return "Todos";
+                  return DIAS_SEMANA.filter((d) =>
+                    selected.includes(d.value)
+                  )
+                    .map((d) => d.label)
+                    .join(", ");
+                }}
+              >
+                {DIAS_SEMANA.map((d) => (
+                  <MenuItem key={d.value} value={d.value}>
+                    {d.label}
                   </MenuItem>
                 ))}
               </Select>
@@ -311,6 +429,25 @@ export default function AdvancedSearchBarPrestadores({
               size="small"
             />
           )}
+
+          {Array.isArray(filterState.dias) &&
+            filterState.dias.map((dia) => {
+              const info = DIAS_SEMANA.find((d) => d.value === String(dia));
+              return (
+                <Chip
+                  key={dia}
+                  label={info?.label || `Día ${dia}`}
+                  onDelete={() =>
+                    setFilterState((s) => ({
+                      ...s,
+                      dias: s.dias.filter((x) => x !== dia),
+                    }))
+                  }
+                  variant="outlined"
+                  size="small"
+                />
+              );
+            })}
 
           {filterState.orden && (
             <Chip
