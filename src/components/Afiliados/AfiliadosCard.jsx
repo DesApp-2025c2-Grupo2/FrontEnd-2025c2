@@ -233,7 +233,7 @@ export default function AfiliadosCard({
           >
             Ver
           </Button>
-          <Button
+          {/*<Button
             size="small"
             startIcon={<EditIcon />}
             onClick={() => onEdit(afiliado)}
@@ -241,7 +241,7 @@ export default function AfiliadosCard({
             fullWidth
           >
             Editar
-          </Button>
+          </Button> */}
 
           {/* Lógica corregida para mostrar los botones de alta/baja */}
           {tieneBajaProgramada ? (

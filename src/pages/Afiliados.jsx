@@ -223,13 +223,9 @@ export default function Afiliados() {
       emails: titular?.emails ?? [],
       // Mantener direcciones como objetos, no como strings
       direcciones: titular?.direcciones ?? [],
-      situacionesTerapeuticasIds: Array.isArray(
-        titular?.situacionesTerapeuticas
-      )
-        ? titular.situacionesTerapeuticas.map((s) =>
-            typeof s === "object" ? s : { id: s, nombre: "", fechaFin: null }
-          )
-        : [],
+      situacionesTerapeuticas: convertirSituacionesAObjeto(
+        titular?.situacionesTerapeuticasIds || []
+      ),
     });
 
     const miembros = Array.isArray(afiliado.integrantes)
