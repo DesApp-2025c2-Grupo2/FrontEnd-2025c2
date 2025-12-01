@@ -29,7 +29,6 @@ import {
   Delete as DeleteIcon
 } from '@mui/icons-material';
 import { selectPrestadores } from '../store/prestadoresSlice';
-import * as agendasService from '../services/agendasService';
 
 
 const diasSemana = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];

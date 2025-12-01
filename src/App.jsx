@@ -8,7 +8,6 @@ import PlanesMedicos from "./pages/PlanesMedicos.jsx";
 import Layout from "./layouts/Layout.jsx";
 import ConsultasReportes from "./pages/ConsultasReportes.jsx";
 import SituacionesTerapeuticas from "./pages/SituacionesTerapeuticas.jsx";
-import AgendaCentro from "./pages/AgendaCentro.jsx";
 
 const router = createBrowserRouter([
   {
@@ -22,7 +21,6 @@ const router = createBrowserRouter([
       { path: "consultas-reportes", element: <ConsultasReportes /> },
       { path: "situaciones", element: <SituacionesTerapeuticas /> },
       { path: "planes", element: <PlanesMedicos /> },
-      { path: "agenda-centro/:centroId", element: <AgendaCentro /> },
     ],
   },
 ]);
