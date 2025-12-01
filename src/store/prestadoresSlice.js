@@ -1,321 +1,186 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import * as prestadoresService from '../services/prestadoresService';
-import * as agendasService from '../services/agendasService';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import * as prestadorService from "../services/prestadoresService";
+
+// Async Thunks
+export const fetchPrestadores = createAsyncThunk(
+  "prestadores/fetchAll",
+  async (_, { rejectWithValue }) => {
+    try {
+      return await prestadorService.getAll();
+    } catch (error) {
+      return rejectWithValue(error.message || "Error al obtener prestadores");
+    }
+  }
+);
+
+export const togglePrestadorStatus = createAsyncThunk(
+  "prestadores/toggleStatus",
+  async (id, { rejectWithValue }) => {
+    try {
+      // Idealmente esto devuelve el prestador actualizado
+      return await prestadorService.toggleStatus(id);
+    } catch (error) {
+      return rejectWithValue(
+        error.message || "Error al cambiar estado del prestador"
+      );
+    }
+  }
+);
+
+export const createPrestador = createAsyncThunk(
+  "prestadores/create",
+  async (prestadorData, { rejectWithValue }) => {
+    try {
+      // EL SERVICE SE ENCARGA DEL MAPEADO — NO EL SLICE
+      return await prestadorService.saveNew(prestadorData);
+    } catch (error) {
+      return rejectWithValue(error.message || "Error al crear prestador");
+    }
+  }
+);
+
+export const updatePrestador = createAsyncThunk(
+  "prestadores/update",
+  async (prestadorData, { rejectWithValue }) => {
+    try {
+      return await prestadorService.update(prestadorData);
+    } catch (error) {
+      return rejectWithValue(error.message || "Error al actualizar prestador");
+    }
+  }
+);
+
+export const updateAgendaPrestador = createAsyncThunk(
+  "prestadores/updateAgenda",
+  async (agendaData, { rejectWithValue }) => {
+    try {
+      return await prestadorService.updateAgenda(agendaData);
+    } catch (error) {
+      return rejectWithValue(error.message || "Error al actualizar agenda");
+    }
+  }
+);
 
 const initialState = {
   items: [],
   loading: false,
   error: null,
+  currentPrestador: null,
 };
 
-// Thunks asíncronos
-export const cargarPrestadores = createAsyncThunk(
-  'prestadores/cargar',
-  async (_, { rejectWithValue, getState }) => {
-    try {
-      // Consumir backend con normalización
-      const data = await prestadoresService.getAll();
-      return data;
-    } catch (error) {
-      return rejectWithValue(error.message || 'Error al cargar prestadores');
-    }
-  }
-);
-
-export const crearPrestador = createAsyncThunk(
-  'prestadores/crear',
-  async (prestador, { rejectWithValue, getState }) => {
-    try {
-      const creado = await prestadoresService.create(prestador);
-      return creado;
-    } catch (error) {
-      return rejectWithValue(error.message || 'Error al crear prestador');
-    }
-  }
-);
-
-export const editarPrestador = createAsyncThunk(
-  'prestadores/editar',
-  async (prestador, { rejectWithValue }) => {
-    try {
-      const actualizado = await prestadoresService.update(prestador);
-      return actualizado;
-    } catch (error) {
-      return rejectWithValue(error.message || 'Error al editar prestador');
-    }
-  }
-);
-
-// Actualiza solo datos base e incluye direcciones (sin horarios)
-export const actualizarDireccionesPrestador = createAsyncThunk(
-  'prestadores/actualizarDirecciones',
-  async (prestador, { rejectWithValue }) => {
-    try {
-      const actualizado = await prestadoresService.update(prestador, { includeDirecciones: true });
-      return actualizado;
-    } catch (error) {
-      return rejectWithValue(error.message || 'Error al actualizar direcciones');
-    }
-  }
-);
-
-export const actualizarHorariosPrestador = createAsyncThunk(
-  'prestadores/actualizarHorarios',
-  async ({ id, lugaresAtencion, isCentro = false }, { rejectWithValue }) => {
-    try {
-      const normalizados = await agendasService.updateLugares(id, lugaresAtencion, { isCentro, strategy: 'merge' });
-      return { id, lugaresAtencion: Array.isArray(normalizados) ? normalizados : lugaresAtencion };
-    } catch (error) {
-      return rejectWithValue(error.message || 'Error al actualizar horarios');
-    }
-  }
-);
-
-export const eliminarPrestador = createAsyncThunk(
-  'prestadores/eliminar',
-  async (id, { rejectWithValue }) => {
-    try {
-      await prestadoresService.deleteById(id);
-      return id;
-    } catch (error) {
-      return rejectWithValue(error.message || 'Error al eliminar prestador');
-    }
-  }
-);
-
-export const toggleActivoPrestador = createAsyncThunk(
-  'prestadores/toggleActivo',
-  async ({ id, activo }, { rejectWithValue }) => {
-    try {
-      const result = await prestadoresService.toggleActivo(id, activo);
-      return result;
-    } catch (error) {
-      return rejectWithValue(error.message || 'Error al cambiar estado');
-    }
-  }
-);
-
-const slice = createSlice({
-  name: 'prestadores',
+const prestadoresSlice = createSlice({
+  name: "prestadores",
   initialState,
   reducers: {
-    limpiarError: (state) => {
+    clearError: (state) => {
       state.error = null;
-    }
+    },
+    setCurrentPrestador: (state, action) => {
+      state.currentPrestador = action.payload;
+    },
+    clearPrestadores: (state) => {
+      state.items = [];
+    },
   },
   extraReducers: (builder) => {
     builder
-      // Cargar prestadores
-      .addCase(cargarPrestadores.pending, (state) => {
+      // FETCH
+      .addCase(fetchPrestadores.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(cargarPrestadores.fulfilled, (state, action) => {
+      .addCase(fetchPrestadores.fulfilled, (state, action) => {
         state.loading = false;
-        state.items = Array.isArray(action.payload) ? action.payload : [];
+        state.items = action.payload;
       })
-      .addCase(cargarPrestadores.rejected, (state, action) => {
+      .addCase(fetchPrestadores.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload || 'Error al cargar prestadores';
+        state.error = action.payload;
       })
-      
-      // Crear prestador
-      .addCase(crearPrestador.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(crearPrestador.fulfilled, (state, action) => {
-        state.loading = false;
-        // Cuando el servicio devuelve lista completa tras crear
-        if (Array.isArray(action.payload)) {
-          state.items = action.payload;
-        } else if (action.payload) {
-          state.items.push(action.payload);
-        }
-      })
-      .addCase(crearPrestador.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload || 'No se pudo crear el prestador';
-      })
-      
-      // Editar prestador
-      .addCase(editarPrestador.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(editarPrestador.fulfilled, (state, action) => {
-        state.loading = false;
-        if (Array.isArray(action.payload)) {
-          state.items = action.payload;
-        } else if (action.payload && action.payload.id) {
-          const idx = state.items.findIndex(p => p.id === action.payload.id);
-          if (idx !== -1) {
-            state.items[idx] = action.payload;
+
+      // TOGGLE STATUS
+      .addCase(togglePrestadorStatus.fulfilled, (state, action) => {
+        const prestadorId = action.meta.arg;
+        const payload = action.payload;
+        const index = state.items.findIndex((p) => p.id === prestadorId);
+        if (index === -1) return;
+
+        const actual = state.items[index];
+
+        if (payload && typeof payload === "object") {
+          // Caso ideal: el backend devolvió el prestador actualizado
+          state.items[index] = payload;
+
+          if (state.currentPrestador?.id === payload.id) {
+            state.currentPrestador = payload;
+          }
+        } else {
+          // Fallback: payload es boolean (activo / inactivo)
+          const estaActivo = Boolean(payload);
+          const actualizado = {
+            ...actual,
+            baja: estaActivo ? null : new Date().toISOString().split("T")[0],
+          };
+
+          state.items[index] = actualizado;
+
+          if (state.currentPrestador?.id === actual.id) {
+            state.currentPrestador = actualizado;
           }
         }
       })
-      .addCase(editarPrestador.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload || 'No se pudo actualizar el prestador';
+
+      // CREATE
+      .addCase(createPrestador.fulfilled, (state, action) => {
+        state.items.push(action.payload);
       })
-      
-      // Actualizar direcciones
-      .addCase(actualizarDireccionesPrestador.pending, (state) => {
-        state.loading = true;
-        state.error = null;
+      .addCase(createPrestador.rejected, (state, action) => {
+        state.error = action.payload;
       })
-      .addCase(actualizarDireccionesPrestador.fulfilled, (state, action) => {
-        state.loading = false;
-        if (action.payload && action.payload.id) {
-          const idx = state.items.findIndex(p => p.id === action.payload.id);
-          if (idx !== -1) state.items[idx] = action.payload;
+
+      // UPDATE
+      .addCase(updatePrestador.fulfilled, (state, action) => {
+        const index = state.items.findIndex((p) => p.id === action.payload.id);
+        if (index !== -1) state.items[index] = action.payload;
+
+        if (state.currentPrestador?.id === action.payload.id)
+          state.currentPrestador = action.payload;
+      })
+      .addCase(updatePrestador.rejected, (state, action) => {
+        state.error = action.payload;
+      })
+
+      // UPDATE AGENDA
+      .addCase(updateAgendaPrestador.fulfilled, (state, action) => {
+        const updatedAgenda = action.payload; // { id, horarios }
+
+        // Buscar el prestador que contiene esta agenda
+        const prestador = state.items.find((p) =>
+          p.agendas?.some((a) => a.id === updatedAgenda.id)
+        );
+
+        if (!prestador) return;
+
+        // Reemplazar solo la agenda modificada
+        prestador.agendas = prestador.agendas.map((a) =>
+          a.id === updatedAgenda.id
+            ? { ...a, horarios: updatedAgenda.horarios }
+            : a
+        );
+
+        // También actualizar currentPrestador si está seleccionado
+        if (state.currentPrestador?.id === prestador.id) {
+          state.currentPrestador = { ...prestador };
         }
-      })
-      .addCase(actualizarDireccionesPrestador.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload || 'No se pudieron actualizar las direcciones';
-      })
-      
-      // Actualizar horarios
-      .addCase(actualizarHorariosPrestador.pending, (state) => {
-        state.error = null;
-      })
-      .addCase(actualizarHorariosPrestador.fulfilled, (state, action) => {
-        const { id, lugaresAtencion } = action.payload || {};
-        const idx = state.items.findIndex(p => p.id === id);
-        if (idx !== -1 && Array.isArray(lugaresAtencion)) {
-          state.items[idx].lugaresAtencion = lugaresAtencion;
-        }
-      })
-      .addCase(actualizarHorariosPrestador.rejected, (state, action) => {
-        state.error = action.payload || 'No se pudieron actualizar los horarios';
-      })
-      
-      // Eliminar prestador
-      .addCase(eliminarPrestador.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(eliminarPrestador.fulfilled, (state, action) => {
-        state.loading = false;
-        state.items = state.items.filter(p => p.id !== action.payload);
-      })
-      .addCase(eliminarPrestador.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload || 'No se pudo eliminar el prestador';
-      })
-      
-      // Toggle activo
-      .addCase(toggleActivoPrestador.pending, (state) => {
-        state.error = null;
-      })
-      .addCase(toggleActivoPrestador.fulfilled, (state, action) => {
-        const idx = state.items.findIndex(p => p.id === action.payload.id);
-        if (idx !== -1) {
-          state.items[idx].activo = action.payload.activo;
-        }
-      })
-      .addCase(toggleActivoPrestador.rejected, (state, action) => {
-        state.error = action.payload || 'No se pudo cambiar el estado';
       });
-  }
+  },
 });
 
-export const { limpiarError } = slice.actions;
-
-// Selectores
 export const selectPrestadores = (state) => state.prestadores.items;
 export const selectPrestadoresLoading = (state) => state.prestadores.loading;
 export const selectPrestadoresError = (state) => state.prestadores.error;
 
-// Selector para obtener prestador por ID
-export const selectPrestadorById = (id) => (state) => {
-  return state.prestadores.items.find(p => p.id === id);
-};
+export const { clearError, setCurrentPrestador, clearPrestadores } =
+  prestadoresSlice.actions;
 
-// Selector para obtener prestadores activos
-export const selectPrestadoresActivos = (state) => {
-  return state.prestadores.items.filter(p => p.activo);
-};
-
-// Selector para filtrar prestadores
-export const selectPrestadoresFiltrados = (searchTerm) => (state) => {
-  // Dejar prestadores como están (sin resolver especialidades con catálogo)
-  const prestadoresBase = selectPrestadores(state); // incluir activos e inactivos (baja lógica visible)
-  let resultado = prestadoresBase;
-  
-  if (!searchTerm || searchTerm.trim() === '') {
-    return resultado;
-  }
-  
-  const searchLower = searchTerm.toLowerCase();
-  
-  // Detectar si el término de búsqueda incluye un día de la semana
-  const diasSemana = ['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'];
-  const diaEncontrado = diasSemana.find(dia => searchLower.includes(dia));
-  
-  resultado = resultado.filter(prestador => {
-    // Búsqueda general
-    const espNombrePorId = new Map((prestador.especialidades || []).map(e => [e.id, (e.nombre || '').toLowerCase()]));
-    const matchEspecialidadEnHorarios = Array.isArray(prestador.lugaresAtencion) && prestador.lugaresAtencion.some(l =>
-      Array.isArray(l.horarios) && l.horarios.some(h => {
-        if (h && typeof h.especialidadId === 'number') {
-          const nom = espNombrePorId.get(h.especialidadId);
-          return typeof nom === 'string' && nom.includes(searchLower);
-        }
-        return false;
-      })
-    );
-    const matchGeneral = 
-      prestador.nombreCompleto.toLowerCase().includes(searchLower) ||
-      prestador.cuilCuit.toLowerCase().includes(searchLower) ||
-      prestador.tipo.toLowerCase().includes(searchLower) ||
-      // Especialidad seleccionada por dirección
-      (Array.isArray(prestador.lugaresAtencion) && prestador.lugaresAtencion.some(l =>
-        typeof l.especialidadSeleccionada === 'string' && l.especialidadSeleccionada.toLowerCase().includes(searchLower)
-      )) ||
-      matchEspecialidadEnHorarios ||
-      // Resolver nombre de centro por ID para búsqueda
-      (() => {
-        if (!prestador.integraCentroMedicoId) return false;
-        const centro = selectPrestadores(state).find(p => p.id === prestador.integraCentroMedicoId);
-        return centro ? centro.nombreCompleto.toLowerCase().includes(searchLower) : false;
-      })() ||
-      // Especialidades del prestador
-      prestador.especialidades.some(esp => esp.nombre.toLowerCase().includes(searchLower)) ||
-      // Dirección del lugar
-      prestador.lugaresAtencion.some(lugar => 
-        lugar.direccion.toLowerCase().includes(searchLower)
-      ) ||
-      // Código postal del lugar (como texto)
-      prestador.lugaresAtencion.some(lugar => 
-        String(lugar.codigoPostal ?? '').toLowerCase().includes(searchLower)
-      );
-    
-    // Si se detectó un día, también filtrar por día de atención
-    if (diaEncontrado) {
-      // Normalizar el día (capitalizar primera letra)
-      const diaNormalizado = diaEncontrado.charAt(0).toUpperCase() + diaEncontrado.slice(1);
-      const diaNormalizadoConTilde = diaNormalizado === 'Miercoles' ? 'Miércoles' : 
-                                     diaNormalizado === 'Sabado' ? 'Sábado' : diaNormalizado;
-      
-      const matchDia = prestador.lugaresAtencion.some(lugar =>
-        lugar.horarios && lugar.horarios.some(horario =>
-          horario.dias && horario.dias.some(d => 
-            d.toLowerCase() === diaEncontrado || 
-            d === diaNormalizadoConTilde
-          )
-        )
-      );
-      
-      return matchGeneral || matchDia;
-    }
-    
-    return matchGeneral;
-  });
-  
-  return resultado;
-};
-
-export default slice.reducer;
-
+export default prestadoresSlice.reducer;
