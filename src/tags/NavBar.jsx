@@ -35,16 +35,16 @@ const menuItems = [
     icon: <LocalHospitalIcon />,
   },
   {
-    text: "Consultas y Reportes",
-    path: "/consultas-reportes",
-    icon: <PollIcon />,
-  },
-  {
     text: "Situaciones Terapéuticas",
     path: "/situaciones",
     icon: <HealingIcon />,
   },
   { text: "Planes", path: "/planes", icon: <CreditCardIcon /> },
+  {
+    text: "Consultas y Reportes",
+    path: "/consultas-reportes",
+    icon: <PollIcon />,
+  },
 ];
 
 export default function NavBar({ mobileOpen, handleDrawerToggle }) {
