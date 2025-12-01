@@ -49,6 +49,12 @@ export default function DialogoPlan({
     const errs = {};
     const nombreStr = String(form.nombre).trim().toLowerCase();
     if (!nombreStr) errs.nombre = "Nombre requerido";
+    const descripcionStr = String(form.descripcion).trim();
+    if (!descripcionStr) errs.descripcion = "Descripción requerida";
+    const costoNum = Number(form.costoMensual);
+    if (!Number.isFinite(costoNum) || costoNum <= 0) {
+      errs.costoMensual = "El costo mensual debe ser mayor a 0";
+    }
     const duplicado = planes?.some((p) => p.id !== form.id && String(p.nombre).trim().toLowerCase() === nombreStr);
     if (duplicado) errs.nombre = "Nombre ya existente";
     return errs;
@@ -90,6 +96,8 @@ export default function DialogoPlan({
             fullWidth
             multiline
             rows={2}
+            error={!!errores.descripcion}
+            helperText={errores.descripcion}
           />
           <TextField
             label="Costo mensual"
@@ -97,6 +105,8 @@ export default function DialogoPlan({
             onChange={cambiar("costoMensual")}
             type="number"
             fullWidth
+            error={!!errores.costoMensual}
+            helperText={errores.costoMensual}
           />
           <TextField
             label="Moneda"

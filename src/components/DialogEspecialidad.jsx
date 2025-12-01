@@ -27,6 +27,8 @@ export default function DialogEspecialidad({ abierto, valorInicial, onCerrar, on
     const errs = {};
     const nombreStr = String(form.nombre).trim().toLowerCase();
     if (!nombreStr) errs.nombre = 'Nombre requerido';
+    const descripcionStr = String(form.descripcion).trim();
+    if (!descripcionStr) errs.descripcion = 'Descripción requerida';
     const duplicado = especialidades?.some(e => e.id !== form.id && String(e.nombre).trim().toLowerCase() === nombreStr);
     if (duplicado) {
       errs.nombre = 'Nombre ya existente';
@@ -48,8 +50,24 @@ export default function DialogEspecialidad({ abierto, valorInicial, onCerrar, on
         size="medium"
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, paddingTop: 8 }}>
-          <TextField label="Nombre" value={form.nombre} onChange={cambiar('nombre')} fullWidth error={!!errores.nombre} helperText={errores.nombre} />
-          <TextField label="Descripción" value={form.descripcion} onChange={cambiar('descripcion')} fullWidth multiline rows={2} />
+          <TextField
+            label="Nombre"
+            value={form.nombre}
+            onChange={cambiar('nombre')}
+            fullWidth
+            error={!!errores.nombre}
+            helperText={errores.nombre}
+          />
+          <TextField
+            label="Descripción"
+            value={form.descripcion}
+            onChange={cambiar('descripcion')}
+            fullWidth
+            multiline
+            rows={2}
+            error={!!errores.descripcion}
+            helperText={errores.descripcion}
+          />
           <FormControlLabel control={<Switch checked={!!form.activa} onChange={cambiar('activa')} color="secondary" />} label="Activa" />
         </div>
       </DialogContent>
