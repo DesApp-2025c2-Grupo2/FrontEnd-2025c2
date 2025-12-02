@@ -128,5 +128,6 @@ export async function exportarReporte(datos) {
   const hexaId = datos.reporteId;
   const tipoReporteInt = TIPO_REPORTE_MAP[datos.tipoReporte] || 0;
   const response = await WebAPI.Instance().get(`${ENDPOINT}/regenerate?hexaId=${hexaId}&tipo=${tipoReporteInt}`);
+  console.log(response.data.fileURL || "");
   return response.data.fileURL || "";
 }

@@ -20,6 +20,7 @@ import {
   Schedule as ScheduleIcon,
   FileOpen as FileOpenIcon,
 } from "@mui/icons-material";
+import { exportarReporte } from "../../services/reportesService";
 
 export default function HistorialReportes({
   historialReportes = [],
@@ -216,15 +217,17 @@ export default function HistorialReportes({
                       variant="contained"
                       size="small"
                       startIcon={<FileOpenIcon />}
-                      onClick={() => 
-                          window.open(
-                              `${onExportarReporte({
-                                  reporteId: reporte.id,
-                                  formato: "pdf",
-                                  tipoReporte: reporte.tipoReporte
-                              })}`,
-                              "_blank"
-                          )
+                      onClick={async() => {
+                        const url = await exportarReporte({
+                          reporteId: reporte.id,
+                          formato: "pdf",
+                          tipoReporte: reporte.tipoReporte
+                        });
+                        window.open(
+                              url,
+                             "_blank"
+                        )
+                          console.log(url)}
                       }
                       disabled={
                         exportandoReporte && reporteExportando === reporte.id
