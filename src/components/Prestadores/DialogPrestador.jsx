@@ -408,7 +408,14 @@ export default function DialogPrestador({
                 <Checkbox
                   checked={form.integraCentro}
                   disabled={saving}
-                  onChange={(e) => setField("integraCentro", e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setField("integraCentro", checked);
+                    // Si deja de integrar un centro, limpiar la referencia
+                    if (!checked) {
+                      setField("centroId", null);
+                    }
+                  }}
                 />
               }
               label="Integra un Centro Médico"
@@ -425,7 +432,11 @@ export default function DialogPrestador({
               <Select
                 value={form.centroId || ""}
                 disabled={saving}
-                onChange={(e) => setField("centroId", e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Normalizar: string vacío -> null
+                  setField("centroId", value === "" ? null : value);
+                }}
               >
                 <MenuItem value="">Seleccione</MenuItem>
                 {centrosDisponibles.map((c) => (

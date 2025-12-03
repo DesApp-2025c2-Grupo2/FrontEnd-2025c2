@@ -91,7 +91,11 @@ export function mapPrestadorRequest(p, esEdicion) {
     // Campos opcionales
     matricula: p.matricula ?? null,
     razonSocial: p.razonSocial ?? null,
-    centroId: p.centroId ?? null,
+    // Solo enviar centroId si es profesional e integra un centro
+    centroId:
+      p.tipo === "Profesional Independiente" && p.integraCentro
+        ? p.centroId ?? null
+        : null,
 
     alta: p.alta || new Date().toISOString().split("T")[0],
 
