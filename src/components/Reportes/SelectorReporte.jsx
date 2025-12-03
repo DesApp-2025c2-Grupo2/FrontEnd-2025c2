@@ -91,7 +91,7 @@ export default function SelectorReporte({
       <Stack
         direction={{ xs: "column", sm: "row" }}
         spacing={2}
-        alignItems={{ xs: "stretch", sm: "flex-end" }}
+        alignItems={{ xs: "stretch", sm: "center" }}
       >
         <FormControl sx={{ minWidth: { xs: "100%", sm: 300 }, flexGrow: 1 }}>
           <InputLabel sx={{ fontWeight: 600, color: "#374151" }}>

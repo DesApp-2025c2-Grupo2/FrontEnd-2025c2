@@ -89,45 +89,42 @@ export async function generarReporte(datos) {
     parametros: datos.parametros || {},
   });
 
-  const response = await WebAPI.Instance().post(
-    `${ENDPOINT}/generate`,
-    payload,
-    { responseType: "blob" }
-  );
+  const response = await WebAPI.Instance().post(`${ENDPOINT}/generate`, payload);
+  
+  return response.data.fileURL || "";
+  //let filename = "reporte.pdf";
+  //const disposition = response.headers["content-disposition"];
 
-  let filename = "reporte.pdf";
-  const disposition = response.headers["content-disposition"];
+  //if (disposition) {
+  //  const match = disposition.match(/filename="(.+)"/);
+  //  if (match) filename = match[1];
+  //}
 
-  if (disposition) {
-    const match = disposition.match(/filename="(.+)"/);
-    if (match) filename = match[1];
-  }
+  //const blob = new Blob([response.data], { type: "application/pdf" });
+  //const url = window.URL.createObjectURL(blob);
 
-  const blob = new Blob([response.data], { type: "application/pdf" });
-  const url = window.URL.createObjectURL(blob);
+  //const link = document.createElement("a");
+  //link.href = url;
+  //link.download = filename;
+  //link.click();
+  //link.remove();
 
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.click();
-  link.remove();
+  //window.URL.revokeObjectURL(url);
 
-  window.URL.revokeObjectURL(url);
-
-  return {
-    id: filename.replace("reporte_", "").replace(".pdf", ""),
-    tipoReporte: datos.tipoReporte,
-    nombre: filename,
-    fechaGeneracion: new Date().toISOString(),
-    parametros: datos.parametros,
-    estado: "generado",
-  };
+  //return {
+  //  id: filename.replace("reporte_", "").replace(".pdf", ""),
+  //  tipoReporte: datos.tipoReporte,
+  //  nombre: filename,
+  //  fechaGeneracion: new Date().toISOString(),
+  //  parametros: datos.parametros,
+  //  estado: "generado",
+  //};
 }
 
 export async function exportarReporte(datos) {
   const hexaId = datos.reporteId;
   const tipoReporteInt = TIPO_REPORTE_MAP[datos.tipoReporte] || 0;
   const response = await WebAPI.Instance().get(`${ENDPOINT}/regenerate?hexaId=${hexaId}&tipo=${tipoReporteInt}`);
-  console.log(response.data.fileURL || "");
+  //console.log(response.data.fileURL || "");
   return response.data.fileURL || "";
 }

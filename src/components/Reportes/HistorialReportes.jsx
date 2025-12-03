@@ -120,173 +120,179 @@ export default function HistorialReportes({
                   py: 2,
                   px: 3,
                   "&:hover": {
-                    backgroundColor: "#f8fafc",
+                    backgroundColor: "#eceef0",
                   },
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center"
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 48 }}>
-                  <BarChartIcon sx={{ color: "#6b7280" }} />
-                </ListItemIcon>
+                <Box sx={{ 
+                    flexGrow: 1, 
+                    mr: 2, 
+                    display: "flex", 
+                    flexDirection: "row", 
+                    alignItems: "flex-start",
+                    alignItems: "center"
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 48 }}>
+                    <BarChartIcon sx={{ color: "#6b7280" }} />
+                  </ListItemIcon>
 
-                <ListItemText
-                  primary={
-                    <Stack
-                      direction="row"
-                      spacing={2}
-                      alignItems="center"
-                      sx={{
-                        mb: 1,
-                        flexWrap: "wrap",
-                        columnGap: 1,
-                        rowGap: 0.5,
-                      }}
-                    >
-                      <Typography
-                        variant="body1"
+                  <ListItemText
+                    primary={
+                      <Stack
+                        direction="row"
+                        spacing={2}
+                        alignItems="center"
                         sx={{
-                          fontWeight: 600,
-                          color: "#1f2937",
-                          maxWidth: "100%",
-                          wordBreak: "break-word",
-                          flex: "1 1 auto",
-                          minWidth: 0,
+                          mb: 1,
+                          flexWrap: "wrap",
+                          columnGap: 1,
+                          rowGap: 0.5,
                         }}
                       >
+                        <Typography
+                          variant="body1"
+                          sx={{
+                            fontWeight: 600,
+                            color: "#1f2937",
+                            maxWidth: "100%",
+                            wordBreak: "break-word",
+                            flex: "1 1 auto",
+                            minWidth: 0,
+                          }}
+                        >
                         {reporte.nombre}
-                      </Typography>
+                        </Typography>
 
-                      <Chip
-                        icon={getEstadoIcon(reporte.estado)}
-                        label={getEstadoTexto(reporte.estado)}
-                        size="small"
-                        color={getEstadoColor(reporte.estado)}
-                        variant="outlined"
-                        sx={{
-                          flexShrink: 0,
-                        }}
-                      />
-                    </Stack>
-                  }
-                  secondary={
-                    <Stack spacing={1}>
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Generado el:</strong>{" "}
-                        {formatFecha(reporte.fechaGeneracion)}
-                      </Typography>
+                      </Stack>
+                    }
+                    secondary={
+                      <Stack spacing={1}>
+                        <Typography variant="body2" color="text.secondary">
+                          <strong>Generado el:</strong>{" "}
+                          {formatFecha(reporte.fechaGeneracion)}
+                        </Typography>
 
-                      {Object.keys(reporte.parametros || {}).length > 0 && (
-                        <Box>
-                          <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ fontWeight: 600 }}
-                          >
+                        {Object.keys(reporte.parametros || {}).length > 0 && (
+                          <Box>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ fontWeight: 600 }}
+                            >
                             Parámetros:
-                          </Typography>
-                          <Box sx={{ mt: 0.5 }}>
-                            {Object.entries(reporte.parametros).map(
-                              ([key, value]) => (
-                                <Chip
-                                  key={key}
-                                  label={`${key}: ${
-                                    Array.isArray(value)
-                                      ? value.join(", ")
-                                      : value
-                                  }`}
-                                  size="small"
-                                  variant="outlined"
-                                  sx={{
-                                    mr: 0.5,
-                                    mb: 0.5,
-                                    fontSize: "0.75rem",
-                                    height: 20,
-                                  }}
-                                />
-                              )
-                            )}
+                            </Typography>
+                            <Box sx={{ mt: 0.5 }}>
+                              {Object.entries(reporte.parametros).map(
+                                ([key, value]) => (
+                                  <Chip
+                                    key={key}
+                                    label={`${key}: ${
+                                      Array.isArray(value)
+                                        ? value.join(", ")
+                                        : value
+                                    }`}
+                                    size="small"
+                                    variant="outlined"
+                                    sx={{
+                                      mr: 0.5,
+                                      mb: 0.5,
+                                      fontSize: "0.75rem",
+                                      height: 20,
+                                    }}
+                                  />
+                                )
+                              )}
+                            </Box>
                           </Box>
-                        </Box>
-                      )}
-                    </Stack>
-                  }
-                />
-
-                <Box sx={{ ml: 2 }}>
-                  <Tooltip title="Regenerar reporte">
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={<FileOpenIcon />}
-                      onClick={async() => {
-                        const url = await exportarReporte({
-                          reporteId: reporte.id,
-                          formato: "pdf",
-                          tipoReporte: reporte.tipoReporte
-                        });
-                        window.open(
-                              url,
-                             "_blank"
-                        )
-                          console.log(url)}
-                      }
-                      disabled={
-                        exportandoReporte && reporteExportando === reporte.id
-                      }
-                      sx={{
-                        backgroundColor: "#2563eb",
-                        color: "white",
-                        fontWeight: 700,
-                        textTransform: "none",
-                        px: 2,
-                        py: 1,
-                        "&:hover": {
-                          backgroundColor: "#1d4ed8",
-                        },
-                        "&:disabled": {
-                          backgroundColor: "#d1d5db",
-                          color: "#9ca3af",
-                        },
-                      }}
-                    >
-                      REGENERAR
-                    </Button>
-                  </Tooltip>
+                        )}
+                      </Stack>
+                    }
+                  />
                 </Box>
-                <Box sx={{ ml: 2 }}>
-                  <Tooltip title="Visualizar reporte">
-                    <Button
-                      variant="contained"
-                      size="small"
-                      startIcon={<VisibilityIcon />}
-                      onClick={() =>
-                          // Visualizar el mismo reporte generado usando la url del reporte para abrir el pdf en una ventana aparte
-                        window.open(
-                          `${reporte.fileURL}`,
-                          "_blank"
-                        )
-                      }
-                      disabled={
-                        exportandoReporte && reporteExportando === reporte.id
-                      }
-                      sx={{
-                        backgroundColor: "#2563eb",
-                        color: "white",
-                        fontWeight: 700,
-                        textTransform: "none",
-                        px: 2,
-                        py: 1,
-                        "&:hover": {
-                          backgroundColor: "#1d4ed8",
-                        },
-                        "&:disabled": {
-                          backgroundColor: "#d1d5db",
-                          color: "#9ca3af",
-                        },
-                      }}
-                    >
-                      VISUALIZAR
-                    </Button>
-                  </Tooltip>
+                <Box sx={{ 
+                    display: "flex", 
+                    flexDirection: "column", 
+                    gap: 1
+                  }}
+                >
+                  <Chip
+                    icon={getEstadoIcon(reporte.estado)}
+                    label={getEstadoTexto(reporte.estado)}
+                    size="small"
+                    color={getEstadoColor(reporte.estado)}
+                    variant="outlined"
+                    sx={{ flexShrink: 0, mb: 2 }}
+                  />
+                  <Box sx={{ mb: 0.25 }}>
+                    <Tooltip title="Generar reporte nuevo usando los mismos parametros">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<FileOpenIcon />}
+                        onClick={() =>
+                          onExportarReporte({
+                            reporteId: reporte.id,
+                            formato: "PDF",
+                            tipoReporte: reporte.tipoReporte,
+                          })
+                        }
+                        disabled={
+                          exportandoReporte && reporteExportando === reporte.id
+                        }
+                        sx={{
+                          backgroundColor: "#2563eb",
+                          color: "white",
+                          fontWeight: 700,
+                          textTransform: "none",
+                          px: 2,
+                          py: 1,
+                          "&:hover": {
+                            backgroundColor: "#1d4ed8",
+                          },
+                          "&:disabled": {
+                            backgroundColor: "#d1d5db",
+                            color: "#9ca3af",
+                          },
+                        }}
+                      >
+                        GENERAR NUEVO
+                      </Button>
+                    </Tooltip>
+                  </Box>
+                  <Box>
+                    <Tooltip title="Visualizar reporte original generado">
+                      <Button
+                        variant="contained"
+                        size="small"
+                        startIcon={<VisibilityIcon />}
+                        onClick={() => window.open(`${reporte.fileURL}`, "_blank")}
+                        disabled={
+                          exportandoReporte && reporteExportando === reporte.id
+                        }
+                        sx={{
+                          backgroundColor: "#2563eb",
+                          color: "white",
+                          fontWeight: 700,
+                          textTransform: "none",
+                          px: 2,
+                          py: 1,
+                          "&:hover": {
+                            backgroundColor: "#1d4ed8",
+                          },
+                          "&:disabled": {
+                            backgroundColor: "#d1d5db",
+                            color: "#9ca3af",
+                          },
+                        }}
+                      >
+                        VISUALIZAR
+                      </Button>
+                    </Tooltip>
+                  </Box>
                 </Box>
               </ListItem>
 

@@ -74,7 +74,14 @@ function ConsultasReportes() {
 
   const handleGenerarReporte = async (datos) => {
     try {
-      await dispatch(generarReporte(datos)).unwrap();
+      // ahora el thunk devuelve la URL (string)
+      const url = await dispatch(generarReporte(datos)).unwrap();
+
+      // si hay URL, abrir en nueva pestaña (noopener,noreferrer por seguridad)
+      if (url) {
+        const win = window.open(url, "_blank", "noopener,noreferrer");
+        if (win) win.opener = null;
+      }
 
       // actualizar historial real desde el backend
       dispatch(cargarHistorialReportes());
@@ -89,8 +96,18 @@ function ConsultasReportes() {
   const handleExportarReporte = async (datos) => {
     try {
       setReporteExportando(datos.reporteId);
-      await dispatch(exportarReporte(datos)).unwrap();
-      setSnackbarMessage("Reporte exportado exitosamente");
+        const url = await dispatch(exportarReporte(datos)).unwrap();
+
+      // si hay URL, abrir en nueva pestaña (noopener,noreferrer por seguridad)
+      if (url) {
+        const win = window.open(url, "_blank", "noopener,noreferrer");
+        if (win) win.opener = null;
+      }
+
+      // actualizar historial real desde el backend
+      dispatch(cargarHistorialReportes());
+
+      setSnackbarMessage("Reporte generado exitosamente");
       setSnackbarOpen(true);
     } catch (error) {
       // El error se maneja en el useEffect anterior
