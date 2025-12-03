@@ -65,6 +65,9 @@ export default function AgendaDialog({
   const handleAgregarHorario = (agendaId) => {
     const agenda = agendas.find((a) => a.id === agendaId);
 
+    // Todos los horarios existentes (para validar cruces)
+    const horariosExistentes = agendas.flatMap((ag) => ag.horarios || []);
+
     setEditingHorario({
       id: 0,
       agendaId,
@@ -78,6 +81,7 @@ export default function AgendaDialog({
       especialidadesDisponibles: prestador?.especialidades || [],
       profesionalesDisponibles: profesionalesCentro,
       editIndex: null,
+      horariosExistentes,
     });
   };
 
@@ -103,12 +107,21 @@ export default function AgendaDialog({
     const h = ag.horarios[horarioIndex];
     if (!h) return;
 
+    // Todos los horarios existentes, excluyendo el que se está editando
+    const horariosExistentes = agendas.flatMap((agendaActual) =>
+      (agendaActual.horarios || []).filter(
+        (horarioActual, indexActual) =>
+          !(agendaActual.id === agendaId && indexActual === horarioIndex)
+      )
+    );
+
     setEditingHorario({
       ...h,
       agendaId,
       especialidadesDisponibles: prestador?.especialidades || [],
       profesionalesDisponibles: profesionalesCentro,
       editIndex: horarioIndex,
+      horariosExistentes,
     });
   };
 
@@ -239,6 +252,7 @@ export default function AgendaDialog({
               ? handleSaveHorarioEdit(form)
               : handleSaveHorario(form)
           }
+          horariosExistentes={editingHorario.horariosExistentes || []}
         />
       )}
     </Dialog>

@@ -26,6 +26,10 @@ import HomeIcon from "@mui/icons-material/Home";
 import ContactInfoEditor from "../ContactInfoEditor";
 import EspecialidadesSelector from "./EspecialidadesSelector";
 import DireccionesEditor from "../Afiliados/DireccionesEditor";
+import {
+  soloLetrasYEspacios,
+  soloNumeros,
+} from "../../utilidades/input-filters";
 
 import {
   cargarEspecialidades,
@@ -145,22 +149,63 @@ export default function DialogPrestador({
   function validar() {
     const e = {};
 
-    if (!form.nombreCompleto.trim())
+    // Nombre obligatorio y sin números
+    const nombre = form.nombreCompleto?.trim() || "";
+    if (!nombre) {
       e.nombreCompleto = "El nombre es obligatorio";
+    } else if (/\d/.test(nombre)) {
+      e.nombreCompleto = "El nombre no debe contener números";
+    }
 
     if (!form.tipoDocumento)
       e.tipoDocumento = "Debe seleccionar el tipo de documento";
 
-    if (!form.cuilCuit.trim())
-      e.cuilCuit = "El número de documento es obligatorio";
+    // CUIL/CUIT obligatorio y de exactamente 11 dígitos numéricos
+    const cuilDigits = (form.cuilCuit || "").replace(/\D/g, "");
+    if (!cuilDigits) {
+      e.cuilCuit = "El CUIL/CUIT es obligatorio";
+    } else if (cuilDigits.length !== 11) {
+      e.cuilCuit = "El CUIL/CUIT debe tener exactamente 11 dígitos numéricos";
+    }
 
     if (!form.tipo) e.tipo = "Debe seleccionar el tipo";
 
+    // Mínimo una especialidad
     if (!form.especialidadesIds.length)
       e.especialidades = "Debe seleccionar al menos una especialidad";
 
+    // Debe existir al menos una dirección (los campos obligatorios se validan en DireccionesEditor)
     if (!form.direcciones.length)
       e.direcciones = "Debe agregar al menos una dirección";
+
+    // Teléfonos: si hay, deben ser de 8 o 10 dígitos numéricos
+    if (Array.isArray(form.telefonos) && form.telefonos.length > 0) {
+      const telefonoInvalido = form.telefonos.some((t) => {
+        const valor =
+          (typeof t === "string" ? t : t?.numero ?? "").toString() || "";
+        const digits = valor.replace(/\D/g, "");
+        return !(digits.length === 8 || digits.length === 10);
+      });
+      if (telefonoInvalido) {
+        e.telefonos =
+          "Cada teléfono debe tener exactamente 8 o 10 dígitos numéricos";
+      }
+    }
+
+    // Emails: si hay, cada uno debe contener un '@'
+    if (Array.isArray(form.emails) && form.emails.length > 0) {
+      const emailInvalido = form.emails.some((emailItem) => {
+        const valor =
+          (typeof emailItem === "string"
+            ? emailItem
+            : emailItem?.correo ?? ""
+          ).toString() || "";
+        return !valor.includes("@");
+      });
+      if (emailInvalido) {
+        e.emails = "Todos los emails deben contener un '@'";
+      }
+    }
 
     setErrores(e);
     return Object.keys(e).length === 0;
@@ -304,10 +349,11 @@ export default function DialogPrestador({
             label="Número *"
             value={form.cuilCuit}
             onChange={(e) => {
-              setField("cuilCuit", e.target.value);
+              const soloNums = soloNumeros(e.target.value).slice(0, 11);
+              setField("cuilCuit", soloNums);
               setField("documentacion", {
                 ...form.documentacion,
-                numero: e.target.value,
+                numero: soloNums,
               });
             }}
             error={!!errores.cuilCuit}
@@ -323,7 +369,9 @@ export default function DialogPrestador({
             disabled={saving}
             label="Nombre Completo *"
             value={form.nombreCompleto}
-            onChange={(e) => setField("nombreCompleto", e.target.value)}
+            onChange={(e) =>
+              setField("nombreCompleto", soloLetrasYEspacios(e.target.value))
+            }
             error={!!errores.nombreCompleto}
             helperText={errores.nombreCompleto}
           />
@@ -360,7 +408,14 @@ export default function DialogPrestador({
                 <Checkbox
                   checked={form.integraCentro}
                   disabled={saving}
-                  onChange={(e) => setField("integraCentro", e.target.checked)}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setField("integraCentro", checked);
+                    // Si deja de integrar un centro, limpiar la referencia
+                    if (!checked) {
+                      setField("centroId", null);
+                    }
+                  }}
                 />
               }
               label="Integra un Centro Médico"
@@ -377,7 +432,11 @@ export default function DialogPrestador({
               <Select
                 value={form.centroId || ""}
                 disabled={saving}
-                onChange={(e) => setField("centroId", e.target.value)}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Normalizar: string vacío -> null
+                  setField("centroId", value === "" ? null : value);
+                }}
               >
                 <MenuItem value="">Seleccione</MenuItem>
                 {centrosDisponibles.map((c) => (
@@ -428,10 +487,23 @@ export default function DialogPrestador({
           keyProp="numero"
           placeholder="Agregar teléfonos"
           newValue={newTel}
-          onNewValueChange={setNewTel}
+          onNewValueChange={(valor) => setNewTel(soloNumeros(valor))}
           onAdd={() => {
-            if (!newTel.trim()) return;
-            setField("telefonos", [...form.telefonos, { numero: newTel }]);
+            const limpio = soloNumeros(newTel || "");
+            if (!limpio) return;
+
+            // Validar longitud 8 o 10 dígitos
+            if (!(limpio.length === 8 || limpio.length === 10)) {
+              setErrores((prev) => ({
+                ...prev,
+                telefonos:
+                  "Cada teléfono debe tener exactamente 8 o 10 dígitos numéricos",
+              }));
+              return;
+            }
+
+            setField("telefonos", [...form.telefonos, { numero: limpio }]);
+            setErrores((prev) => ({ ...prev, telefonos: undefined }));
             setNewTel("");
           }}
           onRemove={(idx) =>
@@ -441,6 +513,11 @@ export default function DialogPrestador({
             )
           }
         />
+        {errores.telefonos && (
+          <Typography color="error" variant="caption">
+            {errores.telefonos}
+          </Typography>
+        )}
       </Box>
 
       <Box sx={{ mb: 2 }}>
@@ -455,8 +532,19 @@ export default function DialogPrestador({
           inputType="email"
           onNewValueChange={setNewEmail}
           onAdd={() => {
-            if (!newEmail.trim()) return;
-            setField("emails", [...form.emails, { correo: newEmail }]);
+            const valor = (newEmail || "").trim();
+            if (!valor) return;
+
+            if (!valor.includes("@")) {
+              setErrores((prev) => ({
+                ...prev,
+                emails: "El email debe contener un '@'",
+              }));
+              return;
+            }
+
+            setField("emails", [...form.emails, { correo: valor }]);
+            setErrores((prev) => ({ ...prev, emails: undefined }));
             setNewEmail("");
           }}
           onRemove={(idx) =>
@@ -466,6 +554,11 @@ export default function DialogPrestador({
             )
           }
         />
+        {errores.emails && (
+          <Typography color="error" variant="caption">
+            {errores.emails}
+          </Typography>
+        )}
       </Box>
 
       <Box sx={{ mb: 1 }}>
