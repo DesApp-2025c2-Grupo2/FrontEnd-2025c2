@@ -178,7 +178,7 @@ export default function AfiliadoFormDialog({
   };
 
   const planesActivos = (planesMedicos || []).filter(
-    (plan) => plan.activo === true
+    (plan) => plan.activa === true
   );
 
   const planActual =
@@ -518,15 +518,15 @@ export default function AfiliadoFormDialog({
                       <MenuItem
                         key={plan.id}
                         value={String(plan.id)}
-                        disabled={plan.activo === false} // Deshabilitar si el plan está dado de baja
+                        disabled={plan.activa === false} // Deshabilitar si el plan está dado de baja
                         style={{
                           fontStyle:
-                            plan.activo === false ? "italic" : "normal",
-                          color: plan.activo === false ? "#999" : "inherit",
+                            plan.activa === false ? "italic" : "normal",
+                          color: plan.activa === false ? "#999" : "inherit",
                         }}
                       >
                         {plan.nombre}{" "}
-                        {plan.activo === false ? " (Inactivo)" : ""}
+                        {plan.activa === false ? " (Inactivo)" : ""}
                       </MenuItem>
                     ))}
                   </Select>
