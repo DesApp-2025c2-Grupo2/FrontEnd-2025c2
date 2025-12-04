@@ -18,7 +18,7 @@ export default function TarjetaPlan({ plan, onEditar, onAlternarActivo, onElimin
           <Stack spacing={1} flex={1}>
             <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
               <Typography variant="h6" sx={{ fontWeight: 700, color: '#1f2937' }}>{plan.nombre}</Typography>
-              <Chip label={plan.activo ? 'Activo' : 'Inactivo'} size="small" color={plan.activo ? 'success' : 'default'} sx={{ borderRadius: 999 }} />
+              <Chip label={plan.activa ? 'Activo' : 'Inactivo'} size="small" color={plan.activa ? 'success' : 'default'} sx={{ borderRadius: 999 }} />
             </Stack>
             {plan.descripcion ? (
               <Typography variant="body2" sx={{ color: '#6b7280' }}>{plan.descripcion}</Typography>
@@ -37,7 +37,7 @@ export default function TarjetaPlan({ plan, onEditar, onAlternarActivo, onElimin
             >
               Editar
             </Button>
-            <BotonAlternarEstado activo={!!plan.activo} onClick={() => onAlternarActivo?.(plan)} />
+            <BotonAlternarEstado activo={!!plan.activa} onClick={() => onAlternarActivo?.(plan)} />
           </Stack>
         </Stack>
       </CardContent>

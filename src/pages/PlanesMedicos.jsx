@@ -1,17 +1,28 @@
-import React, { useState } from 'react';
-import { Box, Typography, Snackbar, CircularProgress, Alert } from '@mui/material';
-import SearchField from '../components/Ui/SearchField.jsx';
-import EstadoFilter from '../components/Ui/EstadoFilter.jsx';
-import SnackbarMini from '../components/Ui/SnackbarMini.jsx';
-import TarjetaPlan from '../components/TarjetaPlan.jsx';
-import DialogoPlan from '../components/DialogoPlan.jsx';
-import BotonFlotante from '../components/BotonFlotante.jsx';
-import { useDispatch, useSelector } from 'react-redux';
-import { selectPlanesFiltrados, cargarPlanes, crearPlan, editarPlan, alternarPlanThunk } from '../store/planesSlice.js';
-import { useEffect } from 'react';
-import SearchIcon from '@mui/icons-material/Search';
-import PageHeader from '../components/Ui/PageHeader.jsx';
-
+import React, { useState } from "react";
+import {
+  Box,
+  Typography,
+  Snackbar,
+  CircularProgress,
+  Alert,
+} from "@mui/material";
+import SearchField from "../components/Ui/SearchField.jsx";
+import EstadoFilter from "../components/Ui/EstadoFilter.jsx";
+import SnackbarMini from "../components/Ui/SnackbarMini.jsx";
+import TarjetaPlan from "../components/TarjetaPlan.jsx";
+import DialogoPlan from "../components/DialogoPlan.jsx";
+import BotonFlotante from "../components/BotonFlotante.jsx";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  selectPlanesFiltrados,
+  cargarPlanes,
+  crearPlan,
+  editarPlan,
+  alternarPlanThunk,
+} from "../store/planesSlice.js";
+import { useEffect } from "react";
+import SearchIcon from "@mui/icons-material/Search";
+import PageHeader from "../components/Ui/PageHeader.jsx";
 
 function PlanesMedicos() {
   const dispatch = useDispatch();
@@ -25,10 +36,10 @@ function PlanesMedicos() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editPlan, setEditPlan] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
-  const [search, setSearch] = useState('');
-  const [estado, setEstado] = useState('activos');
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
+  const [search, setSearch] = useState("");
+  const [estado, setEstado] = useState("activos");
 
   const handleOpenAdd = () => {
     setEditPlan(null);
@@ -42,44 +53,65 @@ function PlanesMedicos() {
 
   const handleSubmit = (data) => {
     if (editPlan) {
-      dispatch(editarPlan({ ...data, id: editPlan.id }));
-      setSnackbarMessage('Plan actualizado correctamente');
-      setSnackbarSeverity('success');
+      dispatch(editarPlan({ ...data, id: editPlan.id }))
+        .unwrap()
+        .finally(() => dispatch(cargarPlanes()));
+      setSnackbarMessage("Plan actualizado correctamente");
+      setSnackbarSeverity("success");
     } else {
-      dispatch(crearPlan(data));
-      setSnackbarMessage('Plan agregado correctamente');
-      setSnackbarSeverity('success');
+      dispatch(crearPlan(data))
+        .unwrap()
+        .finally(() => dispatch(cargarPlanes()));
+      setSnackbarMessage("Plan agregado correctamente");
+      setSnackbarSeverity("success");
     }
     setDialogOpen(false);
     setSnackbarOpen(true);
   };
 
   const planesFiltrados = planes
-    .filter((p) => estado === 'todos' ? true : estado === 'activos' ? !!p.activo : !p.activo)
+    .filter((p) =>
+      estado === "todos" ? true : estado === "activos" ? !!p.activa : !p.activa
+    )
     .filter((plan) => {
-    const texto = search.toLowerCase();
-    return (
-      (plan.nombre || '').toLowerCase().includes(texto) ||
-      (plan.descripcion || '').toLowerCase().includes(texto) ||
-      String(plan.moneda || '').toLowerCase().includes(texto)
-    );
-  });
+      const texto = search.toLowerCase();
+      return (
+        (plan.nombre || "").toLowerCase().includes(texto) ||
+        (plan.descripcion || "").toLowerCase().includes(texto) ||
+        String(plan.moneda || "")
+          .toLowerCase()
+          .includes(texto)
+      );
+    });
 
   return (
     <>
-      <PageHeader title="Planes Médicos" subtitle="Gestión de planes médicos y coberturas" />
+      <PageHeader
+        title="Planes Médicos"
+        subtitle="Gestión de planes médicos y coberturas"
+      />
 
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-start', gap: 2 }}>
-        <SearchField value={search} onChange={setSearch} placeholder="Buscar plan por nombre o descripción" />
+      <Box
+        sx={{ mb: 3, display: "flex", justifyContent: "flex-start", gap: 2 }}
+      >
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Buscar plan por nombre o descripción"
+        />
         <EstadoFilter value={estado} onChange={setEstado} />
       </Box>
 
       <Box sx={{ mb: 8 }}>
         {loading && (
-          <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}><CircularProgress /></Box>
+          <Box sx={{ display: "flex", justifyContent: "center", my: 3 }}>
+            <CircularProgress />
+          </Box>
         )}
         {error && (
-          <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
         )}
         {planesFiltrados.map((plan) => (
           <TarjetaPlan
@@ -87,21 +119,35 @@ function PlanesMedicos() {
             plan={plan}
             onEditar={handleOpenEdit}
             onAlternarActivo={(p) => {
-              const seraActivo = !p.activo;
-              dispatch(alternarPlanThunk({ id: p.id, activo: p.activo }));
-              setSnackbarMessage(seraActivo ? 'Plan activado correctamente' : 'Plan desactivado correctamente');
-              setSnackbarSeverity(seraActivo ? 'success' : 'warning');
+              const seraActivo = !p.activa;
+              dispatch(alternarPlanThunk({ id: p.id, activa: p.activa }));
+              setSnackbarMessage(
+                seraActivo
+                  ? "Plan activado correctamente"
+                  : "Plan desactivado correctamente"
+              );
+              setSnackbarSeverity(seraActivo ? "success" : "warning");
               setSnackbarOpen(true);
             }}
           />
         ))}
       </Box>
 
-      <DialogoPlan abierto={dialogOpen} onCerrar={handleClose} onGuardar={handleSubmit} valorInicial={editPlan} />
+      <DialogoPlan
+        abierto={dialogOpen}
+        onCerrar={handleClose}
+        onGuardar={handleSubmit}
+        valorInicial={editPlan}
+      />
 
       <BotonFlotante onClick={handleOpenAdd} title="Agregar plan" />
 
-      <SnackbarMini open={snackbarOpen} message={snackbarMessage} severity={snackbarSeverity} onClose={() => setSnackbarOpen(false)} />
+      <SnackbarMini
+        open={snackbarOpen}
+        message={snackbarMessage}
+        severity={snackbarSeverity}
+        onClose={() => setSnackbarOpen(false)}
+      />
     </>
   );
 }

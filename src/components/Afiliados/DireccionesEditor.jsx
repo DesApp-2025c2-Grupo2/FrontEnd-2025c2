@@ -58,14 +58,22 @@ export default function DireccionesEditor({
       "provinciaCiudad",
       direccion.provinciaCiudad
     );
-    newErrors.codigoPostal = validateField("codigoPostal", direccion.codigoPostal);
+    newErrors.codigoPostal = validateField(
+      "codigoPostal",
+      direccion.codigoPostal
+    );
     return newErrors;
   };
 
   // Verificar si el formulario es válido
   const isFormValid = () => {
     const errors = validateForm(newValue);
-    return !errors.calle && !errors.altura && !errors.provinciaCiudad && !errors.codigoPostal;
+    return (
+      !errors.calle &&
+      !errors.altura &&
+      !errors.provinciaCiudad &&
+      !errors.codigoPostal
+    );
   };
 
   // Manejar cambios en los campos
@@ -225,12 +233,15 @@ export default function DireccionesEditor({
               label="Código Postal"
               value={newValue.codigoPostal || ""}
               onChange={(e) =>
-                onNewValueChange({ ...newValue, codigoPostal: e.target.value })
+                handleFieldChange("codigoPostal", e.target.value)
               }
+              onBlur={() => handleFieldBlur("codigoPostal")}
               onKeyDown={handleKeyDown}
               disabled={disabled}
               required
               inputProps={{ maxLength: 10 }} // Limitar longitud máxima
+              error={!!errors.codigoPostal}
+              helperText={errors.codigoPostal}
             />
           </Grid>
           <Grid item xs={12}>

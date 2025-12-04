@@ -39,11 +39,11 @@ export const eliminarPlanThunk = createAsyncThunk('planes/eliminar', async (id, 
   }
 });
 
-export const alternarPlanThunk = createAsyncThunk('planes/alternar', async ({ id, activo }, { rejectWithValue }) => {
+export const alternarPlanThunk = createAsyncThunk('planes/alternar', async ({ id, activa }, { rejectWithValue }) => {
   try {
     const res = await planesService.toggle(id);
-    const nuevoActivo = (res && (res.activo ?? res.activa)) !== undefined ? (res.activo ?? res.activa) : !activo;
-    return { id, activo: !!nuevoActivo };
+    const nuevoActivo = (res && (res.activa ?? res.activa)) !== undefined ? (res.activa ?? res.activa) : !activa;
+    return { id, activa: !!nuevoActivo };
   } catch (e) {
     return rejectWithValue(e.message || 'No se pudo cambiar el estado del plan');
   }
@@ -107,21 +107,21 @@ const planesSlice = createSlice({
       // alternar activo
       .addCase(alternarPlanThunk.pending, (state, action) => {
         state.error = null;
-        const { id, activo } = action.meta?.arg || {};
+        const { id, activa } = action.meta?.arg || {};
         if (id !== undefined) {
-          state.items = state.items.map(p => p.id === id ? { ...p, activo: !activo } : p);
+          state.items = state.items.map(p => p.id === id ? { ...p, activa: !activa } : p);
         }
       })
       .addCase(alternarPlanThunk.fulfilled, (state, action) => {
-        const { id, activo } = action.payload;
-        state.items = state.items.map(p => p.id === id ? { ...p, activo } : p);
+        const { id, activa } = action.payload;
+        state.items = state.items.map(p => p.id === id ? { ...p, activa } : p);
       })
       .addCase(alternarPlanThunk.rejected, (state, action) => {
         state.error = action.payload || 'No se pudo cambiar el estado del plan';
-        const { id, activo } = action.meta?.arg || {};
+        const { id, activa } = action.meta?.arg || {};
         if (id !== undefined) {
           // rollback
-          state.items = state.items.map(p => p.id === id ? { ...p, activo } : p);
+          state.items = state.items.map(p => p.id === id ? { ...p, activa } : p);
         }
       });
   }

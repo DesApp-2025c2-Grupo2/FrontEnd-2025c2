@@ -23,7 +23,7 @@ export default function DialogoPlan({
     descripcion: "",
     costoMensual: 0,
     moneda: 'ARS',
-    activo: true,
+    activa: true,
   });
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function DialogoPlan({
         descripcion: valorInicial?.descripcion ?? "",
         costoMensual: valorInicial?.costoMensual ?? 0,
         moneda: valorInicial?.moneda ?? 'ARS',
-        activo: valorInicial?.activo ?? true,
+        activa: valorInicial?.activa ?? true,
         id: valorInicial?.id,
       });
     }
@@ -106,7 +106,7 @@ export default function DialogoPlan({
           />
           <FormControlLabel
             control={
-              <Switch checked={!!form.activo} color="secondary" onChange={cambiar("activo")} />
+              <Switch checked={!!form.activa} color="secondary" onChange={cambiar("activo")} />
             }
             label="Activo"
           />
