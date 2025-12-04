@@ -7,7 +7,7 @@ import {
 } from "@mui/material";
 import PageHeader from "../components/Ui/PageHeader.jsx";
 import { useDispatch, useSelector } from "react-redux";
-import { selectPlanes } from "../store/planesSlice";
+import { cargarPlanes, selectPlanes } from "../store/planesSlice";
 import PeopleIcon from "@mui/icons-material/People";
 import DescriptionIcon from "@mui/icons-material/Description";
 import TarjetaEstadistica from "../components/TarjetaEstadistica.jsx";
@@ -50,6 +50,7 @@ function Dashboard() {
   // Obtener estadísticas al cargar
   useEffect(() => {
     dispatch(fetchEstadisticas());
+    dispatch(cargarPlanes());
   }, [dispatch]);
 
   // Tarjetas
@@ -114,7 +115,7 @@ function Dashboard() {
 
   const pieColors = ["#22c55e", "#ef4444"];
 
-  const renderLabel = ({ name,value, percent }) => {
+  const renderLabel = ({ name, value, percent }) => {
     if (isSmall) {
       return `${(percent * 100).toFixed(1)}%(${value})`; // solo porcentaje en mobile
     }

@@ -64,12 +64,6 @@ export default function ModalParametrosReporte({
       tipoReporte === "alta-afiliados-periodo" ||
       tipoReporte === "alta-prestadores-periodo"
     ) {
-      if (!parametros.fechaDesde || !dayjs(parametros.fechaDesde).isValid()) {
-        nuevosErrores.fechaDesde = "La fecha desde es obligatoria";
-      }
-      if (!parametros.fechaHasta || !dayjs(parametros.fechaHasta).isValid()) {
-        nuevosErrores.fechaHasta = "La fecha hasta es obligatoria";
-      }
       if (parametros.fechaDesde && parametros.fechaHasta) {
         if (
           dayjs(parametros.fechaDesde).isAfter(dayjs(parametros.fechaHasta))

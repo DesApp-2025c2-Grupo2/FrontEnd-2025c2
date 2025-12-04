@@ -10,7 +10,7 @@ export async function getAll() {
     id: p.id,
     nombre: p.nombre,
     descripcion: p.descripcion ?? "",
-    activo: p.activo ?? p.activa ?? true,
+    activa: p.activa,
     costoMensual: p.costoMensual ?? p.precio ?? 0,
     moneda: p.moneda ?? "ARS",
   }));
